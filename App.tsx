@@ -59,7 +59,7 @@ const HeaderLogo = () => (
       {/* Bottom-right shadow */}
       <div className="absolute inset-0 bg-gradient-to-tl from-black/30 via-transparent to-transparent pointer-events-none"></div>
       {/* Icon */}
-      <i className="fas fa-music relative z-10 text-white text-sm" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.7))' }}></i>
+      <i className="fas fa-compact-disc relative z-10 text-white text-sm" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.7))' }}></i>
     </div>
   </div>
 );
