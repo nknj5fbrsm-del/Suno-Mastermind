@@ -1,8 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SongConcept, GeneratedStyle } from "../types";
 
-// Standard-Modell für Text/Prompt-Generierung (schnell, geringe Latenz)
+// Text (Lyrics, Analyse, Style) – Free Tier kompatibel
 const TEXT_MODEL = "gemini-3-flash-preview";
+// Bilder (Cover Art) – Free Tier: Bildgenerierung funktioniert mit diesem Modell
+const IMAGE_MODEL = "gemini-2.5-flash-image";
 // Thinking für reine Textaufgaben minimieren (niedrige Latenz)
 const DEFAULT_THINKING = { thinkingConfig: { thinkingLevel: "low" as const } };
 
@@ -416,7 +418,7 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. Visual only, no text or letters in the image.`;
   const attemptGeneration = async (promptText: string, useImageConfig = true) => {
     return await ai.models.generateContent({
-      model: "gemini-3-pro-image-preview",
+      model: IMAGE_MODEL,
       contents: promptText,
       config: {
         responseModalities: ["TEXT", "IMAGE"],
