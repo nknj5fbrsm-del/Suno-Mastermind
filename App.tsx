@@ -280,13 +280,14 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-suno-bg text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
 
       {/* ─── HEADER ─── */}
-      <header className="glass-header sticky top-0 z-[60] px-4 md:px-8">
+      <header className="glass-header sticky top-0 z-[60] px-0 md:px-8">
 
-        {/* ── Row 1: Logo + Links + Controls ── */}
-        <div className="flex items-center justify-between py-2.5">
+        {/* ── Row 1: Logo + Links + Controls (auf Mobile horizontal scrollbar) ── */}
+        <div className="overflow-x-auto overflow-y-hidden md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex items-center justify-between py-2.5 min-w-max md:min-w-0">
 
           {/* Left: Logo + Name */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveStep(WorkflowStep.DASHBOARD)}>
               <HeaderLogo />
               <div className="flex flex-col leading-none gap-[3px]">
@@ -298,21 +299,25 @@ const App: React.FC = () => {
             {/* Divider */}
             <div className="hidden md:block w-px h-7 mx-1 bg-gradient-to-b from-transparent via-zinc-300 dark:via-zinc-600 to-transparent"></div>
 
-            {/* External links */}
-            <div className="hidden md:flex items-center gap-1.5">
+            {/* External links – große Icons, auf Mobile sichtbar */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               <a href="https://suno.com/@cwzjtpwwwy" target="_blank" rel="noopener noreferrer"
-                className="glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary">
-                <i className="fas fa-user text-suno-primary text-[9px]"></i> NilsP
+                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
+                title="Mein Suno-Profil">
+                <i className="fas fa-user text-suno-primary text-base sm:text-sm"></i>
+                <span className="hidden sm:inline">NilsP</span>
               </a>
               <a href="https://suno.com/create" target="_blank" rel="noopener noreferrer"
-                className="glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary">
-                <i className="fas fa-headphones text-suno-primary text-[9px]"></i> Suno
+                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
+                title="Suno Create">
+                <i className="fas fa-headphones text-suno-primary text-base sm:text-sm"></i>
+                <span className="hidden sm:inline">Suno</span>
               </a>
             </div>
           </div>
 
           {/* Right: Controls */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             {/* Language toggle */}
             <button onClick={toggleLang}
               className="glass-btn touch-target rounded-xl flex items-center gap-1 px-3 font-black text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:text-suno-primary"
@@ -350,10 +355,11 @@ const App: React.FC = () => {
               }
             </button>
           </div>
+          </div>
         </div>
 
         {/* ── Row 2: Workflow Navigation ── */}
-        <div className="border-t border-white/30 dark:border-white/6 py-1.5">
+        <div className="border-t border-white/30 dark:border-white/6 py-1.5 px-4 md:px-0">
           <WorkflowNavigation activeStep={activeStep} setActiveStep={setActiveStep} hasLyrics={!!lyrics} hasStyle={!!styleData} isComparingLyrics={!!lyricsVariants} />
         </div>
 
