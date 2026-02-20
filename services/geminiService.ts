@@ -104,7 +104,29 @@ Bei Anfragen zur Songgenerierung (z.B. für Suno) erstellst du grundsätzlich nu
 6. Anti-Memorization & Transformation Logic
 - Original-Vermeidung: Wenn der Nutzer einen bekannten Songtitel (z. B. "Thriller") als Referenz nennt, darfst du niemals den Originaltext reproduzieren.
 - Strukturelles Klonen: Analysiere stattdessen das exakte Metrum (Silbenanzahl pro Zeile), das Reimschema und die rhythmische Phrasierung des Originals.
-- Inhaltliche Neuschöpfung: Erstelle einen völlig neuen Text („Text-Klon“), der sich nahtlos auf die Melodie des Originals singen lässt, aber thematisch eigenständig ist. Nutze nur den „Vibe“ und die Struktur, nicht die Worte des Originals.`;
+- Inhaltliche Neuschöpfung: Erstelle einen völlig neuen Text („Text-Klon“), der sich nahtlos auf die Melodie des Originals singen lässt, aber thematisch eigenständig ist. Nutze nur den „Vibe“ und die Struktur, nicht die Worte des Originals.
+
+7. Rolle: Professioneller Prompt-Engineer für KI-Musikgenerierung (Suno/Udio)
+Ziel: Erstellung hochspezialisierter Prompts mit klarer Trennung und Konsistenz zwischen Gesangsstimmen durch \"Named Variables\" und präzise Regieanweisungen.
+
+7.1 Stimm-Definition (Variable Assignment)
+- Definiere jede Stimme zu Beginn des Style-Prompts bzw. am Anfang der Lyrics-Regie mit einem eindeutigen Namen in eckigen Klammern (z. B. [Manfred], [Sonja]).
+- Verknüpfe den Namen sofort mit spezifischen Attributen: Stimmlage (Bariton, Sopran, Tenor), Timbre (gritty, breathy, warm, bright) und Artikulation (legato, staccato, vibrato).
+- Beispiel: [Manfred: Deep, resonant Baritone, chest voice.] [Sonja: Ethereal, bright Sopran, head voice.]
+- Referenz-Künstler: Wenn die Songidee eine Referenz nennt (z. B. \"Song der klingt wie Thriller von Michael Jackson\", \"im Stil von Adele\"), nutze den Künstlernamen bzw. Vornamen (z. B. [Michael], [Adele]) als Named Variable für die Gesangsregie in den Lyrics. Bei \"Michael Jackson\" → [Verse 1: Michael], [Chorus: Michael]; bei \"Adele\" → [Adele]. So ordnet Suno die Stimmfarbe/den Stil korrekt zu.
+
+7.2 Strukturelle Trennung (Lyrics-Feld)
+- Nutze konsequent eckige Klammern [ ] für alle Regieanweisungen.
+- Leite jeden Abschnitt mit dem Namen der Stimme ein (Anker-Effekt): [Verse 1: Manfred], [Chorus: Sonja], [Verse 2: Michael].
+- Bei Duetten: explizite Anweisungen für die Interaktion – [Duet: Manfred & Sonja in Harmony], [Call and Response: Manfred / Sonja].
+
+7.3 Musikalisches Fachvokabular
+- Nutze präzise Begriffe für Instrumentierung und Harmonik, um den Kontext für die Stimmen zu festigen (z. B. Low Brass for Manfred's entries, High Strings for Sonja's arcs).
+- Steuere die Dynamik über Anweisungen wie [Crescendo], [Diminuendo], [Staccato phrasing].
+
+7.4 Vermeidung von Vermischung (Anti-Morphing)
+- Wiederhole die Namens-Tags bei jedem Sprecherwechsel, auch bei kurzen Parts.
+- Bei Ad-libs explizite Tags setzen: [Ad-libs: Sonja - high riffs], [Ad-lib: Michael - spoken].`;
 
 const RANDOM_TOPIC_PROMPT = `Du bist ein Ghostwriter für Songideen. Generiere eine konkrete, alltagstaugliche Songidee auf Deutsch (5–15 Wörter). Themen: Alltag, Natur, Liebe, Reisen, Erinnerungen, Jahreszeiten, kleine Geschichten, zwischenmenschliche Situationen, Stimmungen. Keine Sci-Fi, keine Roboter/KI, keine rein elektronischen oder digitalen Themen, nichts Skurriles oder Abgedrehtes. Antworte nur mit dem Thema, nichts anderes.`;
 
@@ -134,7 +156,7 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
     : " Gib auch passende language- und vocals-Vorschläge.";
   const response = await ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Analyse für Suno V5 – oberste Priorität: Qualität der Vorschläge für Style und Spielanweisungen. Thema: "${topic}".${instrumentalNote} Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Diese Inspiration ist entscheidend für den späteren Style-Prompt und die Regieanweisungen.`,
+    contents: `Analyse für Suno V5 – oberste Priorität: Qualität der Vorschläge für Style und Spielanweisungen. Thema: "${topic}".${instrumentalNote} Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Diese Inspiration ist entscheidend für den späteren Style-Prompt und die Regieanweisungen. Falls das Thema einen Künstler oder Song referenziert (z. B. "klingt wie Thriller von Michael Jackson"), behalte diese Referenz im Kontext – bei der späteren Lyrics-Generierung wird der Künstlername/Vorname (z. B. Michael) als Named Variable in den Gesangsregie-Tags verwendet.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       ...DEFAULT_THINKING,
@@ -175,7 +197,7 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
-// AUDIO ANALYSE – Gemini 1.5 Flash (multimodal audio support)
+// AUDIO ANALYSE – Gemini 3 Flash (multimodal audio support)
 // ──────────────────────────────────────────────────────────────────────────────
 export interface AudioAnalysisResult extends Partial<SongConcept> {
   topicSuggestion: string;
@@ -291,7 +313,8 @@ export const generateLyrics = async (
 - VERBOTEN:
   · Keine Einleitungen wie \"Hier ist dein Song\" oder Erklär-Absätze.
   · Keine Markdown-Überschriften (kein ### 1./2.).
-- Die erste Zeile der Antwort ist direkt entweder ein Regie-Tag [Intro] oder die erste gesungene Zeile (ohne Klammern).`;
+- Die erste Zeile der Antwort ist direkt entweder ein Regie-Tag [Intro] oder die erste gesungene Zeile (ohne Klammern).
+- Named Variables: Wenn das Thema einen Künstler/Song referenziert (z. B. "wie Michael Jackson"), nutze den Vornamen bzw. Künstlernamen in den Regie-Tags für die Gesangsstimme: [Verse 1: Michael], [Chorus: Michael]. Definiere die Stimme zu Beginn (z. B. [Michael: Tenor, warm, breathy]).`;
 
   const { onChunk } = options;
   let accumulated = "";
@@ -328,12 +351,12 @@ export const generateStylePrompt = async (concept: SongConcept, lang: 'de' | 'en
   · Wichtige Instrumentierung und Artikulation nennen (z. B. \"Rhodes pno, upright bass, marcato brass, tight drums\").
   · Gern Musiker-Abkürzungen verwenden (tpt, sax, pno, dr), um Zeichen zu sparen.
 - Nutze exaktes musikalisches Vokabular (minor 9th chords, syncopated slap bass, ghost notes, close-miked, plate reverb).
-- Zusätzlich zurückgeben:
+- Zusätzlich zurückgeben (Safe Zone – beide Werte MÜSSEN zwischen 15 und 85 liegen):
   · promptEffect: Wie wirkt dieser Prompt musikalisch (Fokus auf Harmonik, Groove, Artikulation).
   · similarArtists: Einige passende Referenzen (kommagetrennt).
-  · weirdness: 0–100 (Originalität/Kreativität).
-  · styleInfluence: 0–100 (Treue zum Text- und Konzept-Prompt).
-  · recommendationReason: Kurze Begründung (2–4 Sätze ${reasonLang}), warum diese Werte gewählt wurden (Genres, Stimmung, gewünschte Treue).
+  · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). Wähle bewusst: experimentelles Genre/avantgardistisch → eher höher (z. B. 55–75); Mainstream-Pop/klassisch → eher niedriger (z. B. 25–45). Niemals unter 15 oder über 85.
+  · styleInfluence: Ganzzahl 15–85 (Treue zum Text- und Konzept-Prompt). Stark textgetrieben/Story wichtig → eher höher (z. B. 65–85); mehr Freiraum für Suno → eher niedriger (z. B. 25–45). Niemals unter 15 oder über 85.
+  · recommendationReason: Kurze Begründung (2–4 Sätze ${reasonLang}), warum genau DIESE Werte für DIESEN Song gewählt wurden – konkret auf Thema, Genre und Stimmung eingehen, keine generischen Floskeln.
   · songDescription: Kurze Beschreibung des Songs/Vibes für Cover-Art und Story.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -360,12 +383,16 @@ export const generateStylePrompt = async (concept: SongConcept, lang: 'de' | 'en
     if (text) accumulated += text;
   }
   const response = { text: accumulated };
+  const SAFE_MIN = 15;
+  const SAFE_MAX = 85;
+  const clampSafe = (v: number) => Math.min(SAFE_MAX, Math.max(SAFE_MIN, Math.round(Number(v))));
+
   const defaultStyle: GeneratedStyle = {
     prompt: concept.genre.join(", ") || "Ambient",
     promptEffect: "Generiert einen passenden Sound basierend auf dem Thema.",
     similarArtists: "Diverse Einflüsse",
     weirdness: 50,
-    styleInfluence: 80,
+    styleInfluence: 65,
     recommendationReason: "Empfehlung basierend auf Genre und Stimmung; Werte in Suno nach Bedarf anpassbar.",
     songDescription: concept.topic,
   };
@@ -375,9 +402,21 @@ export const generateStylePrompt = async (concept: SongConcept, lang: 'de' | 'en
     if (stylePrompt.length > MAX_STYLE_PROMPT_LENGTH) {
       stylePrompt = stylePrompt.slice(0, MAX_STYLE_PROMPT_LENGTH);
     }
-    return { ...defaultStyle, ...parsed, prompt: stylePrompt };
+    const weirdness = clampSafe(parsed.weirdness ?? defaultStyle.weirdness);
+    const styleInfluence = clampSafe(parsed.styleInfluence ?? defaultStyle.styleInfluence);
+    return {
+      ...defaultStyle,
+      ...parsed,
+      prompt: stylePrompt,
+      weirdness,
+      styleInfluence,
+    };
   } catch {
-    return defaultStyle;
+    return {
+      ...defaultStyle,
+      weirdness: clampSafe(defaultStyle.weirdness),
+      styleInfluence: clampSafe(defaultStyle.styleInfluence),
+    };
   }
 };
 

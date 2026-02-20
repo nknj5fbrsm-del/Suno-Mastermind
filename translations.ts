@@ -121,6 +121,13 @@ export const t = {
       moods: ['Melancholisch', 'Energetisch', 'Düster', 'Euphorisch', 'Entspannt', 'Aggressiv', 'Mysteriös', 'Heroisch', 'Romantisch', 'Nostalgisch', 'Verträumt', 'Bedrohlich', 'Hoffnungsvoll', 'Sarkastisch', 'Hypnotisch', 'Sehnsuchtsvoll', 'Verspielt', 'Feierlich', 'Bitter', 'Zärtlich'],
       vocals: ['Männlich (Kräftig)', 'Weiblich (Sanft)', 'Männlich (Rau)', 'Weiblich (Soulig)', 'Duett (M/W)', 'Chor (Klassisch)', 'Gospelchor', 'Rap (Aggressiv)', 'Flüstern', 'Operngesang', 'Kindlich', 'Vocoder/Roboter'],
       languages: ['Deutsch', 'Englisch', 'Französisch', 'Spanisch', 'Italienisch', 'Japanisch', 'Koreanisch'],
+      genres: ['Synthpop', 'Techno', 'Indie Rock', 'Lo-Fi Hip Hop', 'Cinematic', 'German Pop', 'Power Metal', 'Deep House', 'Neo Soul', 'Klassik', 'Schlager', 'Hardstyle', 'Phonk', 'Jazz Fusion', 'Country', 'Reggaeton', 'Dark Trap', 'Cyberpunk', 'Folk', 'Gothic Rock', 'Eurodance', 'Ambient', 'Liquid DnB', 'Soul', 'Funk'],
+      tempos: ['Langsam', 'Mittel', 'Schnell', '60 BPM', '90 BPM', '120 BPM', '128 BPM', '140 BPM', '175 BPM'],
+      instruments: [
+        'Rhodes Piano', 'Upright Bass', 'Piccolo Trumpet', 'Acoustic Guitar', 'Electric Guitar', 'Drums', 'Bass Guitar', 'Synthesizer', 'Strings', 'Cello', 'Violin', 'Saxophone', 'Trumpet', 'Trombone', 'Piano', 'Organ', 'Harmonica', 'Flute', 'Clarinet', 'Congas', 'Shaker', 'Glockenspiel', 'Marimba', 'Vibraphone', 'Slide Guitar', 'Lap Steel', 'Banjo', 'Mandolin', 'Ukulele', 'Double Bass', 'Harp', 'Mellotron', 'Lo-Fi Keys', '808 Bass', 'Brass Section', 'Strings Section', 'Choir (Ah)', 'Tambourine', 'Hi-Hat', 'Snare', 'Kick',
+        'Yamaha DX7', 'Yamaha CS-80', 'Yamaha DX100', 'Roland Juno-60', 'Roland Juno-106', 'Roland JX-8P', 'Roland TB-303', 'Roland TR-808', 'Roland TR-909', 'Roland SH-101', 'Roland Jupiter-8', 'Oberheim OB-8', 'Oberheim Matrix-6', 'Oberheim SEM', 'Moog Minimoog', 'Moog Model D', 'Moog Taurus', 'Prophet-5', 'Prophet-6', 'Korg MS-20', 'Korg Poly-800', 'Korg M1', 'ARP Odyssey', 'ARP 2600', 'LinnDrum', 'E-mu Emulator', 'Fairlight CMI', 'Roland D-50', 'Korg Wavestation', 'Nord Lead', 'Access Virus', 'Clavia Nord Stage',
+      ],
+      exclusions: ['Country', 'Jazz', 'Akustisch', 'Heavy Bass', 'E-Gitarre', 'Screaming', 'Lo-Fi', 'Schnelles Tempo', 'Langsames Tempo', 'Trap Drums'],
       randomThemes: [
         'Zufall', 'Alltagsleben', 'Liebe & Herzschmerz', 'Freundschaft', 'Heimweh',
         'Natur & Jahreszeiten', 'Party & Feiern', 'Reise & Abenteuer', 'Sport & Ehrgeiz',
@@ -273,6 +280,13 @@ export const t = {
       moods: ['Melancholic', 'Energetic', 'Dark', 'Euphoric', 'Relaxed', 'Aggressive', 'Mysterious', 'Heroic', 'Romantic', 'Nostalgic', 'Dreamy', 'Threatening', 'Hopeful', 'Sarcastic', 'Hypnotic', 'Longing', 'Playful', 'Solemn', 'Bitter', 'Tender'],
       vocals: ['Male (Powerful)', 'Female (Soft)', 'Male (Husky)', 'Female (Soulful)', 'Duet (M/F)', 'Choir (Classical)', 'Gospel Choir', 'Rap (Aggressive)', 'Whispering', 'Operatic', 'Childlike', 'Vocoder/Robot'],
       languages: ['German', 'English', 'French', 'Spanish', 'Italian', 'Japanese', 'Korean'],
+      genres: ['Synthpop', 'Techno', 'Indie Rock', 'Lo-Fi Hip Hop', 'Cinematic', 'German Pop', 'Power Metal', 'Deep House', 'Neo Soul', 'Classical', 'Schlager', 'Hardstyle', 'Phonk', 'Jazz Fusion', 'Country', 'Reggaeton', 'Dark Trap', 'Cyberpunk', 'Folk', 'Gothic Rock', 'Eurodance', 'Ambient', 'Liquid DnB', 'Soul', 'Funk'],
+      tempos: ['Slow', 'Medium', 'Fast', '60 BPM', '90 BPM', '120 BPM', '128 BPM', '140 BPM', '175 BPM'],
+      instruments: [
+        'Rhodes Piano', 'Upright Bass', 'Piccolo Trumpet', 'Acoustic Guitar', 'Electric Guitar', 'Drums', 'Bass Guitar', 'Synthesizer', 'Strings', 'Cello', 'Violin', 'Saxophone', 'Trumpet', 'Trombone', 'Piano', 'Organ', 'Harmonica', 'Flute', 'Clarinet', 'Congas', 'Shaker', 'Glockenspiel', 'Marimba', 'Vibraphone', 'Slide Guitar', 'Lap Steel', 'Banjo', 'Mandolin', 'Ukulele', 'Double Bass', 'Harp', 'Mellotron', 'Lo-Fi Keys', '808 Bass', 'Brass Section', 'Strings Section', 'Choir (Ah)', 'Tambourine', 'Hi-Hat', 'Snare', 'Kick',
+        'Yamaha DX7', 'Yamaha CS-80', 'Yamaha DX100', 'Roland Juno-60', 'Roland Juno-106', 'Roland JX-8P', 'Roland TB-303', 'Roland TR-808', 'Roland TR-909', 'Roland SH-101', 'Roland Jupiter-8', 'Oberheim OB-8', 'Oberheim Matrix-6', 'Oberheim SEM', 'Moog Minimoog', 'Moog Model D', 'Moog Taurus', 'Prophet-5', 'Prophet-6', 'Korg MS-20', 'Korg Poly-800', 'Korg M1', 'ARP Odyssey', 'ARP 2600', 'LinnDrum', 'E-mu Emulator', 'Fairlight CMI', 'Roland D-50', 'Korg Wavestation', 'Nord Lead', 'Access Virus', 'Clavia Nord Stage',
+      ],
+      exclusions: ['Country', 'Jazz', 'Acoustic', 'Heavy Bass', 'Electric Guitar', 'Screaming', 'Lo-Fi', 'Fast Tempo', 'Slow Tempo', 'Trap Drums'],
       randomThemes: [
         'Random', 'Everyday Life', 'Love & Heartbreak', 'Friendship', 'Homesickness',
         'Nature & Seasons', 'Party & Celebration', 'Travel & Adventure', 'Sports & Ambition',

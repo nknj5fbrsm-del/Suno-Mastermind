@@ -20,15 +20,18 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({ data, onRegenerate, onUpdat
     onUpdatePrompt?.(value);
   };
 
+  const SAFE_MIN = 15;
+  const SAFE_MAX = 85;
   const normalize = (val: any) => {
     const n = Number(val);
     if (isNaN(n)) return 50;
     if (n > 0 && n <= 1) return Math.round(n * 100);
     return Math.min(100, Math.max(0, Math.round(n)));
   };
+  const clampSafe = (v: number) => Math.min(SAFE_MAX, Math.max(SAFE_MIN, v));
 
-  const weirdness     = normalize(data.weirdness);
-  const styleInfluence = normalize(data.styleInfluence);
+  const weirdness     = clampSafe(normalize(data.weirdness));
+  const styleInfluence = clampSafe(normalize(data.styleInfluence));
   const charCount     = editablePrompt.length;
   const isTooLong     = charCount > 120;
 

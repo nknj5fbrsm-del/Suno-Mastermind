@@ -9,10 +9,7 @@ interface ConceptFormProps {
   onSubmit: (concept: SongConcept) => void;
 }
 
-const genres = ['Synthpop', 'Techno', 'Indie Rock', 'Lo-Fi Hip Hop', 'Cinematic', 'German Pop', 'Power Metal', 'Deep House', 'Neo Soul', 'Classical', 'Schlager', 'Hardstyle', 'Phonk', 'Jazz Fusion', 'Country', 'Reggaeton', 'Dark Trap', 'Cyberpunk', 'Folk', 'Gothic Rock', 'Eurodance', 'Ambient', 'Liquid DnB', 'Soul', 'Funk'];
-const tempoList = ['Slow', 'Medium', 'Fast', '60 BPM', '90 BPM', '120 BPM', '128 BPM', '140 BPM', '175 BPM'];
-const instrumentsList = ['Rhodes Piano', 'Upright Bass', 'Piccolo Trumpet', 'Acoustic Guitar', 'Electric Guitar', 'Drums', 'Bass Guitar', 'Synthesizer', 'Strings', 'Cello', 'Violin', 'Saxophone', 'Trumpet', 'Trombone', 'Piano', 'Organ', 'Harmonica', 'Flute', 'Clarinet', 'Congas', 'Shaker', 'Glockenspiel', 'Marimba', 'Vibraphone', 'Slide Guitar', 'Lap Steel', 'Banjo', 'Mandolin', 'Ukulele', 'Double Bass', 'Harp', 'Mellotron', 'Lo-Fi Keys', '808 Bass', 'Brass Section', 'Strings Section', 'Choir (Ah)', 'Tambourine', 'Hi-Hat', 'Snare', 'Kick'];
-const presetExclusions = ['Country', 'Jazz', 'Acoustic', 'Heavy Bass', 'Electric Guitar', 'Screaming', 'Lo-Fi', 'Fast Tempo', 'Slow Tempo', 'Trap Drums'];
+// Optionen kommen aus tr.conceptOptions (übersetzt)
 
 // ─── SEARCHABLE MULTI INPUT ───────────────────────────────────────────────
 const SearchableMultiInput: React.FC<{
@@ -30,13 +27,18 @@ const SearchableMultiInput: React.FC<{
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const justOpenedRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()) && !selected.includes(o));
@@ -45,6 +47,21 @@ const SearchableMultiInput: React.FC<{
     const val = searchTerm.trim();
     if (val && !selected.includes(val)) { onToggle(val); }
     setSearchTerm(''); setIsOpen(false);
+  };
+
+  const handleInputClick = () => {
+    if (disabled) return;
+    if (justOpenedRef.current) {
+      justOpenedRef.current = false;
+      return;
+    }
+    setIsOpen(prev => !prev);
+  };
+
+  const handleInputFocus = () => {
+    if (disabled) return;
+    justOpenedRef.current = true;
+    setIsOpen(true);
   };
 
   return (
@@ -63,7 +80,8 @@ const SearchableMultiInput: React.FC<{
           className={`w-full glass-input rounded-xl px-3.5 py-3 pr-10 text-sm outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-zinc-100 ${isLoading ? 'border-suno-primary/50' : ''}`}
           value={searchTerm}
           placeholder={placeholder}
-          onFocus={() => !disabled && setIsOpen(true)}
+          onFocus={handleInputFocus}
+          onClick={handleInputClick}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
         />
@@ -73,15 +91,17 @@ const SearchableMultiInput: React.FC<{
         </button>
       </div>
 
-      {isOpen && !disabled && filtered.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-52 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix">
-          {filtered.slice(0, 12).map(opt => (
+      {isOpen && !disabled && (
+        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix">
+          {filtered.length > 0 ? filtered.map(opt => (
             <button key={opt} type="button"
-              className="w-full text-left px-4 py-3 text-xs font-medium hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-700 dark:text-zinc-300 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
+              className="w-full text-left px-4 py-2.5 text-xs font-medium hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-700 dark:text-zinc-300 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
               onClick={() => { onToggle(opt); setSearchTerm(''); setIsOpen(false); }}>
               {opt}
             </button>
-          ))}
+          )) : (
+            <p className="px-4 py-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.concept.optional}</p>
+          )}
         </div>
       )}
 
@@ -371,8 +391,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="relative">
-            <SearchableMultiInput label={tr.concept.genre} icon="fa-music" options={genres} selected={concept.genre}
-              onToggle={(v) => toggle('genre', v)} placeholder="Synthpop, Indie Rock…" isLoading={isAnalyzing} />
+            <SearchableMultiInput label={tr.concept.genre} icon="fa-music" options={opts.genres} selected={concept.genre}
+              onToggle={(v) => toggle('genre', v)} placeholder={opts.genres.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} />
           </div>
           <div className="relative">
             <SearchableMultiInput label={tr.concept.mood} icon="fa-face-smile" options={opts.moods} selected={concept.mood}
@@ -389,18 +409,18 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
               disabled={concept.isInstrumental} accent="text-blue-500" />
           </div>
           <div className="relative">
-            <SearchableMultiInput label={tr.concept.tempo} icon="fa-gauge-high" options={tempoList} selected={concept.tempo}
-              onToggle={(v) => toggle('tempo', v)} placeholder="120 BPM, Fast…" isLoading={isAnalyzing} accent="text-yellow-500" />
+            <SearchableMultiInput label={tr.concept.tempo} icon="fa-gauge-high" options={opts.tempos} selected={concept.tempo}
+              onToggle={(v) => toggle('tempo', v)} placeholder={opts.tempos.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-yellow-500" />
           </div>
           <div className="relative">
-            <SearchableMultiInput label={tr.concept.instruments} icon="fa-guitar" options={instrumentsList} selected={concept.instrumentation ?? []}
-              onToggle={(v) => toggle('instrumentation', v)} placeholder="Rhodes, Cello, 808 Bass…" isLoading={isAnalyzing} accent="text-orange-500" />
+            <SearchableMultiInput label={tr.concept.instruments} icon="fa-guitar" options={opts.instruments} selected={concept.instrumentation ?? []}
+              onToggle={(v) => toggle('instrumentation', v)} placeholder={opts.instruments.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-orange-500" />
           </div>
         </div>
 
         <div className="pt-2 border-t border-white/20 dark:border-white/8">
-          <SearchableMultiInput label={tr.concept.exclude} icon="fa-ban" options={presetExclusions} selected={concept.excludedStyles}
-            onToggle={(v) => toggle('excludedStyles', v)} placeholder="z. B. Country, Trap Drums…" accent="text-red-400" />
+          <SearchableMultiInput label={tr.concept.exclude} icon="fa-ban" options={opts.exclusions} selected={concept.excludedStyles}
+            onToggle={(v) => toggle('excludedStyles', v)} placeholder={opts.exclusions.slice(0, 2).join(', ') + '…'} accent="text-red-400" />
         </div>
       </div>
 
