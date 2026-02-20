@@ -242,10 +242,12 @@ const App: React.FC = () => {
   };
 
   // Design-Dropdown-Position für Portal (damit es auf Mobile nicht von overflow abgeschnitten wird)
+  const DROPDOWN_WIDTH = 208; // w-52
   useEffect(() => {
     if (isThemeMenuOpen && themeMenuRef.current) {
       const rect = themeMenuRef.current.getBoundingClientRect();
-      setThemeDropdownAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+      const right = Math.min(window.innerWidth - DROPDOWN_WIDTH - 8, Math.max(8, window.innerWidth - rect.right));
+      setThemeDropdownAnchor({ top: rect.bottom + 8, right });
     } else {
       setThemeDropdownAnchor(null);
     }
@@ -349,14 +351,23 @@ const App: React.FC = () => {
               <i className="fas fa-key text-sm"></i>
             </button>
             <div className="relative" ref={themeMenuRef}>
-              <button onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)} className="glass-btn touch-target rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-suno-primary" aria-expanded={isThemeMenuOpen} aria-haspopup="true" title={tr.header.theme}>
+              <button
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setIsThemeMenuOpen((prev) => !prev);
+                }}
+                className="glass-btn touch-target rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-suno-primary touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
+                aria-expanded={isThemeMenuOpen}
+                aria-haspopup="true"
+                title={tr.header.theme}
+              >
                 <i className="fas fa-palette text-sm"></i>
               </button>
               {isThemeMenuOpen && themeDropdownAnchor && createPortal(
-                <div ref={themeDropdownRef} className="fixed w-52 glass-card rounded-2xl p-1.5 z-[70] animate-scale-in shadow-xl" style={{ top: themeDropdownAnchor.top, right: themeDropdownAnchor.right }}>
+                <div ref={themeDropdownRef} className="fixed w-52 glass-card rounded-2xl p-1.5 z-[70] animate-scale-in shadow-xl touch-manipulation" style={{ top: themeDropdownAnchor.top, right: themeDropdownAnchor.right, touchAction: 'manipulation' }}>
                   {themes.map((th) => (
-                    <button key={th.id} onClick={() => { changeTheme(th.id); setIsThemeMenuOpen(false); }}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeTheme === th.id ? 'bg-suno-primary/10' : 'hover:bg-white/40 dark:hover:bg-white/8'}`}>
+                    <button key={th.id} type="button" onClick={() => { changeTheme(th.id); setIsThemeMenuOpen(false); }} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all touch-target ${activeTheme === th.id ? 'bg-suno-primary/10' : 'hover:bg-white/40 dark:hover:bg-white/8'}`}>
                       <div className={`w-7 h-7 rounded-lg ${th.color} flex items-center justify-center text-white text-[10px] shadow`}><i className={`fas ${th.icon}`}></i></div>
                       <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">{th.label}</span>
                       {activeTheme === th.id && <i className="fas fa-check text-suno-primary text-[10px] ml-auto"></i>}
