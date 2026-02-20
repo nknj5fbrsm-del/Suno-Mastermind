@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
 import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
@@ -70,6 +71,8 @@ const App: React.FC = () => {
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
+  const themeDropdownRef = useRef<HTMLDivElement>(null);
+  const [themeDropdownAnchor, setThemeDropdownAnchor] = useState<{ top: number; right: number } | null>(null);
   
   // BYOK State: Wir nutzen jetzt einen String statt nur eines Booleans
   const [manualApiKey, setManualApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
@@ -110,12 +113,17 @@ const App: React.FC = () => {
     fetchHistory();
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
-        setIsThemeMenuOpen(false);
-      }
+      const target = event.target as Node;
+      const inMenu = themeMenuRef.current?.contains(target);
+      const inDropdown = themeDropdownRef.current?.contains(target);
+      if (!inMenu && !inDropdown) setIsThemeMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside as any);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
+    };
   }, []);
 
   // Key speichern Funktion
@@ -233,6 +241,16 @@ const App: React.FC = () => {
     localStorage.setItem('suno-lang', next);
   };
 
+  // Design-Dropdown-Position für Portal (damit es auf Mobile nicht von overflow abgeschnitten wird)
+  useEffect(() => {
+    if (isThemeMenuOpen && themeMenuRef.current) {
+      const rect = themeMenuRef.current.getBoundingClientRect();
+      setThemeDropdownAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+    } else {
+      setThemeDropdownAnchor(null);
+    }
+  }, [isThemeMenuOpen]);
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       <ToastBar toast={toast} onDismiss={() => setToast(null)} />
@@ -331,20 +349,21 @@ const App: React.FC = () => {
               <i className="fas fa-key text-sm"></i>
             </button>
             <div className="relative" ref={themeMenuRef}>
-              <button onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)} className="glass-btn touch-target rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-suno-primary">
+              <button onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)} className="glass-btn touch-target rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-suno-primary" aria-expanded={isThemeMenuOpen} aria-haspopup="true" title={tr.header.theme}>
                 <i className="fas fa-palette text-sm"></i>
               </button>
-              {isThemeMenuOpen && (
-                <div className="absolute right-0 mt-2 w-52 glass-card rounded-2xl p-1.5 z-[60] animate-scale-in">
+              {isThemeMenuOpen && themeDropdownAnchor && createPortal(
+                <div ref={themeDropdownRef} className="fixed w-52 glass-card rounded-2xl p-1.5 z-[70] animate-scale-in shadow-xl" style={{ top: themeDropdownAnchor.top, right: themeDropdownAnchor.right }}>
                   {themes.map((th) => (
-                    <button key={th.id} onClick={() => changeTheme(th.id)}
+                    <button key={th.id} onClick={() => { changeTheme(th.id); setIsThemeMenuOpen(false); }}
                       className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeTheme === th.id ? 'bg-suno-primary/10' : 'hover:bg-white/40 dark:hover:bg-white/8'}`}>
                       <div className={`w-7 h-7 rounded-lg ${th.color} flex items-center justify-center text-white text-[10px] shadow`}><i className={`fas ${th.icon}`}></i></div>
                       <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">{th.label}</span>
                       {activeTheme === th.id && <i className="fas fa-check text-suno-primary text-[10px] ml-auto"></i>}
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
             {/* Dark/Light toggle – sun = warm gold, moon = cool indigo */}
