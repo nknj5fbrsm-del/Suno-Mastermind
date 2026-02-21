@@ -1,17 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLang } from '../App';
 
 interface LyricsCompareViewProps {
   variantA: string;
   variantB: string;
+  onUpdateVariantA?: (value: string) => void;
+  onUpdateVariantB?: (value: string) => void;
 }
 
-const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({ variantA, variantB }) => {
+const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({ variantA, variantB, onUpdateVariantA, onUpdateVariantB }) => {
   const { tr } = useLang();
+  const [editA, setEditA] = useState(variantA);
+  const [editB, setEditB] = useState(variantB);
+
+  useEffect(() => { setEditA(variantA); }, [variantA]);
+  useEffect(() => { setEditB(variantB); }, [variantB]);
+
+  const handleChangeA = (value: string) => {
+    setEditA(value);
+    onUpdateVariantA?.(value);
+  };
+  const handleChangeB = (value: string) => {
+    setEditB(value);
+    onUpdateVariantB?.(value);
+  };
 
   return (
     <section className="space-y-5 animate-fade-up">
-      {/* Header wie Style-Seite */}
       <div className="flex flex-wrap items-center gap-3">
         <p className="section-pill">{tr.lyrics.pill}</p>
         <div className="gradient-line flex-1"></div>
@@ -30,9 +45,13 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({ variantA, variant
               {tr.lyrics.variant1}
             </span>
           </div>
-          <pre className="flex-1 overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar min-h-0">
-            {variantA || '…'}
-          </pre>
+          <textarea
+            value={editA}
+            onChange={(e) => handleChangeA(e.target.value)}
+            className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none"
+            placeholder="…"
+            spellCheck={false}
+          />
         </div>
 
         <div className="glass-card rounded-2xl p-5 flex flex-col min-h-[420px] max-h-[70vh]">
@@ -41,9 +60,13 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({ variantA, variant
               {tr.lyrics.variant2}
             </span>
           </div>
-          <pre className="flex-1 overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar min-h-0">
-            {variantB || '…'}
-          </pre>
+          <textarea
+            value={editB}
+            onChange={(e) => handleChangeB(e.target.value)}
+            className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none"
+            placeholder="…"
+            spellCheck={false}
+          />
         </div>
       </div>
     </section>

@@ -484,7 +484,7 @@ const App: React.FC = () => {
         {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptSubmit} />}
         {activeStep === WorkflowStep.LYRICS && (
           lyricsVariants ? (
-            <LyricsCompareView variantA={lyricsVariants[0]} variantB={lyricsVariants[1]} />
+            <LyricsCompareView variantA={lyricsVariants[0]} variantB={lyricsVariants[1]} onUpdateVariantA={(v) => { setLyricsVariants(prev => prev ? [v, prev[1]] : null); setLyrics(v); }} onUpdateVariantB={(v) => { setLyricsVariants(prev => prev ? [prev[0], v] : null); }} />
           ) : (
             <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={(l) => setLyrics(l)} />
           )
