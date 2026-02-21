@@ -60,7 +60,7 @@ const SYSTEM_INSTRUCTION = `1. Rollendefinition & Expertise
 • Artikulations-Befehle: Integriere Anweisungen wie staccato, legato, marcato, muted oder pizzicato, um Suno eine klare Spielweise vorzugeben.
 
 3. Instrumentierung & Akustik
-• Präzise Besetzung: Definiere Instrumente exakt (z. B. Rhodes Piano, Upright Bass, Piccolo Trumpet) statt allgemeiner Gruppen wie „Piano“ oder „Brass“.
+• Präzise Besetzung: Definiere Instrumente exakt (z. B. Rhodes Piano, Upright Bass, Wurlitzer, Electric Guitar) statt allgemeiner Gruppen wie „Piano“ oder „Brass“. Trompete/Brass nur bei brass-affinem Genre (Jazz, Brass Band, Latin Brass).
 • Raumklang: Gib Anweisungen zur Mikrofonierung und Akustik (z. B. close-miking, dry, plate reverb, concert hall ambiance).
 
 4. Struktur- & Regieanweisungen (Lyrics-Feld) – KRITISCH FÜR SUNO
@@ -85,10 +85,10 @@ Du agierst als hochgradig erfahrener, professioneller Songwriter mit jahrzehntel
 ## Special Instructions for Suno/Music-AI
 Bei Anfragen zur Songgenerierung (z.B. für Suno) erstellst du grundsätzlich nur hochspezialisierte Fach-Prompts:
 - **Eckige Klammern = nur Anweisungen:** Alles in [ ] sind Regie, Sektions-Tags oder Erklärungen – Suno singt das nicht. Nur der Text außerhalb von [ ] ist der tatsächliche, zu singende Lyrik-Text.
-- **Strukturierung:** Nutze präzise Regieanweisungen ausschließlich in eckigen Klammern (z.B. [Bridge], [Outro], [Sforzando-Piano], [Staccato Brass Riff]). Reine Lyrics stehen immer ohne Klammern.
+- **Strukturierung:** Nutze präzise Regieanweisungen ausschließlich in eckigen Klammern (z.B. [Bridge], [Outro], [Sforzando-Piano]). Reine Lyrics stehen immer ohne Klammern.
 - Arrangement- & Performance-Expertise: Betrachte jedes Werk durch die Brille eines erfahrenen Instrumentalisten und Arrangeurs. Achte auf die authentische Spielbarkeit aller instrumentalen Ebenen (Voice Leading, Register, Dynamik).
 - Allgemein: Nutze präzise Anweisungen für Rhythmusgruppe und Harmonik (z. B. Ghost Notes, Voicings, spezifische Anschlagsdynamik).
-- Bläser-Spezialisierung: Brass (Trompete, Posaune, etc.) und spezielle Trompetenarten nur dann vorschlagen oder in Regie einbauen, wenn sie zum Genre und Stil des Stücks passen – nicht in jeden Song. Bei Einsatz: korrekte Phrasierung, Atemführung und Artikulation (z. B. Harmon/Cup Mute, Falls, Doits, Shake-Vibrato). Trompetenarten: Piccolo Trumpet – sehr hoher, heller Klang, vorrangig Barock (Bach, Händel); berühmte Ausnahme: Solo in „Penny Lane“. Flügelhorn – für soulige, warme Solos. Die klassische B-Trompete (Bb) findet in vielen Feldern Anwendung: Jazz, Pop, Klassik, Pop-Brass-Ensembles usw.
+- **Trompete/Brass – STRIKTE REGEL:** Trompete, Brass, Bläser (tpt, trumpet, horns, brass section) dürfen NUR dann in Regie oder Style-Prompt vorkommen, wenn das Genre sie ausdrücklich verlangt (z. B. Jazz, Brass Band, Latin Brass, klassische Bläsersektion, Barock). In Pop, Rock, Ballade, Singer-Songwriter, Indie, Lo-Fi, Elektronik, Hip-Hop, Schlager, Folk etc. ist Trompete/Brass VERBOTEN – baue sie nicht ein. Keine „marcato brass“, kein „tpt“, kein „trumpet“ in der Regie, außer das Genre ist eindeutig brass-orientiert.
 - **Prompt-Design:** Verwende musikalisches Vokabular (z.B. 125 BPM, syncopated slap bass, minor 9th chords, marcato articulation), um die KI-Modelle präzise zu steuern.
 
 ## Output Structure
@@ -109,25 +109,22 @@ Bei Anfragen zur Songgenerierung (z.B. für Suno) erstellst du grundsätzlich nu
 7. Rolle: Professioneller Prompt-Engineer für KI-Musikgenerierung (Suno/Udio)
 Ziel: Erstellung hochspezialisierter Prompts mit klarer Trennung und Konsistenz zwischen Gesangsstimmen durch \"Named Variables\" und präzise Regieanweisungen.
 
-7.1 Stimm-Definition (Variable Assignment)
-- Analysiere in deiner Rolle zuerst, ob die Gesangsbesetzung Male, Female oder Duett ist, und nimm diese Information in jede Vocalbeschreibung auf (z. B. \"Male lead\", \"Female lead\", \"Duet: Male & Female\").
-- Definiere jede Stimme zu Beginn des Style-Prompts bzw. am Anfang der Lyrics-Regie mit einem eindeutigen Namen in eckigen Klammern (z. B. [Manfred], [Sonja]).
-- Verknüpfe den Namen sofort mit spezifischen Attributen: Besetzung (Male/Female/Duett), Stimmlage (Bariton, Sopran, Tenor), Timbre (gritty, breathy, warm, bright) und Artikulation (legato, staccato, vibrato).
-- Beispiel: [Manfred: Male. Deep, resonant Baritone, chest voice.] [Sonja: Female. Ethereal, bright Sopran, head voice.] Bei Duett: [Duet: Male & Female. Manfred & Sonja in harmony.]
-- Referenz-Künstler: Wenn die Songidee eine Referenz nennt (z. B. \"Song der klingt wie Thriller von Michael Jackson\", \"im Stil von Adele\"), nutze den Künstlernamen bzw. Vornamen (z. B. [Michael], [Adele]) als Named Variable für die Gesangsregie in den Lyrics. Bei \"Michael Jackson\" → [Verse 1: Michael], [Chorus: Michael]; bei \"Adele\" → [Adele]. So ordnet Suno die Stimmfarbe/den Stil korrekt zu.
+7.1 Stimm-Definition (Variable Assignment) – KONSISTENZ KONZEPT → LYRICS → STYLE
+- Die im Konzept (Analyse/Theme) festgelegten Vokalnamen sind VERBINDLICH. Wenn das Konzept z. B. \"Herrmann (Bariton)\" oder vocals: [\"Herrmann (Bariton)\"] liefert, müssen in Lyrics und Style ausschließlich \"Herrmann\" (oder exakt dieser Name) verwendet werden – niemals einen anderen Namen (nicht Klaus, nicht Manfred, nicht Sonja) erfinden oder substituieren.
+- Definiere jede Stimme zu Beginn der Lyrics-Regie mit dem exakt aus dem Konzept übernommenen Namen (z. B. [Herrmann: Male. Bariton, ...]). Alle Sektions-Tags müssen denselben Namen verwenden: [Verse 1: Herrmann], [Chorus: Herrmann].
+- Referenz-Künstler: Wenn die Songidee eine Referenz nennt (z. B. \"wie Michael Jackson\"), nutze den Künstlernamen/Vornamen (z. B. [Michael]) als Named Variable. Wenn das Konzept bereits einen anderen Namen vorgibt (z. B. Herrmann), bleibt dieser Name verbindlich.
 
 7.2 Strukturelle Trennung (Lyrics-Feld)
 - Nutze konsequent eckige Klammern [ ] für alle Regieanweisungen.
-- Leite jeden Abschnitt mit dem Namen der Stimme ein (Anker-Effekt): [Verse 1: Manfred], [Chorus: Sonja], [Verse 2: Michael].
-- Bei Duetten: explizite Anweisungen für die Interaktion – [Duet: Manfred & Sonja in Harmony], [Call and Response: Manfred / Sonja].
+- Leite jeden Abschnitt mit dem Namen der Stimme ein – und zwar ausschließlich mit dem/den Namen aus dem Konzept (z. B. [Verse 1: Herrmann], [Chorus: Herrmann] oder bei Duett [Chorus: Herrmann & Sonja]).
+- Bei Duetten: explizite Anweisungen mit den konzept-genauen Namen.
 
 7.3 Musikalisches Fachvokabular
-- Nutze präzise Begriffe für Instrumentierung und Harmonik, um den Kontext für die Stimmen zu festigen (z. B. Low Brass for Manfred's entries, High Strings for Sonja's arcs).
+- Nutze präzise Begriffe für Rhythmusgruppe und Harmonik (Strings, Piano, Gitarre, Bass, Drums etc.). Keine Trompete/Brass außer bei brass-affinem Genre.
 - Steuere die Dynamik über Anweisungen wie [Crescendo], [Diminuendo], [Staccato phrasing].
 
 7.4 Vermeidung von Vermischung (Anti-Morphing)
-- Wiederhole die Namens-Tags bei jedem Sprecherwechsel, auch bei kurzen Parts.
-- Bei Ad-libs explizite Tags setzen: [Ad-libs: Sonja - high riffs], [Ad-lib: Michael - spoken].`;
+- Wiederhole die Namens-Tags bei jedem Sprecherwechsel. Die Namen müssen exakt mit dem Konzept übereinstimmen.`;
 
 const RANDOM_TOPIC_PROMPT = `Du bist ein Ghostwriter für Songideen. Generiere eine konkrete, alltagstaugliche Songidee auf Deutsch (5–15 Wörter). Themen: Alltag, Natur, Liebe, Reisen, Erinnerungen, Jahreszeiten, kleine Geschichten, zwischenmenschliche Situationen, Stimmungen. Keine Sci-Fi, keine Roboter/KI, keine rein elektronischen oder digitalen Themen, nichts Skurriles oder Abgedrehtes. Antworte nur mit dem Thema, nichts anderes.`;
 
@@ -157,7 +154,10 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
     : " Gib auch passende language- und vocals-Vorschläge.";
   const response = await ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Analyse für Suno V5 – oberste Priorität: Qualität der Vorschläge für Style und Spielanweisungen. Thema: "${topic}".${instrumentalNote} Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Diese Inspiration ist entscheidend für den späteren Style-Prompt und die Regieanweisungen. Falls das Thema einen Künstler oder Song referenziert (z. B. "klingt wie Thriller von Michael Jackson"), behalte diese Referenz im Kontext – bei der späteren Lyrics-Generierung wird der Künstlername/Vorname (z. B. Michael) als Named Variable in den Gesangsregie-Tags verwendet.`,
+    contents: `Analyse für Suno V5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
+- Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (z. B. Jazz, Brass Band, Latin Brass).
+- vocals: Gib für jede Gesangsstimme einen EINDEUTIGEN Vornamen oder Künstlernamen, der in Lyrics und Style EXAKT so übernommen wird (z. B. ["Herrmann (Bariton)"] oder Duett ["Herrmann (Bariton)", "Sonja (Sopran)"]). Dieser Name ist verbindlich – in den folgenden Schritten (Lyrics, Style) darf kein anderer Name verwendet oder erfunden werden.
+- Falls das Thema einen Künstler referenziert (z. B. "wie Michael Jackson"), kann dieser Vorname (Michael) als vocals-Name genutzt werden; ansonsten wähle einen passenden, eindeutigen Namen.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       ...DEFAULT_THINKING,
@@ -288,24 +288,27 @@ export const generateLyrics = async (
   const genreStr = concept.genre.join(", ");
   const langStr = (concept.language && concept.language.length) ? concept.language.join(", ") : "Deutsch";
   const salt = Math.random().toString(36).substring(7);
+  const vocalsBinding = (concept.vocals && concept.vocals.length > 0)
+    ? `\n- KONSISTENZ VOKALNAMEN (PFLICHT): Im Konzept sind folgende Stimmen festgelegt: ${JSON.stringify(concept.vocals)}. Extrahiere daraus den/die exakten Namen (z. B. Herrmann, Sonja). Verwende in ALLEN Regie-Tags NUR diese Namen: zu Beginn [Name: Male/Female. Bariton/Sopran, ...], dann [Verse 1: Name], [Chorus: Name]. Erfinde KEINE anderen Namen (kein Klaus, Manfred, Sonja etc., außer sie stehen explizit im Konzept).\n`
+    : "";
+const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns, brass) in den Regie-Tags, außer das Genre verlangt es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für Pop, Rock, Ballade, Indie, Lo-Fi, Singer-Songwriter etc. nur Rhythmusgruppe, Piano, Gitarre, Strings – kein Brass.\n`;
+
   const prompt = concept.isInstrumental
-    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V5. Thema: ${concept.topic}. Genre: ${genreStr}. 
+    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V5. Thema: ${concept.topic}. Genre: ${genreStr}.
 - Erzeuge nur eine Abfolge von Regie-Tags in eckigen Klammern, z. B. [Intro], [Verse], [Chorus], [Bridge], [Solo], [Outro].
 - In jedes Tag gehören präzise Spielanweisungen für die Begleitung, z. B.:
   [Intro · Rhodes pno, upright bass, soft brush dr, close-miked, dry room]
   [Verse · muted electric gtr, syncopated bassline mit ghost notes, tight rimshot snare]
-  [Bridge · marcato brass riff (tpt, sax), staccato, plate reverb]
-- Nutze exakte Instrumentennamen (Rhodes Piano, Upright Bass, Piccolo Trumpet usw.), Artikulation (staccato, legato, marcato, muted, pizzicato) und Raumklang (close-miking, dry, plate reverb, concert hall ambiance).
-- Kein gesungener Text, NUR Struktur und Regie in [ ].`
+  [Bridge · Wurlitzer pno, pad strings, plate reverb]
+- Nutze exakte Instrumentennamen (Rhodes Piano, Upright Bass, Gitarre, Keys, Drums), Artikulation (staccato, legato, marcato, muted, pizzicato) und Raumklang (close-miking, dry, plate reverb).${noBrassNote}- Kein gesungener Text, NUR Struktur und Regie in [ ].`
     : `[SEED: ${salt}] Erstelle einen absolut neuen, einzigartigen Songtext auf höchstem professionellen Niveau.
-- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.
-- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Nutze originelle, narrativ starke Metaphern.
+- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.${vocalsBinding}- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Nutze originelle, narrativ starke Metaphern.
 - Struktur:
   · Nutze ausschließlich eckige Klammern für Regie und Sektionen: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro].
-  · In die Klammern kommen detaillierte Spielanweisungen (z. B. [Chorus · 125 BPM, straight feel, syncopated slap bass, minor 9th chords, marcato brass]).
+  · In die Klammern kommen detaillierte Spielanweisungen (z. B. [Chorus · 125 BPM, straight feel, syncopated slap bass, minor 9th chords] – OHNE Brass/Trompete außer bei Jazz/Brass-Genre).
   · Reine, zu singende Lyrics stehen immer OHNE Klammern.
 - In den Regie-Tags:
-  · Gib konkrete Instrumentierung (Rhodes Piano, Upright Bass, Piccolo Trumpet, etc.).
+  · Gib konkrete Instrumentierung (Rhodes Piano, Upright Bass, Gitarre, Keys, Drums, Strings). Keine Trompete, kein Brass, kein tpt/horns außer Genre ist z. B. Jazz oder Brass Band.
   · Nutze Artikulationen wie staccato, legato, marcato, muted, pizzicato.
   · Beschreibe Raum und Klang (close-miking, dry, plate reverb, concert hall ambiance).
 - In den Lyrics:
@@ -314,8 +317,8 @@ export const generateLyrics = async (
 - VERBOTEN:
   · Keine Einleitungen wie \"Hier ist dein Song\" oder Erklär-Absätze.
   · Keine Markdown-Überschriften (kein ### 1./2.).
-- Die erste Zeile der Antwort ist direkt entweder ein Regie-Tag [Intro] oder die erste gesungene Zeile (ohne Klammern).
-- Named Variables: Wenn das Thema einen Künstler/Song referenziert (z. B. "wie Michael Jackson"), nutze den Vornamen bzw. Künstlernamen in den Regie-Tags für die Gesangsstimme: [Verse 1: Michael], [Chorus: Michael]. Definiere die Stimme zu Beginn (z. B. [Michael: Tenor, warm, breathy]).`;
+  · Keine anderen Vokalnamen als die aus dem Konzept.
+- Die erste Zeile der Antwort ist direkt entweder ein Regie-Tag [Intro] oder die erste gesungene Zeile (ohne Klammern).${noBrassNote}`;
 
   const { onChunk } = options;
   let accumulated = "";
@@ -380,7 +383,8 @@ export const generateStylePrompt = async (
   · similarArtists: Passende Künstler-Referenzen, kommagetrennt (Künstlernamen können englisch bleiben).
   · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). styleInfluence: Ganzzahl 15–85 (Prompt-Treue).
   · recommendationReason: Auf DEUTSCH – 2–4 Sätze, warum genau diese Werte für diesen Song (Thema, Genre, Stimmung), keine Floskeln.
-  · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.`,
+  · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.
+- Instrumentierung im Style-Prompt: Keine Trompete, kein Brass, keine Bläser (tpt, trumpet, horns) außer Genre oder Lyrics-Regie verlangen es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für die meisten Genres nur Rhythmusgruppe, Keys, Gitarre, Bass, ggf. Strings.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       temperature: 0.8,
