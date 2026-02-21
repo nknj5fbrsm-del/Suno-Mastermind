@@ -7,18 +7,18 @@ interface WorkflowNavigationProps {
   setActiveStep: (step: WorkflowStep) => void;
   hasLyrics: boolean;
   hasStyle: boolean;
-  /** Wenn true (Lyrics-Varianten-Modal), sind Style und Cover ausgegraut. */
-  isComparingLyrics?: boolean;
+  /** Wenn true, sind zwei Lyrics-Varianten vorhanden; Style ist dann klickbar (generiert Style aus beiden). */
+  hasLyricsVariants?: boolean;
 }
 
-const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, setActiveStep, hasLyrics, hasStyle, isComparingLyrics }) => {
+const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, setActiveStep, hasLyrics, hasStyle, hasLyricsVariants }) => {
   const { tr } = useLang();
   const steps = [
     { id: WorkflowStep.DASHBOARD, icon: 'fa-house',         label: tr.nav.home,    enabled: true },
     { id: WorkflowStep.CONCEPT,   icon: 'fa-wand-sparkles', label: tr.nav.concept, enabled: true },
     { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: hasLyrics },
-    { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: hasStyle && !isComparingLyrics },
-    { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: hasStyle && !isComparingLyrics },
+    { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: hasStyle || !!hasLyricsVariants },
+    { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: hasStyle },
   ];
 
   return (

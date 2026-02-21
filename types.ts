@@ -37,6 +37,10 @@ export interface SongHistoryItem {
   timestamp: number;
   concept: SongConcept;
   lyrics: string;
+  /** Zweite Lyrics-Variante (Create-Flow); wenn gesetzt, werden beide im Lyrics- und Cover-Tab angezeigt. */
+  lyricsVariant2?: string;
   styleData: GeneratedStyle;
+  /** Zweite Style-Variante (passend zu Lyrics 2); wenn gesetzt, werden beide auf der Style- und Cover-Seite genutzt. */
+  styleVariant2?: GeneratedStyle;
   coverUrl: string;
 }

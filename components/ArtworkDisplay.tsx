@@ -1,12 +1,19 @@
 
 import React, { useState } from 'react';
 import { useLang, useToast } from '../App';
+import type { GeneratedStyle } from '../types';
+
+type CopyPillType = 'lyrics' | 'clean' | 'style' | 'story' | 'cover' | 'suno';
 
 interface ArtworkDisplayProps {
   coverUrl: string;
   songDescription: string;
   lyrics: string;
+  /** Wenn gesetzt: zwei Pills „Variante 1“ / „Variante 2“, jeweils aufklappbar mit Copy-Optionen. */
+  lyricsVariants?: [string, string] | null;
   stylePrompt: string;
+  /** Wenn gesetzt (zwei Style-Varianten): Copy „Style“ nutzt pro Variante den passenden Prompt. */
+  styleVariants?: [GeneratedStyle, GeneratedStyle] | null;
   onUpdateStory: (newStory: string) => void;
   onRegenerateCover: (style: string) => Promise<void>;
 }
@@ -23,9 +30,12 @@ const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 
 const SUNO_CREATE_URL = 'https://suno.com/create';
 
-const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, stylePrompt, onUpdateStory, onRegenerateCover }) => {
+const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, onUpdateStory, onRegenerateCover }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
+  const [expandedVariant, setExpandedVariant] = useState<1 | 2 | null>(null);
+  /** Nur der zuletzt geklickte Copy-Button (innerhalb einer Variante) wird farbig hervorgehoben. */
+  const [activeCopyPill, setActiveCopyPill] = useState<{ variant: 1 | 2; type: CopyPillType } | null>(null);
   const [isZoomed,         setIsZoomed]         = useState(false);
   const [feedbackText,     setFeedbackText]     = useState('');
   const [isSending,        setIsSending]        = useState(false);
@@ -50,17 +60,18 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
     } catch { showToast(tr.artwork.copyFailed, 'error'); }
   };
 
-  const handleCopyLyrics = () => {
+  const handleCopyLyrics = (lyricsText?: string) => {
+    const text = lyricsText ?? lyrics;
     try {
-      navigator.clipboard.writeText(lyrics);
+      navigator.clipboard.writeText(text);
       showToast(tr.artwork.copied, 'success');
     } catch { showToast(tr.artwork.copyFailed, 'error'); }
   };
 
-  const handleCopyLyricsClean = () => {
+  const handleCopyLyricsClean = (lyricsText?: string) => {
+    const text = (lyricsText ?? lyrics).replace(/\[.*?\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
     try {
-      const clean = lyrics.replace(/\[.*?\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
-      navigator.clipboard.writeText(clean);
+      navigator.clipboard.writeText(text);
       showToast(tr.artwork.copied, 'success');
     } catch { showToast(tr.artwork.copyFailed, 'error'); }
   };
@@ -72,9 +83,13 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
     } catch { showToast(tr.artwork.copyFailed, 'error'); }
   };
 
-  const handleCopyStyle = () => {
+  const getStylePromptForVariant = (variant: 1 | 2) =>
+    (styleVariants && styleVariants[variant - 1]?.prompt) ? styleVariants[variant - 1].prompt : stylePrompt;
+
+  const handleCopyStyle = (variant?: 1 | 2) => {
+    const text = variant != null ? getStylePromptForVariant(variant) : stylePrompt;
     try {
-      navigator.clipboard.writeText(stylePrompt);
+      navigator.clipboard.writeText(text);
       showToast(tr.artwork.copied, 'success');
     } catch { showToast(tr.artwork.copyFailed, 'error'); }
   };
@@ -162,7 +177,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wider hidden sm:block">1024 × 1024 · Suno</span>
       </div>
 
-      {/* ═══ FÜR SUNO (oben, damit sofort sichtbar: alles kopierbar) ═══ */}
+      {/* ═══ FÜR SUNO (oben: alles kopierbar, bei 2 Varianten als Pills) ═══ */}
       <div className="glass-card rounded-3xl p-5 space-y-4 border-2 border-suno-primary/20">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-suno-primary flex items-center gap-1.5 mb-1">
@@ -170,34 +185,93 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
           </p>
           <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed">{tr.artwork.sunoHandoffHint}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={handleCopyLyrics} disabled={!lyrics.trim()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider btn-create text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95 transition-opacity">
-            <i className="fas fa-align-left text-[9px]"></i> {tr.artwork.copyLyrics}
-          </button>
-          <button onClick={handleCopyLyricsClean} disabled={!lyrics.trim()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary hover:text-white hover:border-suno-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            <i className="fas fa-align-left text-[9px]"></i> {tr.artwork.copyLyricsClean}
-          </button>
-          <button onClick={handleCopyStyle} disabled={!stylePrompt.trim()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary hover:text-white hover:border-suno-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            <i className="fas fa-bolt text-[9px]"></i> {tr.artwork.copyStyle}
-          </button>
-          <button onClick={handleCopyStory} disabled={!songDescription.trim()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            <i className="fas fa-quote-left text-[9px]"></i> {tr.artwork.copyStory}
-          </button>
-          {coverUrl && (
-            <button onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all">
-              <i className="fas fa-download text-[9px]"></i> {tr.artwork.coverDownload}
+        {lyricsVariants && lyricsVariants.length >= 2 ? (
+          <div className="space-y-3">
+            {([1, 2] as const).map((num) => {
+              const isExpanded = expandedVariant === num;
+              const lyricsText = lyricsVariants[num - 1];
+              return (
+                <div key={num} className="rounded-2xl border border-white/20 dark:border-white/10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedVariant(isExpanded ? null : num)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-200 ${
+                      isExpanded
+                        ? num === 1
+                          ? 'btn-create text-white border-suno-primary/40 shadow-md'
+                          : 'bg-suno-secondary text-white border-suno-secondary/40 shadow-md'
+                        : 'glass-btn text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/20 dark:hover:bg-white/10 border-transparent'
+                    }`}
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-wider">{num === 1 ? tr.lyrics.variant1 : tr.lyrics.variant2}</span>
+                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] ${isExpanded ? 'opacity-90' : 'opacity-70'}`}></i>
+                  </button>
+                  {isExpanded && (
+                    <div className="p-4 pt-3 bg-white/5 dark:bg-black/10">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-xl mx-auto">
+                        {([
+                          { type: 'lyrics' as CopyPillType, label: tr.artwork.copyLyrics, icon: 'fa-align-left', onClick: () => handleCopyLyrics(lyricsText), disabled: !lyricsText.trim(), primary: true },
+                          { type: 'clean' as CopyPillType, label: tr.artwork.copyLyricsClean, icon: 'fa-align-left', onClick: () => handleCopyLyricsClean(lyricsText), disabled: !lyricsText.trim(), primary: false },
+                          { type: 'style' as CopyPillType, label: tr.artwork.copyStyle, icon: 'fa-bolt', onClick: () => handleCopyStyle(num), disabled: !getStylePromptForVariant(num).trim(), primary: false },
+                          { type: 'story' as CopyPillType, label: tr.artwork.copyStory, icon: 'fa-quote-left', onClick: handleCopyStory, disabled: !songDescription.trim(), primary: false },
+                          ...(coverUrl ? [{ type: 'cover' as CopyPillType, label: tr.artwork.coverDownload, icon: 'fa-download', onClick: handleDownload, disabled: false, primary: false }] : []),
+                          { type: 'suno' as CopyPillType, label: tr.artwork.openSuno, icon: 'fa-external-link-alt', onClick: handleOpenSuno, disabled: false, primary: false, noHighlight: true },
+                        ] as Array<{ type: CopyPillType; label: string; icon: string; onClick: () => void; disabled: boolean; primary?: boolean; noHighlight?: boolean }>).map(({ type, label, icon, onClick, disabled, primary, noHighlight }) => {
+                          const isActive = !noHighlight && activeCopyPill?.variant === num && activeCopyPill?.type === type;
+                          const btnClass = noHighlight
+                            ? 'bg-zinc-600 dark:bg-zinc-500 text-white hover:bg-zinc-500'
+                            : isActive
+                              ? primary ? 'btn-create text-white shadow' : (num === 1 ? 'border-2 border-suno-primary bg-suno-primary/15 text-suno-primary' : 'border-2 border-suno-secondary bg-suno-secondary/15 text-suno-secondary')
+                              : 'glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary/20';
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => { setActiveCopyPill(noHighlight ? null : { variant: num, type }); onClick(); }}
+                              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider min-h-[44px] ${btnClass} disabled:opacity-50`}
+                            >
+                              <i className={`fas ${icon} text-[9px] flex-shrink-0`}></i> <span className="truncate">{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => handleCopyLyrics()} disabled={!lyrics.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider btn-create text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95 transition-opacity">
+              <i className="fas fa-align-left text-[9px]"></i> {tr.artwork.copyLyrics}
             </button>
-          )}
-          <button type="button" onClick={handleOpenSuno}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-zinc-700 dark:bg-zinc-600 text-white hover:bg-zinc-600 dark:hover:bg-zinc-500 transition-colors">
-            <i className="fas fa-external-link-alt text-[9px]"></i> {tr.artwork.openSuno}
-          </button>
-        </div>
+            <button onClick={() => handleCopyLyricsClean()} disabled={!lyrics.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary hover:text-white hover:border-suno-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <i className="fas fa-align-left text-[9px]"></i> {tr.artwork.copyLyricsClean}
+            </button>
+            <button onClick={handleCopyStyle} disabled={!stylePrompt.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary hover:text-white hover:border-suno-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <i className="fas fa-bolt text-[9px]"></i> {tr.artwork.copyStyle}
+            </button>
+            <button onClick={handleCopyStory} disabled={!songDescription.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+              <i className="fas fa-quote-left text-[9px]"></i> {tr.artwork.copyStory}
+            </button>
+            {coverUrl && (
+              <button onClick={handleDownload}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all">
+                <i className="fas fa-download text-[9px]"></i> {tr.artwork.coverDownload}
+              </button>
+            )}
+            <button type="button" onClick={handleOpenSuno}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-zinc-700 dark:bg-zinc-600 text-white hover:bg-zinc-600 dark:hover:bg-zinc-500 transition-colors">
+              <i className="fas fa-external-link-alt text-[9px]"></i> {tr.artwork.openSuno}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ═══ MAIN GRID (Cover + Story) ═══ */}

@@ -3,7 +3,7 @@ export type Lang = 'de' | 'en';
 export const t = {
   de: {
     nav: {
-      home: 'Home', concept: 'Konzept', lyrics: 'Lyrics', style: 'Style', cover: 'Cover',
+      home: 'Home', concept: 'Konzept', lyrics: 'Lyrics', style: 'Style', cover: 'Cover & Copy',
     },
     header: {
       apiKey: 'API Key ändern', theme: 'Theme', lightMode: 'Hellmodus', darkMode: 'Dunkelmodus',
@@ -70,6 +70,9 @@ export const t = {
       compareTitle: 'Zwei Varianten – wähle eine',
       compareSub: 'Klicke auf „Diese wählen“, um mit der Variante weiterzumachen.',
       variantA: 'Variante A', variantB: 'Variante B',
+      twoVariantsTitle: 'Lyrics',
+      twoVariantsSub: 'Beide Varianten werden übernommen. Style ist jeweils an die Regie der Variante angepasst.',
+      variant1: 'Variante 1', variant2: 'Variante 2',
       chooseThis: 'Diese wählen',
     },
     style: {
@@ -162,7 +165,7 @@ export const t = {
 
   en: {
     nav: {
-      home: 'Home', concept: 'Concept', lyrics: 'Lyrics', style: 'Style', cover: 'Cover',
+      home: 'Home', concept: 'Concept', lyrics: 'Lyrics', style: 'Style', cover: 'Cover & Copy',
     },
     header: {
       apiKey: 'Change API Key', theme: 'Theme', lightMode: 'Light Mode', darkMode: 'Dark Mode',
@@ -229,6 +232,9 @@ export const t = {
       compareTitle: 'Two variants – pick one',
       compareSub: 'Click „Choose this“ to continue with that variant.',
       variantA: 'Variant A', variantB: 'Variant B',
+      twoVariantsTitle: 'Lyrics',
+      twoVariantsSub: 'Both variants are kept. Each style is adapted to that variant\'s regie.',
+      variant1: 'Variant 1', variant2: 'Variant 2',
       chooseThis: 'Choose this',
     },
     style: {

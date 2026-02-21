@@ -335,30 +335,52 @@ export const generateLyrics = async (
   return stripLyricsPreamble(cleaned);
 };
 
-export const generateStylePrompt = async (concept: SongConcept, lang: 'de' | 'en' = 'de'): Promise<GeneratedStyle> => {
+/** Kurzfassung der Regie-Tags aus Lyrics (nur [ ]-Blöcke) für Style-Anpassung. */
+function extractRegieSummary(lyrics: string, maxChars = 600): string {
+  const matches = lyrics.match(/\[[^\]]*\]/g) || [];
+  const regie = matches.join(' ').replace(/\s+/g, ' ').trim();
+  return regie.length > maxChars ? regie.slice(0, maxChars) + '…' : regie;
+}
+
+export const generateStylePrompt = async (
+  concept: SongConcept,
+  lang: 'de' | 'en' = 'de',
+  /** Eine oder zwei Lyrics-Varianten. Bei einer: Style passend zu dieser Regie; bei zwei: ein Prompt für beide. */
+  lyricsVariants?: string[] | [string, string] | null
+): Promise<GeneratedStyle> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
-  const reasonLang = lang === 'en' ? 'in English' : 'auf Deutsch';
+  let regieBlock = '';
+  if (lyricsVariants && lyricsVariants.length >= 1) {
+    if (lyricsVariants.length >= 2) {
+      regieBlock = `\n- WICHTIG – Anpassung an die Lyrics-Regie: Es gibt zwei Lyrics-Varianten mit folgenden Regieanweisungen (Inhalte in [ ]). Passe den Style-Prompt so an, dass er zu diesen Regieanweisungen passt (Stimmen, Instrumentierung, Dynamik, BPM/Feel). Variante 1 – Regie: ${extractRegieSummary(lyricsVariants[0])}. Variante 2 – Regie: ${extractRegieSummary(lyricsVariants[1])}. Der eine kompakte Style-Prompt soll für beide Varianten funktionieren.\n`;
+    } else {
+      regieBlock = `\n- WICHTIG – Anpassung an die Lyrics-Regie: Passe den Style-Prompt exakt an die Regieanweisungen dieser Lyrics an (Inhalte in [ ]: Stimmen, Instrumentierung, Dynamik, BPM/Feel). Regie: ${extractRegieSummary(lyricsVariants[0])}.\n`;
+    }
+  }
   let accumulated = "";
   const stream = await ai.models.generateContentStream({
     model: TEXT_MODEL,
-    contents: `Suno V5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.
+    contents: `Suno V5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}
 - Aufgabe: Erzeuge einen extrem kompakten, hochpräzisen Style-Prompt für eine Musik-KI wie Suno.
-- DER STYLE-PROMPT (Feld \"prompt\" im JSON) muss:
-  · Streng kürzer als ${MAX_STYLE_PROMPT_LENGTH} Zeichen sein.
-  · Immer eine konkrete BPM-Zahl enthalten (z. B. 125 BPM).
-  · Ein klares Feel enthalten (z. B. swing, straight, halftime).
-  · Wichtige Instrumentierung und Artikulation nennen (z. B. \"Rhodes pno, upright bass, marcato brass, tight drums\").
-  · Gern Musiker-Abkürzungen verwenden (tpt, sax, pno, dr), um Zeichen zu sparen.
-- Nutze exaktes musikalisches Vokabular (minor 9th chords, syncopated slap bass, ghost notes, close-miked, plate reverb).
-- Zusätzlich zurückgeben (Safe Zone – beide Werte MÜSSEN zwischen 15 und 85 liegen):
-  · promptEffect: Wie wirkt dieser Prompt musikalisch (Fokus auf Harmonik, Groove, Artikulation).
-  · similarArtists: Einige passende Referenzen (kommagetrennt).
-  · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). Wähle bewusst: experimentelles Genre/avantgardistisch → eher höher (z. B. 55–75); Mainstream-Pop/klassisch → eher niedriger (z. B. 25–45). Niemals unter 15 oder über 85.
-  · styleInfluence: Ganzzahl 15–85 (Treue zum Text- und Konzept-Prompt). Stark textgetrieben/Story wichtig → eher höher (z. B. 65–85); mehr Freiraum für Suno → eher niedriger (z. B. 25–45). Niemals unter 15 oder über 85.
-  · recommendationReason: Kurze Begründung (2–4 Sätze ${reasonLang}), warum genau DIESE Werte für DIESEN Song gewählt wurden – konkret auf Thema, Genre und Stimmung eingehen, keine generischen Floskeln.
-  · songDescription: Kurze Beschreibung des Songs/Vibes für Cover-Art und Story.`,
+
+- SPRACHE – UNBEDINGT BEACHTEN:
+  · Das Feld \"prompt\" (Suno Style-Prompt) MUSS ausschließlich auf ENGLISCH formuliert sein. Nur englische Begriffe (z. B. BPM, instrumentation, feel). Dieses Feld wird von der App nicht übersetzt.
+  · Die Felder promptEffect, recommendationReason und songDescription MÜSSEN ausschließlich auf DEUTSCH formuliert sein (Wirkung & Technik, Warum diese Empfehlung, Song-Story). Diese Texte können in der App per Sprachumschalter angezeigt werden.
+
+- DER STYLE-PROMPT (Feld \"prompt\" im JSON, nur Englisch):
+  · Streng kürzer als ${MAX_STYLE_PROMPT_LENGTH} Zeichen.
+  · Immer eine konkrete BPM-Zahl (z. B. 125 BPM), ein klares Feel (swing, straight, halftime).
+  · Wichtige Instrumentierung und Artikulation (z. B. Rhodes pno, upright bass, marcato brass, tight drums). Musiker-Abkürzungen erlaubt (tpt, sax, pno, dr).
+  · Exaktes musikalisches Vokabular (minor 9th chords, syncopated slap bass, ghost notes, close-miked, plate reverb).
+
+- Zusätzlich zurückgeben (Safe Zone – Werte MÜSSEN zwischen 15 und 85 liegen):
+  · promptEffect: Auf DEUTSCH – wie wirkt dieser Prompt musikalisch (Harmonik, Groove, Artikulation).
+  · similarArtists: Passende Künstler-Referenzen, kommagetrennt (Künstlernamen können englisch bleiben).
+  · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). styleInfluence: Ganzzahl 15–85 (Prompt-Treue).
+  · recommendationReason: Auf DEUTSCH – 2–4 Sätze, warum genau diese Werte für diesen Song (Thema, Genre, Stimmung), keine Floskeln.
+  · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       temperature: 0.8,
