@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
 import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
 import { t, Lang } from './translations';
 
-// Components
-import ConceptForm from './components/ConceptForm';
-import LyricDisplay from './components/LyricDisplay';
-import LyricsCompareView from './components/LyricsCompareView';
-import StyleDisplay from './components/StyleDisplay';
-import ArtworkDisplay from './components/ArtworkDisplay';
-import DashboardDisplay from './components/DashboardDisplay';
+// Lazy: Step-Views erst bei Bedarf laden (schnellerer Start)
 import WorkflowNavigation from './components/WorkflowNavigation';
+const ConceptForm = lazy(() => import('./components/ConceptForm'));
+const LyricDisplay = lazy(() => import('./components/LyricDisplay'));
+const LyricsCompareView = lazy(() => import('./components/LyricsCompareView'));
+const StyleDisplay = lazy(() => import('./components/StyleDisplay'));
+const ArtworkDisplay = lazy(() => import('./components/ArtworkDisplay'));
+const DashboardDisplay = lazy(() => import('./components/DashboardDisplay'));
 
 // ─── Language Context ───────────────────────────────────────────────────────
 export const LangContext = createContext<{ lang: Lang; tr: typeof t.de }>({ lang: 'de', tr: t.de });
@@ -96,7 +96,7 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<Lang>((localStorage.getItem('suno-lang') as Lang) || 'de');
   const [toast, setToast] = useState<ToastState>(null);
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
-  const tr = t[lang];
+  const tr = useMemo(() => t[lang], [lang]);
 
   useEffect(() => {
     // Theme Initialisierung
@@ -479,6 +479,7 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+        <Suspense fallback={<div className="min-h-[280px] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-suno-primary border-t-transparent animate-spin" /></div>}>
         {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={(item) => { setConcept(item.concept); setLyrics(item.lyrics); setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null); setStyleData(item.styleData); setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null); setCoverUrl(item.coverUrl); setActiveStep(WorkflowStep.LYRICS); }} onDelete={async (id) => { await deleteSongFromDB(id); setHistory(prev => prev.filter(h => h.id !== id)); }} onStartNew={handleStartNew} />}
         {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptSubmit} />}
         {activeStep === WorkflowStep.LYRICS && (
@@ -496,6 +497,7 @@ const App: React.FC = () => {
           )
         )}
         {activeStep === WorkflowStep.ARTWORK && styleData && <ArtworkDisplay coverUrl={coverUrl} songDescription={styleData.songDescription} lyrics={lyrics} lyricsVariants={lyricsVariants} stylePrompt={styleData.prompt} styleVariants={styleVariants} onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)} onRegenerateCover={async (style) => { setLoadingText(tr.loading.generatingCover); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); setCoverUrl(await generateCoverArt(concept, style)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} />}
+      </Suspense>
       </main>
     </div>
     </LangContext.Provider>

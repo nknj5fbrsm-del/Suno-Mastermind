@@ -1,0 +1,15 @@
+/* Tailwind Build-Zeit (kein CDN) – bessere Performance */
+@import "tailwindcss";
+
+@theme {
+  /* Suno-Farben nutzen bestehende CSS-Variablen aus index.html */
+  --color-suno-bg: var(--suno-bg);
+  --color-suno-primary: var(--theme-primary);
+  --color-suno-secondary: var(--theme-secondary);
+  --color-suno-accent: var(--theme-accent);
+}
+
+/* Orbs: GPU-Optimierung für flüssigere Animationen */
+.orb {
+  will-change: transform;
+}
