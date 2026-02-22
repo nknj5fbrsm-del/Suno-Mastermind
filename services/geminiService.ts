@@ -68,7 +68,7 @@ const SYSTEM_INSTRUCTION = `1. Rollendefinition & Expertise
 • Nur OHNE eckige Klammern: Die reinen, zu singenden Lyrics. Jede Zeile ohne [ ] wird von Suno als gesungener Text behandelt. Keine Regie, keine Erklärungen außerhalb von Klammern – nur der tatsächliche Songtext.
 
 5. Kompression & Limitierung (App-Logik)
-• Zeichen-Management: Halte den Style-Prompt unter 120 Zeichen.
+• Zeichen-Management: Halte den Style-Prompt unter 200 Zeichen (Suno V5 erlaubt max. 1000, empfohlen 80–200 für Fokus).
 • Abkürzungen: Verwende im Bedarfsfall gängige Musiker-Kürzel (z. B. tpt, sax, pno, dr).
 • BPM & Feel: Jedes Ergebnis muss eine BPM-Zahl und eine Angabe zum Rhythmus-Gefühl (z. B. swing, straight, halftime) enthalten.
 
@@ -128,7 +128,8 @@ Ziel: Erstellung hochspezialisierter Prompts mit klarer Trennung und Konsistenz 
 
 const RANDOM_TOPIC_PROMPT = `Du bist ein Ghostwriter für Songideen. Generiere eine konkrete, alltagstaugliche Songidee auf Deutsch (5–15 Wörter). Themen: Alltag, Natur, Liebe, Reisen, Erinnerungen, Jahreszeiten, kleine Geschichten, zwischenmenschliche Situationen, Stimmungen. Keine Sci-Fi, keine Roboter/KI, keine rein elektronischen oder digitalen Themen, nichts Skurriles oder Abgedrehtes. Antworte nur mit dem Thema, nichts anderes.`;
 
-const MAX_STYLE_PROMPT_LENGTH = 120;
+const MAX_STYLE_PROMPT_LENGTH = 200;
+const SUNO_HARD_LIMIT = 1000;
 
 export const generateRandomTopic = async (category: string = "Zufall"): Promise<string> => {
   const apiKey = getApiKey();
@@ -338,6 +339,39 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
   return stripLyricsPreamble(cleaned);
 };
 
+/** Regie anreichern: Nur Inhalte in [ ] erweitern (Instrumentierung, Artikulation, BPM, Raum). Gesungene Zeilen bleiben unverändert. */
+export const enrichRegie = async (lyrics: string, concept: SongConcept): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const genreStr = concept.genre.join(", ");
+  const noBrass = concept.genre.some(g => /jazz|brass|latin|barock/i.test(g))
+    ? ""
+    : " Keine Trompete/Brass/Bläser (tpt, trumpet, horns) – nur Rhythmusgruppe, Keys, Gitarre, Bass, ggf. Strings.";
+  const prompt = `Du erhältst einen Songtext mit Regieanweisungen in eckigen Klammern [ ] und gesungenen Zeilen ohne Klammern.
+
+AUFGABE: Gib den EXAKT gleichen Text zurück – mit EINER Änderung: Erweitere NUR den Inhalt INNERHALB der eckigen Klammern [ ]. Alles außerhalb der Klammern muss zeichengetreu gleich bleiben (keine Änderung an gesungenen Lyrics).
+
+Regie-Anreicherung in [ ]:
+- Füge präzise Instrumentierung hinzu (z. B. Rhodes Piano, Upright Bass, Electric Guitar, tight drums), wo noch vage.
+- Füge Artikulation hinzu (staccato, legato, marcato, muted, pizzicato) wo passend.
+- Füge wo sinnvoll BPM/Feel hinzu (z. B. 120 BPM, straight feel, swing).
+- Füge Raumklang hinzu (close-miking, dry, plate reverb) wo passend.${noBrass}
+- Behalte Sektions-Namen (Intro, Verse, Chorus, Bridge, Outro) und Stimmen-Namen aus dem Konzept bei.
+- Genre-Kontext: ${genreStr}.
+
+WICHTIG: Die erste Zeile der Antwort muss direkt der Inhalt sein (kein „Hier ist…“, keine Überschrift). Jede Zeile ohne [ ] muss exakt gleich bleiben.`;
+
+  const response = await ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Eingabe (nur Regie in [ ] anreichern, Rest unverändert):\n\n${lyrics}`,
+    config: { systemInstruction: SYSTEM_INSTRUCTION + "\n\nBei dieser Aufgabe: Antworte NUR mit dem angereicherten Songtext. Keine Einleitung, keine Erklärung. Erste Zeile = erste Zeile des Songs.", temperature: 0.4, ...DEFAULT_THINKING },
+  });
+  const raw = response.text?.trim() || lyrics;
+  const cleaned = cleanText(raw);
+  return stripLyricsPreamble(cleaned);
+};
+
 /** Kurzfassung der Regie-Tags aus Lyrics (nur [ ]-Blöcke) für Style-Anpassung. */
 function extractRegieSummary(lyrics: string, maxChars = 600): string {
   const matches = lyrics.match(/\[[^\]]*\]/g) || [];
@@ -373,7 +407,7 @@ export const generateStylePrompt = async (
   · Die Felder promptEffect, recommendationReason und songDescription MÜSSEN ausschließlich auf DEUTSCH formuliert sein (Wirkung & Technik, Warum diese Empfehlung, Song-Story). Diese Texte können in der App per Sprachumschalter angezeigt werden.
 
 - DER STYLE-PROMPT (Feld \"prompt\" im JSON, nur Englisch):
-  · Streng kürzer als ${MAX_STYLE_PROMPT_LENGTH} Zeichen.
+  · Ziel: 80–200 Zeichen (kompakt und fokussiert). Suno V5 erlaubt bis zu 1000 Zeichen, aber kürzere Prompts erzeugen bessere Ergebnisse. Halte den Prompt unter ${MAX_STYLE_PROMPT_LENGTH} Zeichen.
   · Immer eine konkrete BPM-Zahl (z. B. 125 BPM), ein klares Feel (swing, straight, halftime).
   · Wichtige Instrumentierung und Artikulation (z. B. Rhodes pno, upright bass, marcato brass, tight drums). Musiker-Abkürzungen erlaubt (tpt, sax, pno, dr).
   · Exaktes musikalisches Vokabular (minor 9th chords, syncopated slap bass, ghost notes, close-miked, plate reverb).
@@ -426,8 +460,8 @@ export const generateStylePrompt = async (
   try {
     const parsed = JSON.parse(response.text || "{}");
     let stylePrompt = (parsed.prompt ?? defaultStyle.prompt).trim();
-    if (stylePrompt.length > MAX_STYLE_PROMPT_LENGTH) {
-      stylePrompt = stylePrompt.slice(0, MAX_STYLE_PROMPT_LENGTH);
+    if (stylePrompt.length > SUNO_HARD_LIMIT) {
+      stylePrompt = stylePrompt.slice(0, SUNO_HARD_LIMIT);
     }
     const weirdness = clampSafe(parsed.weirdness ?? defaultStyle.weirdness);
     const styleInfluence = clampSafe(parsed.styleInfluence ?? defaultStyle.styleInfluence);
@@ -470,6 +504,32 @@ export const suggestStyleTags = async (concept: SongConcept, _lyrics: string): P
   } catch {
     return [];
   }
+};
+
+/** Style-Prompt anreichern: präzisere Instrumentierung, Artikulation, BPM/Feel hinzufügen. */
+export const enrichStylePrompt = async (prompt: string, concept: SongConcept): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden.");
+  const ai = new GoogleGenAI({ apiKey });
+  const noBrass = concept.genre.some(g => /jazz|brass|latin|barock/i.test(g))
+    ? ""
+    : " No trumpet/brass/horns unless the genre demands it.";
+  const response = await ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Current Suno V5 style prompt: "${prompt}"
+Genre context: ${concept.genre.join(", ")}. Topic: "${concept.topic}".
+
+Task: Enrich this style prompt for Suno V5. Make it more specific and professional:
+- Add precise BPM and feel if missing (e.g. "118 BPM, halftime feel").
+- Add specific instruments (e.g. Rhodes pno, upright bass, tight brush drums) instead of vague terms.
+- Add articulation cues (staccato, legato, muted, fingerpicked).
+- Add production/room characteristics (close-miked, dry, plate reverb, tape warmth).${noBrass}
+- Keep it ENGLISH ONLY, concise (target 80–200 chars, max 300), and purely descriptive (no lyrics).
+- Return ONLY the enriched prompt text, nothing else.`,
+    config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.5, ...DEFAULT_THINKING },
+  });
+  const raw = (response.text || prompt).trim().replace(/^["']|["']$/g, '');
+  return raw.length > SUNO_HARD_LIMIT ? raw.slice(0, SUNO_HARD_LIMIT) : raw;
 };
 
 export const generateCoverArt = async (concept: SongConcept, artStyle: string = "Default"): Promise<string> => {

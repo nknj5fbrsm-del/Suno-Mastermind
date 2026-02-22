@@ -60,7 +60,7 @@ export const t = {
       fileChoose: 'Datei wählen oder hierher ziehen', fileDrop: 'Loslassen…', analyze: 'KI',
     },
     lyrics: {
-      pill: 'Lyrics', regenerate: 'Neu generieren',
+      pill: 'Lyrics', regenerate: 'Neu generieren', enrichRegie: 'Regie anreichern',
       cleanCopy: 'Clean Copy', fullCopy: 'Full Copy', copied: 'Kopiert!',
       structure: 'Struktur:', structureTemplate: 'Vorlage:',
       templatePop: 'Pop', templateBallad: 'Ballade', templateRock: 'Rock', templateMinimal: 'Minimal', templateInstrumental: 'Instrumental',
@@ -78,7 +78,9 @@ export const t = {
     style: {
       pill: 'Style Prompt', engine: 'V5 Engine', regenerate: 'Neu generieren',
       copy: 'Prompt kopieren', copied: 'Kopiert!',
-      tooLong: 'Über 120 Zeichen – kürzen empfohlen',
+      tooLong: 'Über 200 Zeichen – kürzen empfohlen',
+      enrichStyle: 'Anreichern',
+      charLimit: '/ 200 empf. · max 1000',
       algorithm: 'Algorithmus · KI-Empfehlung',
       weirdness: 'Weirdness', weirdnessDesc: 'Originalität & Kreativität',
       influence: 'Influence',  influenceDesc: 'Prompt-Treue & Fokus',
@@ -222,7 +224,7 @@ export const t = {
       fileChoose: 'Choose file or drag here', fileDrop: 'Release…', analyze: 'AI',
     },
     lyrics: {
-      pill: 'Lyrics', regenerate: 'Regenerate',
+      pill: 'Lyrics', regenerate: 'Regenerate', enrichRegie: 'Enrich direction',
       cleanCopy: 'Clean Copy', fullCopy: 'Full Copy', copied: 'Copied!',
       structure: 'Structure:', structureTemplate: 'Template:',
       templatePop: 'Pop', templateBallad: 'Ballad', templateRock: 'Rock', templateMinimal: 'Minimal', templateInstrumental: 'Instrumental',
@@ -240,7 +242,9 @@ export const t = {
     style: {
       pill: 'Style Prompt', engine: 'V5 Engine', regenerate: 'Regenerate',
       copy: 'Copy Prompt', copied: 'Copied!',
-      tooLong: 'Over 120 chars – shorten recommended',
+      tooLong: 'Over 200 chars – shorten recommended',
+      enrichStyle: 'Enrich',
+      charLimit: '/ 200 rec. · max 1000',
       algorithm: 'Algorithm · AI Recommendation',
       weirdness: 'Weirdness', weirdnessDesc: 'Originality & Creativity',
       influence: 'Influence',  influenceDesc: 'Prompt Fidelity & Focus',
