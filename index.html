@@ -210,12 +210,28 @@
             outline: none;
         }
         .dark .glass-input {
-            background: rgba(255,255,255,0.05);
-            border: 1.5px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.08);
+            border: 1.5px solid rgba(255,255,255,0.14);
+            color: #f4f4f5;
+        }
+        .dark .glass-input::placeholder {
+            color: rgba(212,212,216,0.8);
         }
         .dark .glass-input:focus {
             border-color: var(--theme-primary);
             box-shadow: 0 0 0 3px rgba(168,85,247,0.2);
+        }
+        /* Mobile & Dark: Alle Eingabefelder und Textareas gut lesbar */
+        .dark textarea.glass-input,
+        .dark input.glass-input,
+        .dark textarea[class*="bg-white/5"],
+        .dark textarea[class*="bg-black/20"] {
+            color: #f4f4f5 !important;
+            background: rgba(255,255,255,0.08) !important;
+        }
+        .dark textarea[class*="bg-white/5"]::placeholder,
+        .dark textarea[class*="bg-black/20"]::placeholder {
+            color: rgba(212,212,216,0.75);
         }
 
         /* ════════════════════════════════════════

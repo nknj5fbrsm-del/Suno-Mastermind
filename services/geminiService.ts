@@ -481,14 +481,15 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   const styleInstruction = artStyle && artStyle !== "Default"
     ? (isCustomPrompt ? artStyle : `${artStyle} style`)
     : "professional photography or digital painting";
-  const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. Visual only, no text or letters in the image.`;
-  const attemptGeneration = async (promptText: string, useImageConfig = true) => {
+  const noTextInstruction = "CRITICAL: The image must contain ZERO text: no letters, no words, no numbers, no logos, no titles, no writing of any kind. Purely visual artwork only.";
+  const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. ${noTextInstruction}`;
+  const attemptGeneration = async (promptText: string, useImageConfig = true, modelId?: string) => {
     return await ai.models.generateContent({
-      model: IMAGE_MODEL,
+      model: modelId || IMAGE_MODEL,
       contents: promptText,
       config: {
         responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+        imageConfig: useImageConfig ? { aspectRatio: "1:1", imageSize: "1K" } : undefined,
       },
     });
   };
@@ -506,23 +507,41 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
     }
     return null;
   };
+  const FALLBACK_IMAGE_MODEL = "gemini-2.0-flash-exp";
   try {
     let response: Awaited<ReturnType<typeof attemptGeneration>>;
     try {
       response = await attemptGeneration(primaryPrompt, true);
-    } catch {
-      response = await attemptGeneration(primaryPrompt, false);
+    } catch (firstErr) {
+      try {
+        response = await attemptGeneration(primaryPrompt, false);
+      } catch {
+        try {
+          response = await attemptGeneration(primaryPrompt, false, FALLBACK_IMAGE_MODEL);
+        } catch {
+          throw firstErr;
+        }
+      }
     }
     let dataUrl = extractImageFromResponse(response);
     if (!dataUrl) {
-      const fallbackPrompt = `Abstract album artwork, mood: ${(concept.mood || []).join(", ")}, vibrant colors, ${styleInstruction}, no text.`;
-      response = await attemptGeneration(fallbackPrompt, false);
-      dataUrl = extractImageFromResponse(response);
+      const fallbackPrompt = `Abstract album artwork, mood: ${(concept.mood || []).join(", ")}, vibrant colors, ${styleInstruction}. ${noTextInstruction}`;
+      try {
+        response = await attemptGeneration(fallbackPrompt, false);
+        dataUrl = extractImageFromResponse(response);
+      } catch {
+        response = await attemptGeneration(fallbackPrompt, false, FALLBACK_IMAGE_MODEL);
+        dataUrl = extractImageFromResponse(response);
+      }
     }
     if (dataUrl) return dataUrl;
     console.warn("Cover art: no image in response", response);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Cover art generation error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("billing") || msg.includes("429") || msg.includes("quota") || msg.includes("resource_exhausted")) {
+      throw new Error("Bildgenerierung fehlgeschlagen. Mit kostenlosem API-Key kann das Tageslimit erreicht sein oder die Funktion Billing erfordern. Bitte später erneut versuchen oder in der Google AI Studio das Kontingent prüfen.");
+    }
   }
-  throw new Error("Das Bild konnte nicht generiert werden. Bitte versuche ein neutraleres Thema.");
+  throw new Error("Das Bild konnte nicht generiert werden. Bitte versuche ein neutraleres Thema oder prüfe dein API-Kontingent.");
 };
