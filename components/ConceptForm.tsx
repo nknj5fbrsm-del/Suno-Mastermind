@@ -1,15 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { SongConcept } from '../types';
-import { analyzeTopic, generateRandomTopic, analyzeAudio, AudioAnalysisResult } from '../services/geminiService';
+import {
+  analyzeTopic, generateRandomTopic, analyzeAudio, AudioAnalysisResult,
+  generateGenreFusion, GenreFusionResult,
+  generateCreativeBoost, CreativeBoostResult,
+} from '../services/geminiService';
 import { useLang, useToast } from '../App';
 
 interface ConceptFormProps {
   initialConcept: SongConcept;
   onSubmit: (concept: SongConcept) => void;
 }
-
-// Optionen kommen aus tr.conceptOptions (übersetzt)
 
 // ─── SEARCHABLE MULTI INPUT ───────────────────────────────────────────────
 const SearchableMultiInput: React.FC<{
@@ -130,7 +132,6 @@ interface AudioFile {
   mimeType: string;
 }
 
-// Kompakte, beschriftete Audio-Upload-Leiste
 const AudioUploadBar: React.FC<{
   onAnalysisComplete: (result: AudioAnalysisResult) => void;
 }> = ({ onAnalysisComplete }) => {
@@ -189,16 +190,13 @@ const AudioUploadBar: React.FC<{
           : 'border-zinc-200 dark:border-zinc-700/60 bg-white/30 dark:bg-white/[0.03]'
       }`}
     >
-      {/* Label */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <i className={`fas text-[10px] ${success ? 'fa-check-circle text-emerald-500' : isAnalyzing ? 'fa-spinner animate-spin text-suno-primary' : 'fa-waveform-lines text-suno-primary'}`}></i>
         <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 select-none">{tr.concept.referenceAudio}</span>
       </div>
 
-      {/* Separator */}
       <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 flex-shrink-0"></div>
 
-      {/* State: no file */}
       {!audioFile && (
         <button type="button" onClick={() => fileInputRef.current?.click()}
           className="flex-1 flex items-center gap-1.5 text-[9px] font-medium text-zinc-400 dark:text-zinc-500 hover:text-suno-primary transition-colors text-left">
@@ -207,7 +205,6 @@ const AudioUploadBar: React.FC<{
         </button>
       )}
 
-      {/* State: file loaded */}
       {audioFile && (
         <div className="flex-1 flex items-center gap-2 min-w-0">
           <i className="fas fa-file-audio text-suno-primary text-[9px] flex-shrink-0"></i>
@@ -216,7 +213,6 @@ const AudioUploadBar: React.FC<{
         </div>
       )}
 
-      {/* Analyze btn (only when file loaded, not yet done) */}
       {audioFile && !success && (
         <button type="button" onClick={handleAnalyze} disabled={isAnalyzing}
           className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
@@ -226,7 +222,6 @@ const AudioUploadBar: React.FC<{
         </button>
       )}
 
-      {/* Clear btn */}
       {audioFile && (
         <button type="button" onClick={() => { setAudioFile(null); setSuccess(false); setError(''); }}
           className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[9px]">
@@ -251,6 +246,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isRandomizing, setIsRandomizing] = useState(false);
   const [randomCategory, setRandomCategory] = useState(() => tr.conceptOptions.randomThemes[0]);
+
+  // Genre-Fusion Lab
+  const [isFusing, setIsFusing] = useState(false);
+  const [fusionResult, setFusionResult] = useState<GenreFusionResult | null>(null);
+
+  // Kreativ-Boost
+  const [isBoosting, setIsBoosting] = useState(false);
+  const [boostResult, setBoostResult] = useState<CreativeBoostResult | null>(null);
 
   useEffect(() => { setConcept(initialConcept); }, [initialConcept]);
 
@@ -293,10 +296,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
   const handleAudioAnalysis = (result: AudioAnalysisResult) => {
     setConcept(prev => ({
       ...prev,
-      // Thema aus Audio-Analyse übernehmen wenn noch leer
       topic:           prev.topic.trim() ? prev.topic : (result.topicSuggestion || prev.topic),
       isInstrumental:  result.isInstrumental ?? prev.isInstrumental,
-      // Felder nur überschreiben wenn bisher leer
       genre:           prev.genre.length           ? prev.genre           : (result.genre          ?? []),
       mood:            prev.mood.length            ? prev.mood            : (result.mood           ?? []),
       tempo:           prev.tempo.length           ? prev.tempo           : (result.tempo          ?? []),
@@ -304,6 +305,58 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
       vocals:          result.isInstrumental ? [] : (prev.vocals.length   ? prev.vocals            : (result.vocals    ?? [])),
       language:        result.isInstrumental ? [] : (prev.language.length ? prev.language          : (result.language  ?? [])),
     }));
+  };
+
+  // ─── Genre-Fusion Lab ───
+  const handleFusion = async () => {
+    if (concept.genre.length < 2 || isFusing) return;
+    setIsFusing(true);
+    setFusionResult(null);
+    try {
+      const result = await generateGenreFusion(concept.genre, concept);
+      setFusionResult(result);
+    } catch (err) { console.error(err); showToast('Fusion fehlgeschlagen', 'error'); }
+    finally { setIsFusing(false); }
+  };
+
+  const applyFusion = () => {
+    if (!fusionResult) return;
+    setConcept(prev => {
+      const newInstr = [...(prev.instrumentation ?? [])];
+      fusionResult.suggestedInstruments.forEach(i => { if (!newInstr.includes(i)) newInstr.push(i); });
+      const newMood = [...prev.mood];
+      fusionResult.suggestedMood.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
+      const newTempo = [...prev.tempo];
+      if (fusionResult.suggestedBPM && !newTempo.includes(fusionResult.suggestedBPM)) newTempo.push(fusionResult.suggestedBPM);
+      return { ...prev, instrumentation: newInstr, mood: newMood, tempo: newTempo };
+    });
+    setFusionResult(null);
+  };
+
+  // ─── Kreativ-Boost ───
+  const handleBoost = async () => {
+    if (isBoosting) return;
+    setIsBoosting(true);
+    setBoostResult(null);
+    try {
+      const result = await generateCreativeBoost(concept);
+      setBoostResult(result);
+    } catch (err) { console.error(err); showToast('Boost fehlgeschlagen', 'error'); }
+    finally { setIsBoosting(false); }
+  };
+
+  const applyBoost = () => {
+    if (!boostResult) return;
+    setConcept(prev => {
+      const newGenre = [...prev.genre];
+      boostResult.addGenres.forEach(g => { if (!newGenre.includes(g)) newGenre.push(g); });
+      const newInstr = [...(prev.instrumentation ?? [])];
+      boostResult.addInstruments.forEach(i => { if (!newInstr.includes(i)) newInstr.push(i); });
+      const newMood = [...prev.mood];
+      boostResult.addMoods.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
+      return { ...prev, genre: newGenre, instrumentation: newInstr, mood: newMood };
+    });
+    setBoostResult(null);
   };
 
   return (
@@ -323,7 +376,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
             <i className="fas fa-lightbulb text-suno-primary mr-2"></i>{tr.concept.songIdea}
           </h3>
 
-          {/* Instrumental Toggle */}
           <div
             className="flex items-center gap-2 cursor-pointer select-none group"
             onClick={() => setConcept(prev => ({ ...prev, isInstrumental: !prev.isInstrumental }))}
@@ -345,7 +397,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           />
         </div>
 
-        {/* Referenz-Audio Upload Bar */}
         <AudioUploadBar onAnalysisComplete={handleAudioAnalysis} />
 
         {/* Controls row */}
@@ -366,7 +417,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
             </button>
           </div>
 
-          {/* Inspiration button */}
+          {/* Inspiration */}
           <button type="button" onClick={handleAnalyze}
             disabled={isAnalyzing || !concept.topic}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
@@ -378,7 +429,82 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
               ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.inspiring}</>
               : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
           </button>
+
+          {/* Kreativ-Boost */}
+          <button type="button" onClick={handleBoost}
+            disabled={isBoosting}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+              isBoosting
+                ? 'glass-btn text-suno-secondary border-suno-secondary/30 animate-pulse'
+                : 'glass-btn text-suno-secondary border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary'
+            }`}>
+            {isBoosting
+              ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.creativeBoostLoading}</>
+              : <><i className="fas fa-bolt"></i> {tr.concept.creativeBoost}</>}
+          </button>
         </div>
+
+        {/* ═══ KREATIV-BOOST RESULT ═══ */}
+        {boostResult && (
+          <div className="rounded-2xl border border-suno-secondary/30 bg-suno-secondary/5 dark:bg-suno-secondary/10 p-4 space-y-3 animate-scale-in">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-bolt text-suno-secondary text-sm"></i>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeBoost}</p>
+                  <p className="text-sm font-black text-zinc-800 dark:text-zinc-100">{boostResult.twistTitle}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setBoostResult(null)}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[10px] flex-shrink-0">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            <p className="text-[12px] text-zinc-600 dark:text-zinc-300 leading-relaxed">{boostResult.twistDescription}</p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {boostResult.addGenres.map((g, i) => (
+                <span key={`g${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-primary/10 text-suno-primary border border-suno-primary/20">
+                  <i className="fas fa-music mr-1 text-[7px]"></i>{g}
+                </span>
+              ))}
+              {boostResult.addInstruments.map((inst, i) => (
+                <span key={`i${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                  <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
+                </span>
+              ))}
+              {boostResult.addMoods.map((m, i) => (
+                <span key={`m${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
+                  <i className="fas fa-face-smile mr-1 text-[7px]"></i>{m}
+                </span>
+              ))}
+            </div>
+
+            {boostResult.productionTip && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
+                <i className="fas fa-lightbulb text-amber-500 text-[10px] mt-0.5 flex-shrink-0"></i>
+                <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                  <span className="font-black uppercase tracking-wider text-amber-500 mr-1">{tr.concept.boostTip}:</span>
+                  {boostResult.productionTip}
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button type="button" onClick={applyBoost}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary hover:text-white transition-all">
+                <i className="fas fa-check"></i> {tr.concept.boostApply}
+              </button>
+              <button type="button" onClick={() => setBoostResult(null)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider glass-btn text-zinc-500 hover:text-red-500 transition-all">
+                {tr.concept.boostDismiss}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ═══ FIELDS GRID ═══ */}
@@ -390,9 +516,73 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="relative">
+          <div className="relative space-y-2">
             <SearchableMultiInput label={tr.concept.genre} icon="fa-music" options={opts.genres} selected={concept.genre}
               onToggle={(v) => toggle('genre', v)} placeholder={opts.genres.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} />
+
+            {/* Genre-Fusion Button */}
+            {concept.genre.length >= 2 && (
+              <button type="button" onClick={handleFusion} disabled={isFusing}
+                className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.12em] transition-all border ${
+                  isFusing
+                    ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
+                    : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary/10'
+                }`}>
+                {isFusing
+                  ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.fusionLabLoading}</>
+                  : <><i className="fas fa-shuffle"></i> {tr.concept.fusionLab}: {concept.genre.join(' + ')}</>}
+              </button>
+            )}
+
+            {/* Genre-Fusion Result */}
+            {fusionResult && (
+              <div className="rounded-2xl border border-suno-primary/30 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 animate-scale-in">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                      <i className="fas fa-shuffle text-suno-primary text-[10px]"></i>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.fusionLab}</p>
+                      <p className="text-[13px] font-black text-zinc-800 dark:text-zinc-100">{fusionResult.fusionName}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setFusionResult(null)}
+                    className="w-5 h-5 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 text-[9px] flex-shrink-0">
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed italic">{fusionResult.description}</p>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {fusionResult.suggestedInstruments.map((inst, i) => (
+                    <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                      <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
+                    </span>
+                  ))}
+                  <span className="text-[9px] font-bold px-2 py-1 rounded-lg bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                    <i className="fas fa-gauge-high mr-1 text-[7px]"></i>{fusionResult.suggestedBPM}
+                  </span>
+                  {fusionResult.suggestedMood.map((m, i) => (
+                    <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
+                      {m}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button type="button" onClick={applyFusion}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary hover:text-white transition-all">
+                    <i className="fas fa-check"></i> {tr.concept.fusionApply}
+                  </button>
+                  <button type="button" onClick={() => setFusionResult(null)}
+                    className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold glass-btn text-zinc-500 hover:text-red-500 transition-all">
+                    {tr.concept.fusionDismiss}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="relative">
             <SearchableMultiInput label={tr.concept.mood} icon="fa-face-smile" options={opts.moods} selected={concept.mood}
@@ -424,7 +614,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
         </div>
       </div>
 
-      {/* ═══ CREATE BUTTON ═══ (Abstand damit Dropdowns nicht überdeckt werden; z-0 damit Dropdowns z-50 darüber liegen) */}
+      {/* ═══ CREATE BUTTON ═══ */}
       <div className="relative z-0 mt-20 md:mt-24">
         <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
         <button type="submit"

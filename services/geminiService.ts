@@ -532,6 +532,117 @@ Task: Enrich this style prompt for Suno V5. Make it more specific and profession
   return raw.length > SUNO_HARD_LIMIT ? raw.slice(0, SUNO_HARD_LIMIT) : raw;
 };
 
+// ——— Genre-Fusion Lab ———
+export interface GenreFusionResult {
+  fusionName: string;
+  description: string;
+  suggestedInstruments: string[];
+  suggestedBPM: string;
+  suggestedMood: string[];
+}
+
+export const generateGenreFusion = async (genres: string[], concept: SongConcept): Promise<GenreFusionResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden.");
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Genres to fuse: ${genres.join(" + ")}
+Topic context: "${concept.topic || 'not set yet'}"
+Current mood: ${concept.mood.length ? concept.mood.join(', ') : 'not set'}
+
+Create a unique genre fusion from these genres. Think like a visionary producer who blends styles in unexpected ways.`,
+    config: {
+      systemInstruction: `You are a genre-fusion specialist for Suno V5 music production. Your task is to take 2+ genres and create a unique, cohesive fusion.
+
+Rules:
+- fusionName: A catchy, short hybrid genre name in English (2-4 words, e.g. "Tropical Jazz Trap", "Cinematic Lo-Fi Soul")
+- description: 1-2 sentences describing the sonic character of this fusion – mention specific instruments, production style, rhythmic feel. Be concrete, not vague.
+- suggestedInstruments: 3-6 specific instruments that define this fusion (use exact names like "Rhodes Piano", "808 Sub-Bass", "Muted Trumpet", "Brush Drums")
+- suggestedBPM: A single BPM recommendation with feel (e.g. "92 BPM, halftime swing" or "128 BPM, four-on-the-floor")
+- suggestedMood: 2-3 mood words that match the fusion
+- Keep everything in ENGLISH
+- Be creative but musically plausible – a real producer should think "that could actually work!"`,
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          fusionName: { type: Type.STRING },
+          description: { type: Type.STRING },
+          suggestedInstruments: { type: Type.ARRAY, items: { type: Type.STRING } },
+          suggestedBPM: { type: Type.STRING },
+          suggestedMood: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["fusionName", "description", "suggestedInstruments", "suggestedBPM", "suggestedMood"],
+      },
+    },
+  });
+  return JSON.parse(response.text || "{}");
+};
+
+// ——— Kreativ-Boost / Wildcard Twist ———
+export interface CreativeBoostResult {
+  twistTitle: string;
+  twistDescription: string;
+  addGenres: string[];
+  addInstruments: string[];
+  addMoods: string[];
+  productionTip: string;
+}
+
+export const generateCreativeBoost = async (concept: SongConcept): Promise<CreativeBoostResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden.");
+  const ai = new GoogleGenAI({ apiKey });
+  const salt = Math.random().toString(36).substring(7);
+  const response = await ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Current concept:
+- Topic: "${concept.topic || 'not set'}"
+- Genres: ${concept.genre.length ? concept.genre.join(', ') : 'none'}
+- Mood: ${concept.mood.length ? concept.mood.join(', ') : 'none'}
+- Tempo: ${concept.tempo.length ? concept.tempo.join(', ') : 'none'}
+- Instruments: ${concept.instrumentation?.length ? concept.instrumentation.join(', ') : 'none'}
+- Vocals: ${concept.vocals.length ? concept.vocals.join(', ') : 'none'}
+- Instrumental: ${concept.isInstrumental ? 'yes' : 'no'}
+- Randomness seed: ${salt}
+
+Add ONE unexpected creative twist that transforms this from a good song into something unique and memorable.`,
+    config: {
+      systemInstruction: `You are a wildcard creative director for music production. Your job: take an existing song concept and add ONE unexpected but brilliant twist.
+
+Rules:
+- twistTitle: A catchy 2-5 word title for the twist (in the user's language context, prefer German if topic is German, else English)
+- twistDescription: 1-2 sentences explaining the twist and why it works musically. Be specific and inspiring.
+- addGenres: 0-2 genre elements to blend in (can be empty if twist is about instruments/production)
+- addInstruments: 1-3 specific instruments or sound elements that enable the twist (e.g. "Kalimba", "Tape-saturated Rhodes", "Vinyl Crackle Layer")
+- addMoods: 0-2 mood additions
+- productionTip: One concrete production tip for Suno (e.g. "Add 'lo-fi tape warmth' to the style prompt" or "Use 'whispered bridge' as a Regie instruction")
+- The twist must COMPLEMENT what exists, not replace it
+- Be surprising but musically plausible – think "I would never have thought of that, but it's genius"
+- Vary wildly between runs (use the seed for variety): sometimes suggest an instrument, sometimes a genre twist, sometimes a production technique, sometimes a vocal idea
+- Keep suggestions Suno V5 compatible`,
+      ...DEFAULT_THINKING,
+      temperature: 1.2,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          twistTitle: { type: Type.STRING },
+          twistDescription: { type: Type.STRING },
+          addGenres: { type: Type.ARRAY, items: { type: Type.STRING } },
+          addInstruments: { type: Type.ARRAY, items: { type: Type.STRING } },
+          addMoods: { type: Type.ARRAY, items: { type: Type.STRING } },
+          productionTip: { type: Type.STRING },
+        },
+        required: ["twistTitle", "twistDescription", "addGenres", "addInstruments", "addMoods", "productionTip"],
+      },
+    },
+  });
+  return JSON.parse(response.text || "{}");
+};
+
 export const generateCoverArt = async (concept: SongConcept, artStyle: string = "Default"): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
