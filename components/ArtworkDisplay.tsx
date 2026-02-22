@@ -207,7 +207,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
                     <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] ${isExpanded ? 'opacity-90' : 'opacity-70'}`}></i>
                   </button>
                   {isExpanded && (
-                    <div className="p-4 pt-3 bg-white/5 dark:bg-black/10">
+                    <div className="copy-pills-content p-4 pt-3 bg-white/10 dark:bg-white/10">
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-xl mx-auto">
                         {([
                           { type: 'lyrics' as CopyPillType, label: tr.artwork.copyLyrics, icon: 'fa-align-left', onClick: () => handleCopyLyrics(lyricsText), disabled: !lyricsText.trim(), primary: true },
@@ -222,7 +222,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
                             ? 'bg-zinc-600 dark:bg-zinc-500 text-white hover:bg-zinc-500'
                             : isActive
                               ? primary ? 'btn-create text-white shadow' : (num === 1 ? 'border-2 border-suno-primary bg-suno-primary/15 text-suno-primary' : 'border-2 border-suno-secondary bg-suno-secondary/15 text-suno-secondary')
-                              : 'glass-btn text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary/20';
+                              : 'glass-btn copy-pill-btn text-zinc-800 dark:text-zinc-100 hover:bg-suno-primary/20';
                           return (
                             <button
                               key={type}
