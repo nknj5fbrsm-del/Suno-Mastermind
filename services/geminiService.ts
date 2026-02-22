@@ -483,7 +483,7 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
     : "professional photography or digital painting";
   const noTextInstruction = "CRITICAL: The image must contain ZERO text: no letters, no words, no numbers, no logos, no titles, no writing of any kind. Purely visual artwork only.";
   const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. ${noTextInstruction}`;
-  const attemptGeneration = async (promptText: string, useImageConfig = true, modelId?: string) => {
+  const attemptGeneration = async (promptText: string, useImageConfig = false, modelId?: string) => {
     return await ai.models.generateContent({
       model: modelId || IMAGE_MODEL,
       contents: promptText,
@@ -508,18 +508,21 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
     return null;
   };
   const FALLBACK_IMAGE_MODEL = "gemini-2.0-flash-exp";
+  const freeTierHint = " Kostenloser Key (aistudio.google.com): Tageslimit ca. 500 Bilder; Key dort erstellen und hier eintragen.";
   try {
     let response: Awaited<ReturnType<typeof attemptGeneration>>;
+    // Free-Tier: Zuerst minimaler Aufruf ohne imageConfig (beste Kompatibilität mit kostenlosem API-Key)
     try {
-      response = await attemptGeneration(primaryPrompt, true);
-    } catch (firstErr) {
+      response = await attemptGeneration(primaryPrompt, false);
+    } catch (e1) {
       try {
-        response = await attemptGeneration(primaryPrompt, false);
-      } catch {
+        response = await attemptGeneration(primaryPrompt, true);
+      } catch (e2) {
         try {
           response = await attemptGeneration(primaryPrompt, false, FALLBACK_IMAGE_MODEL);
-        } catch {
-          throw firstErr;
+        } catch (e3) {
+          console.warn("Cover art attempts failed:", { e1, e2, e3 });
+          throw e1;
         }
       }
     }
@@ -530,8 +533,12 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
         response = await attemptGeneration(fallbackPrompt, false);
         dataUrl = extractImageFromResponse(response);
       } catch {
-        response = await attemptGeneration(fallbackPrompt, false, FALLBACK_IMAGE_MODEL);
-        dataUrl = extractImageFromResponse(response);
+        try {
+          response = await attemptGeneration(fallbackPrompt, false, FALLBACK_IMAGE_MODEL);
+          dataUrl = extractImageFromResponse(response);
+        } catch {
+          // keep dataUrl null
+        }
       }
     }
     if (dataUrl) return dataUrl;
@@ -539,9 +546,11 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   } catch (err: unknown) {
     console.error("Cover art generation error:", err);
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("billing") || msg.includes("429") || msg.includes("quota") || msg.includes("resource_exhausted")) {
-      throw new Error("Bildgenerierung fehlgeschlagen. Mit kostenlosem API-Key kann das Tageslimit erreicht sein oder die Funktion Billing erfordern. Bitte später erneut versuchen oder in der Google AI Studio das Kontingent prüfen.");
+    const isBillingOrQuota = /billing|429|quota|resource_exhausted|403|not supported|not available/i.test(msg);
+    if (isBillingOrQuota) {
+      throw new Error("Bildgenerierung fehlgeschlagen (Limit oder Berechtigung)." + freeTierHint);
     }
+    throw new Error("Bildgenerierung fehlgeschlagen: " + (msg.slice(0, 80) || "Unbekannter Fehler") + "." + freeTierHint);
   }
-  throw new Error("Das Bild konnte nicht generiert werden. Bitte versuche ein neutraleres Thema oder prüfe dein API-Kontingent.");
+  throw new Error("Das Bild konnte nicht generiert werden." + freeTierHint);
 };
