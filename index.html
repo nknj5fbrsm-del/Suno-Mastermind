@@ -24,6 +24,7 @@
             --theme-primary: #9333ea;
             --theme-secondary: #db2777;
             --theme-accent: #a855f7;
+            --theme-headline: #a78bfa;
             --orb1: rgba(147,51,234,0.25);
             --orb2: rgba(219,39,119,0.18);
         }
@@ -32,6 +33,7 @@
             --theme-primary: #a855f7;
             --theme-secondary: #ec4899;
             --theme-accent: #c084fc;
+            --theme-headline: #c4b5fd;
             --orb1: rgba(168,85,247,0.22);
             --orb2: rgba(236,72,153,0.16);
         }
@@ -40,6 +42,7 @@
             --theme-primary: #f97316;
             --theme-secondary: #ef4444;
             --theme-accent: #fbbf24;
+            --theme-headline: #fdba74;
             --orb1: rgba(249,115,22,0.22);
             --orb2: rgba(239,68,68,0.16);
         }
@@ -48,6 +51,7 @@
             --theme-primary: #ea580c;
             --theme-secondary: #dc2626;
             --theme-accent: #f59e0b;
+            --theme-headline: #fb923c;
             --orb1: rgba(234,88,12,0.18);
             --orb2: rgba(220,38,38,0.13);
         }
@@ -56,6 +60,7 @@
             --theme-primary: #10b981;
             --theme-secondary: #06b6d4;
             --theme-accent: #34d399;
+            --theme-headline: #6ee7b7;
             --orb1: rgba(16,185,129,0.2);
             --orb2: rgba(6,182,212,0.14);
         }
@@ -64,6 +69,7 @@
             --theme-primary: #059669;
             --theme-secondary: #0891b2;
             --theme-accent: #10b981;
+            --theme-headline: #5eead4;
             --orb1: rgba(5,150,105,0.18);
             --orb2: rgba(8,145,178,0.13);
         }
@@ -209,6 +215,56 @@
             box-shadow: 0 0 0 3px rgba(168,85,247,0.15);
             outline: none;
         }
+        /* Hellmodus: maximale Lesbarkeit – dunkle Schrift auf hellem Grund */
+        html:not(.dark) .glass-input {
+            color: #18181b !important;
+            background: rgba(255,255,255,0.92) !important;
+            border-color: rgba(0,0,0,0.08) !important;
+        }
+        html:not(.dark) .glass-input::placeholder {
+            color: #71717a !important;
+        }
+        html:not(.dark) .glass-card {
+            color: #18181b;
+            background: rgba(255,255,255,0.85) !important;
+            border-color: rgba(0,0,0,0.06) !important;
+        }
+        html:not(.dark) .glass-btn {
+            color: #27272a !important;
+            background: rgba(255,255,255,0.9) !important;
+            border-color: rgba(0,0,0,0.1) !important;
+        }
+        html:not(.dark) .glass-btn:hover {
+            background: rgba(255,255,255,1) !important;
+            color: #18181b !important;
+            border-color: rgba(0,0,0,0.12) !important;
+        }
+        html:not(.dark) .glass-dropdown {
+            background: rgba(255,255,255,0.98) !important;
+            border-color: rgba(0,0,0,0.1) !important;
+            color: #18181b !important;
+        }
+        html:not(.dark) .glass-dropdown button {
+            color: #18181b !important;
+        }
+        html:not(.dark) .glass-dropdown button:hover {
+            color: var(--theme-primary) !important;
+            background: rgba(168,85,247,0.08) !important;
+        }
+        html:not(.dark) .glass-card input,
+        html:not(.dark) .glass-card textarea,
+        html:not(.dark) .glass-card select {
+            color: #18181b !important;
+        }
+        html:not(.dark) .glass-card input::placeholder,
+        html:not(.dark) .glass-card textarea::placeholder {
+            color: #71717a !important;
+        }
+        html:not(.dark) .section-pill {
+            color: var(--theme-primary);
+            background: rgba(168,85,247,0.12);
+            border-color: rgba(168,85,247,0.3);
+        }
         .dark .glass-input {
             background: rgba(255,255,255,0.08);
             border: 1.5px solid rgba(255,255,255,0.14);
@@ -257,6 +313,11 @@
         /* ════════════════════════════════════════
            2026 COMPONENT HELPERS
         ════════════════════════════════════════ */
+
+        /* Dashboard: Headline in blasser Designfarbe */
+        .dashboard-headline {
+            color: var(--theme-headline);
+        }
 
         /* Section label (small pill above headline) */
         .section-pill {

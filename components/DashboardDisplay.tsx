@@ -1,5 +1,5 @@
-
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { SongHistoryItem } from '../types';
 import { exportArchive, importArchive } from '../services/storageService';
 import { useLang, useToast } from '../App';
@@ -64,8 +64,8 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
   return (
     <section className="space-y-6 animate-fade-up">
 
-      {/* ═══ TUTORIAL MODAL ═══ */}
-      {tutorialOpen && (
+      {/* ═══ TUTORIAL MODAL (Portal → body, damit über Header) ═══ */}
+      {tutorialOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setTutorialOpen(false)}>
           <div className="w-full max-w-lg rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar" style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
             onClick={e => e.stopPropagation()}>
@@ -97,11 +97,12 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               <i className="fas fa-check"></i> {tr.tutorial.close}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* ═══ ARCHIV MODAL ═══ */}
-      {archiveOpen && (
+      {/* ═══ ARCHIV MODAL (Portal → body, damit über Header) ═══ */}
+      {archiveOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setArchiveOpen(false)}>
           <div className="w-full max-w-2xl rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar" style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
             onClick={e => e.stopPropagation()}>
@@ -191,7 +192,8 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               <i className="fas fa-times"></i> {tr.tutorial.close}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ═══ HERO ═══ */}
@@ -199,7 +201,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
         <div className="absolute inset-0 suno-gradient-soft rounded-3xl pointer-events-none"></div>
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
-            <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-zinc-900 dark:text-white">
+            <h2 className="dashboard-headline text-3xl md:text-4xl font-black tracking-tight leading-tight">
               {tr.dashboard.headline}
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium max-w-sm leading-relaxed">

@@ -67,7 +67,7 @@ const SearchableMultiInput: React.FC<{
   return (
     <div className={`space-y-2 transition-opacity ${disabled ? 'opacity-40 pointer-events-none' : ''}`} ref={wrapperRef}>
       <div className="flex items-center justify-between">
-        <label className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] ${disabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-600 dark:text-zinc-400'}`}>
+        <label className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] ${disabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-700 dark:text-zinc-400'}`}>
           <i className={`fas ${icon} text-[10px] ${accent}`}></i> {label}
         </label>
         {isLoading && <span className={`text-[8px] font-black uppercase tracking-wider ${accent} animate-pulse`}><i className="fas fa-wand-magic-sparkles mr-1"></i>{tr.concept.inspiring}</span>}
@@ -77,7 +77,7 @@ const SearchableMultiInput: React.FC<{
           type="text"
           disabled={disabled}
           autoComplete="off"
-          className={`w-full glass-input rounded-xl px-3.5 py-3 pr-10 text-sm outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-zinc-100 ${isLoading ? 'border-suno-primary/50' : ''}`}
+          className={`w-full glass-input rounded-xl px-3.5 py-3 pr-10 text-sm outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100 ${isLoading ? 'border-suno-primary/50' : ''}`}
           value={searchTerm}
           placeholder={placeholder}
           onFocus={handleInputFocus}
@@ -92,10 +92,10 @@ const SearchableMultiInput: React.FC<{
       </div>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix">
+        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix concept-dropdown-options">
           {filtered.length > 0 ? filtered.map(opt => (
             <button key={opt} type="button"
-              className="w-full text-left px-4 py-2.5 text-xs font-medium hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-700 dark:text-zinc-300 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
+              className="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-800 dark:text-zinc-200 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
               onClick={() => { onToggle(opt); setSearchTerm(''); setIsOpen(false); }}>
               {opt}
             </button>
@@ -328,17 +328,17 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
             className="flex items-center gap-2 cursor-pointer select-none group"
             onClick={() => setConcept(prev => ({ ...prev, isInstrumental: !prev.isInstrumental }))}
           >
-            <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${!concept.isInstrumental ? 'text-suno-primary' : 'text-zinc-400 dark:text-zinc-600'}`}>{tr.concept.lyrics}</span>
+            <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${!concept.isInstrumental ? 'text-suno-primary' : 'text-zinc-500 dark:text-zinc-600'}`}>{tr.concept.lyrics}</span>
             <div className={`w-10 h-5 rounded-full relative transition-all duration-300 border ${concept.isInstrumental ? 'suno-gradient border-suno-primary/60' : 'bg-zinc-200 dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600'}`}>
               <div className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-all duration-300 ${concept.isInstrumental ? 'left-[22px]' : 'left-0.5'}`}></div>
             </div>
-            <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${concept.isInstrumental ? 'text-suno-primary' : 'text-zinc-400 dark:text-zinc-600'}`}>{tr.concept.instrumental}</span>
+            <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${concept.isInstrumental ? 'text-suno-primary' : 'text-zinc-500 dark:text-zinc-600'}`}>{tr.concept.instrumental}</span>
           </div>
         </div>
 
         <div className="relative">
           <textarea
-            className="glass-input w-full rounded-2xl px-4 py-4 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none h-32 custom-scrollbar"
+            className="glass-input w-full rounded-2xl px-4 py-4 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-300 dark:placeholder:text-zinc-500 resize-none h-32 custom-scrollbar"
             placeholder={concept.isInstrumental ? tr.concept.placeholderInstrumental : tr.concept.placeholder}
             value={concept.topic}
             onChange={(e) => setConcept(prev => ({ ...prev, topic: e.target.value }))}
@@ -383,10 +383,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
 
       {/* ═══ FIELDS GRID ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-6">
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400 flex items-center gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
           <span className="section-pill">{tr.concept.details}</span>
           <span className="gradient-line flex-1 block"></span>
-          <span className="text-zinc-400">{tr.concept.optional}</span>
+          <span className="text-zinc-600 dark:text-zinc-400">{tr.concept.optional}</span>
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -424,8 +424,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
         </div>
       </div>
 
-      {/* ═══ CREATE BUTTON ═══ */}
-      <div className="relative">
+      {/* ═══ CREATE BUTTON ═══ (Abstand damit Dropdowns nicht überdeckt werden; z-0 damit Dropdowns z-50 darüber liegen) */}
+      <div className="relative z-0 mt-20 md:mt-24">
         <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
         <button type="submit"
           className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3">
