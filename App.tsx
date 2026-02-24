@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
   const [themeDropdownAnchor, setThemeDropdownAnchor] = useState<{ top: number; right: number } | null>(null);
@@ -307,6 +308,75 @@ const App: React.FC = () => {
     <LangContext.Provider value={{ lang, tr }}>
     <div className="min-h-screen flex flex-col bg-suno-bg text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
 
+      {/* ─── ABOUT MODAL (NilsP) ─── */}
+      {aboutOpen && createPortal(
+        <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setAboutOpen(false)}>
+          <div
+            className="w-full max-w-lg glass-card rounded-3xl p-6 md:p-7 space-y-5 animate-scale-in overflow-y-auto custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-2xl suno-gradient flex items-center justify-center text-white shadow-md">
+                  <i className="fas fa-user text-sm"></i>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">Über</p>
+                  <p className="text-sm font-black text-zinc-100 leading-tight">Nils Pocklitz</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAboutOpen(false)}
+                className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-[12px] leading-relaxed text-zinc-200">
+              <p>
+                Ich bin Musiker mit über 40 Jahren Erfahrung, insbesondere an der Trompete.
+                Mein Verständnis von Musik basiert auf präziser Artikulation, komplexer Harmonik
+                und der emotionalen Wucht musikalischer Arrangements.
+              </p>
+              <p>
+                Die Suno Mastermind App ist aus der Notwendigkeit entstanden, die Lücke zwischen
+                vager KI-Generierung und professioneller musikalischer Kontrolle zu schließen.
+                Während gängige KI-Tools oft im Ungefähren bleiben, nutzt diese App spezialisiertes
+                Musik-Vokabular und strukturierte Regieanweisungen, um Ergebnisse auf professionellem
+                Niveau zu erzwingen – ohne Phrasen und ohne Klischees.
+              </p>
+              <p>
+                Mein Ziel ist es, die generative Kraft der KI so zu steuern, dass sie als echtes
+                Werkzeug für anspruchsvolle Musiker dient, die genau wissen, wie ein Horn strahlen
+                oder ein Cello atmen muss.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <a
+                href="https://suno.com/@cwzjtpwwwy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-create flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.18em]"
+              >
+                <i className="fas fa-headphones text-sm"></i>
+                Zu meinem Suno-Profil
+              </a>
+              <button
+                type="button"
+                onClick={() => setAboutOpen(false)}
+                className="glass-btn flex-1 py-2.5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300 hover:text-suno-primary"
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ─── HEADER ─── */}
       <header className="glass-header sticky top-0 z-[60] px-0 md:px-8">
 
@@ -329,12 +399,15 @@ const App: React.FC = () => {
 
             {/* External links – große Icons, auf Mobile sichtbar */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <a href="https://suno.com/@cwzjtpwwwy" target="_blank" rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setAboutOpen(true)}
                 className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
-                title="Mein Suno-Profil">
+                title="Über NilsP"
+              >
                 <i className="fas fa-user text-suno-primary text-base sm:text-sm"></i>
                 <span className="hidden sm:inline">NilsP</span>
-              </a>
+              </button>
               <a href="https://suno.com/create" target="_blank" rel="noopener noreferrer"
                 className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
                 title="Suno Create">

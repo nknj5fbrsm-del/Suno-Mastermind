@@ -21,13 +21,18 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
   const [tutorialOpen,  setTutorialOpen]  = useState(false);
   const [archiveOpen,   setArchiveOpen]   = useState(false);
   const [whatsNewOpen,  setWhatsNewOpen]  = useState(false);
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDeleteAll = () => {
+  const handleDeleteAllClick = () => {
     if (!history.length) return;
-    const confirmed = window.confirm(tr.dashboard.deleteAllConfirm || 'Wirklich alle Archiv-Einträge löschen?');
-    if (!confirmed) return;
+    setConfirmDeleteAllOpen(true);
+  };
+
+  const handleDeleteAllConfirm = () => {
     history.forEach(item => onDelete(item.id));
+    setConfirmDeleteAllOpen(false);
+    setArchiveOpen(false);
   };
 
   const handleExport = async () => {
@@ -104,6 +109,28 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
         document.body
       )}
 
+      {/* ═══ BESTÄTIGUNG „Alle löschen“ (Portal → body) ═══ */}
+      {confirmDeleteAllOpen && createPortal(
+        <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setConfirmDeleteAllOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in" style={{ ...modalStyle }} onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-bold text-zinc-200 text-center leading-relaxed">
+              {tr.dashboard.deleteAllConfirm}
+            </p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setConfirmDeleteAllOpen(false)}
+                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-300 text-xs font-bold uppercase tracking-wider">
+                {tr.dashboard.deleteAllCancel}
+              </button>
+              <button type="button" onClick={handleDeleteAllConfirm}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-red-500 text-white hover:bg-red-600">
+                {tr.dashboard.deleteAll}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ═══ ARCHIV MODAL (Portal → body, damit über Header) ═══ */}
       {archiveOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setArchiveOpen(false)}>
@@ -122,15 +149,18 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               </div>
               <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-                <button onClick={handleExport} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
-                  <i className="fas fa-arrow-up-from-bracket text-[9px]"></i> {tr.dashboard.export}
+                <button type="button" onClick={handleExport} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                  <i className="fas fa-arrow-up-from-bracket text-[9px]" aria-hidden></i>
+                  <span>{tr.dashboard.export}</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
-                  <i className="fas fa-arrow-down-to-bracket text-[9px]"></i> {tr.dashboard.import}
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                  <i className="fas fa-download text-[9px]" aria-hidden></i>
+                  <span>{tr.dashboard.import}</span>
                 </button>
                 {history.length > 0 && (
                   <button
-                    onClick={handleDeleteAll}
+                    type="button"
+                    onClick={handleDeleteAllClick}
                     className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[9px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
                   >
                     <i className="fas fa-trash text-[9px]"></i> {tr.dashboard.deleteAll}
@@ -266,14 +296,14 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               <i className="fas fa-sparkles text-suno-primary"></i>
               {tr.dashboard.whatsNew}
             </button>
-            {history.length > 0 && (
-              <button onClick={() => setArchiveOpen(true)}
-                className="glass-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider hover:text-suno-secondary touch-target">
-                <i className="fas fa-folder-open text-suno-secondary"></i>
-                {tr.dashboard.archive}
+            <button onClick={() => setArchiveOpen(true)}
+              className="glass-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider hover:text-suno-secondary touch-target">
+              <i className="fas fa-folder-open text-suno-secondary"></i>
+              {tr.dashboard.archive}
+              {history.length > 0 && (
                 <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-suno-secondary/15 text-suno-secondary text-[9px] font-black">{history.length}</span>
-              </button>
-            )}
+              )}
+            </button>
             <button onClick={onStartNew}
               className="btn-create flex items-center gap-2 px-5 py-2.5 rounded-2xl text-white font-black text-xs uppercase tracking-[0.18em] shadow-xl touch-target">
               <i className="fas fa-plus"></i>
