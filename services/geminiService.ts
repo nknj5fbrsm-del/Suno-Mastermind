@@ -17,6 +17,30 @@ const getApiKey = (): string => {
   return win.GEMINI_API_KEY || "";
 };
 
+// ——— Rate-Limit-aware Retry mit Exponential Backoff ———
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  { maxRetries = 3, baseDelay = 2000, maxDelay = 30000 }: { maxRetries?: number; baseDelay?: number; maxDelay?: number } = {}
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable = /429|resource_exhausted|quota|overloaded|503|unavailable/i.test(msg);
+      if (!isRetryable || attempt === maxRetries) throw err;
+      const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 1000, maxDelay);
+      console.warn(`[Gemini] Rate limit hit (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms…`);
+      await sleep(delay);
+    }
+  }
+  throw lastError;
+}
+
 // ——— Bereinigt %20 und andere URL-Encodings in KI-Text (z. B. Lyrics) ———
 export function cleanText(text: string): string {
   if (!text || typeof text !== "string") return "";
@@ -137,11 +161,11 @@ export const generateRandomTopic = async (category: string = "Zufall"): Promise<
   const ai = new GoogleGenAI({ apiKey });
   const salt = Math.random().toString(36).substring(7);
   const categoryGuidance = category !== "Zufall" ? `eine Songidee, die thematisch in den Bereich '${category}' passt (alltagstauglich, keine KI/Sci-Fi/Skurrilitäten)` : "eine alltagstaugliche Songidee (z. B. Alltag, Natur, Liebe, Reise, Erinnerung)";
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Generiere ${categoryGuidance}. Alltagstauglich, kein Sci-Fi/KI/elektronisch/skurril. Seed: ${salt}`,
-    config: { systemInstruction: RANDOM_TOPIC_PROMPT, temperature: 1.0, ...DEFAULT_THINKING },
-  });
+    config: { systemInstruction: RANDOM_TOPIC_PROMPT, temperature: 1.0 },
+  }));
   const raw = response.text?.replace(/["']/g, "").trim() || "Ein sonniger Tag am geheimen See.";
   return cleanText(raw);
 };
@@ -153,7 +177,7 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
   const instrumentalNote = isInstrumental
     ? " WICHTIG: Es handelt sich um ein INSTRUMENTAL-Stück. Setze 'language' und 'vocals' zwingend auf leere Arrays []. Konzentriere dich auf genre, mood, tempo und vor allem auf präzise 'instrumentation' (konkrete Instrumente wie Rhodes Piano, Upright Bass, Piccolo Trumpet)."
     : " Gib auch passende language- und vocals-Vorschläge.";
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Analyse für Suno V5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
 - Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (z. B. Jazz, Brass Band, Latin Brass).
@@ -176,7 +200,7 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
         required: ["genre", "mood", "tempo", "instrumentation", "language", "vocals"],
       },
     },
-  });
+  }));
   const defaultSuggestions: Partial<SongConcept> = {
     language: [],
     vocals: [],
@@ -234,7 +258,7 @@ Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
     topicSuggestion: "",
   };
 
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: [
       {
@@ -264,7 +288,7 @@ Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
         required: ["genre", "mood", "tempo", "instrumentation", "isInstrumental", "topicSuggestion"],
       },
     },
-  });
+  }));
 
   try {
     const parsed = JSON.parse(response.text || "{}");
@@ -323,11 +347,11 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
 
   const { onChunk } = options;
   let accumulated = "";
-  const stream = await ai.models.generateContentStream({
+  const stream = await withRetry(() => ai.models.generateContentStream({
     model: TEXT_MODEL,
     contents: prompt,
     config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 1.0, ...DEFAULT_THINKING },
-  });
+  }));
   for await (const chunk of stream) {
     const text = chunk.text ?? "";
     if (text) {
@@ -362,11 +386,11 @@ Regie-Anreicherung in [ ]:
 
 WICHTIG: Die erste Zeile der Antwort muss direkt der Inhalt sein (kein „Hier ist…“, keine Überschrift). Jede Zeile ohne [ ] muss exakt gleich bleiben.`;
 
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Eingabe (nur Regie in [ ] anreichern, Rest unverändert):\n\n${lyrics}`,
     config: { systemInstruction: SYSTEM_INSTRUCTION + "\n\nBei dieser Aufgabe: Antworte NUR mit dem angereicherten Songtext. Keine Einleitung, keine Erklärung. Erste Zeile = erste Zeile des Songs.", temperature: 0.4, ...DEFAULT_THINKING },
-  });
+  }));
   const raw = response.text?.trim() || lyrics;
   const cleaned = cleanText(raw);
   return stripLyricsPreamble(cleaned);
@@ -397,7 +421,7 @@ export const generateStylePrompt = async (
     }
   }
   let accumulated = "";
-  const stream = await ai.models.generateContentStream({
+  const stream = await withRetry(() => ai.models.generateContentStream({
     model: TEXT_MODEL,
     contents: `Suno V5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}
 - Aufgabe: Erzeuge einen extrem kompakten, hochpräzisen Style-Prompt für eine Musik-KI wie Suno.
@@ -438,7 +462,7 @@ export const generateStylePrompt = async (
         required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "recommendationReason", "songDescription"],
       },
     },
-  });
+  }));
   for await (const chunk of stream) {
     const text = chunk.text ?? "";
     if (text) accumulated += text;
@@ -485,19 +509,18 @@ export const suggestStyleTags = async (concept: SongConcept, _lyrics: string): P
   const apiKey = getApiKey();
   if (!apiKey) return [];
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Suggest 5 professional Suno V5 style tags for: Topic "${concept.topic}", Genres "${concept.genre.join(", ")}". Focus on instrumentation and recording techniques.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
-      ...DEFAULT_THINKING,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
       },
     },
-  });
+  }));
   try {
     const parsed = JSON.parse(response.text || "[]");
     return Array.isArray(parsed) ? parsed : [];
@@ -514,7 +537,7 @@ export const enrichStylePrompt = async (prompt: string, concept: SongConcept): P
   const noBrass = concept.genre.some(g => /jazz|brass|latin|barock/i.test(g))
     ? ""
     : " No trumpet/brass/horns unless the genre demands it.";
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Current Suno V5 style prompt: "${prompt}"
 Genre context: ${concept.genre.join(", ")}. Topic: "${concept.topic}".
@@ -527,7 +550,7 @@ Task: Enrich this style prompt for Suno V5. Make it more specific and profession
 - Keep it ENGLISH ONLY, concise (target 80–200 chars, max 300), and purely descriptive (no lyrics).
 - Return ONLY the enriched prompt text, nothing else.`,
     config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.5, ...DEFAULT_THINKING },
-  });
+  }));
   const raw = (response.text || prompt).trim().replace(/^["']|["']$/g, '');
   return raw.length > SUNO_HARD_LIMIT ? raw.slice(0, SUNO_HARD_LIMIT) : raw;
 };
@@ -545,7 +568,7 @@ export const generateGenreFusion = async (genres: string[], concept: SongConcept
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden.");
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Genres to fuse: ${genres.join(" + ")}
 Topic context: "${concept.topic || 'not set yet'}"
@@ -577,7 +600,7 @@ Rules:
         required: ["fusionName", "description", "suggestedInstruments", "suggestedBPM", "suggestedMood"],
       },
     },
-  });
+  }));
   return JSON.parse(response.text || "{}");
 };
 
@@ -596,7 +619,7 @@ export const generateCreativeBoost = async (concept: SongConcept): Promise<Creat
   if (!apiKey) throw new Error("Kein API Key gefunden.");
   const ai = new GoogleGenAI({ apiKey });
   const salt = Math.random().toString(36).substring(7);
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Current concept:
 - Topic: "${concept.topic || 'not set'}"
@@ -639,7 +662,7 @@ Rules:
         required: ["twistTitle", "twistDescription", "addGenres", "addInstruments", "addMoods", "productionTip"],
       },
     },
-  });
+  }));
   return JSON.parse(response.text || "{}");
 };
 
@@ -647,23 +670,13 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
-  // Eigener Prompt: längere Texte als volle Style-Anweisung nutzen, Presets mit " style" anhängen
   const isCustomPrompt = artStyle && (artStyle.length > 30 || artStyle.includes("."));
   const styleInstruction = artStyle && artStyle !== "Default"
     ? (isCustomPrompt ? artStyle : `${artStyle} style`)
     : "professional photography or digital painting";
-  const noTextInstruction = "CRITICAL: The image must contain ZERO text: no letters, no words, no numbers, no logos, no titles, no writing of any kind. Purely visual artwork only.";
+  const noTextInstruction = "CRITICAL: The image must contain ZERO text, no letters, no words, no numbers, no logos, no titles. Purely visual artwork only.";
   const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. ${noTextInstruction}`;
-  const attemptGeneration = async (promptText: string, useImageConfig = false, modelId?: string) => {
-    return await ai.models.generateContent({
-      model: modelId || IMAGE_MODEL,
-      contents: promptText,
-      config: {
-        responseModalities: ["TEXT", "IMAGE"],
-        imageConfig: useImageConfig ? { aspectRatio: "1:1", imageSize: "1K" } : undefined,
-      },
-    });
-  };
+
   const extractImageFromResponse = (response: Awaited<ReturnType<typeof ai.models.generateContent>>): string | null => {
     const parts = response.candidates?.[0]?.content?.parts;
     if (!parts) return null;
@@ -678,50 +691,62 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
     }
     return null;
   };
+
   const FALLBACK_IMAGE_MODEL = "gemini-2.0-flash-exp";
-  const freeTierHint = " Kostenloser Key (aistudio.google.com): Tageslimit ca. 500 Bilder; Key dort erstellen und hier eintragen.";
-  try {
-    let response: Awaited<ReturnType<typeof attemptGeneration>>;
-    // Free-Tier: Zuerst minimaler Aufruf ohne imageConfig (beste Kompatibilität mit kostenlosem API-Key)
+  const freeTierHint = " Tipp: Kostenloser Key (aistudio.google.com) hat ein Tageslimit von ca. 500 Bildern und max. 15 pro Minute. Bei 429-Fehlern: 1–2 Minuten warten und erneut versuchen.";
+
+  // Modell-Kaskade: primär → mit imageConfig → Fallback-Modell, jeweils mit Backoff-Retry
+  const modelAttempts: Array<{ model: string; useImageConfig: boolean; label: string }> = [
+    { model: IMAGE_MODEL, useImageConfig: false, label: "primary" },
+    { model: IMAGE_MODEL, useImageConfig: true, label: "primary+config" },
+    { model: FALLBACK_IMAGE_MODEL, useImageConfig: false, label: "fallback" },
+  ];
+
+  for (const attempt of modelAttempts) {
     try {
-      response = await attemptGeneration(primaryPrompt, false);
-    } catch (e1) {
-      try {
-        response = await attemptGeneration(primaryPrompt, true);
-      } catch (e2) {
-        try {
-          response = await attemptGeneration(primaryPrompt, false, FALLBACK_IMAGE_MODEL);
-        } catch (e3) {
-          console.warn("Cover art attempts failed:", { e1, e2, e3 });
-          throw e1;
+      const response = await withRetry(
+        () => ai.models.generateContent({
+          model: attempt.model,
+          contents: primaryPrompt,
+          config: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: attempt.useImageConfig ? { aspectRatio: "1:1", imageSize: "1K" } : undefined,
+          },
+        }),
+        { maxRetries: 2, baseDelay: 3000 }
+      );
+      const dataUrl = extractImageFromResponse(response);
+      if (dataUrl) return dataUrl;
+    } catch (err) {
+      console.warn(`[Cover] ${attempt.label} failed:`, err instanceof Error ? err.message : err);
+      if (attempt.label === "fallback") {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isQuota = /429|quota|resource_exhausted|billing|403|not supported|not available/i.test(msg);
+        if (isQuota) {
+          throw new Error("Bildgenerierung: Rate-Limit erreicht (429)." + freeTierHint);
         }
+        throw new Error("Bildgenerierung fehlgeschlagen: " + (msg.slice(0, 100) || "Unbekannter Fehler") + "." + freeTierHint);
       }
+      await sleep(2000);
     }
-    let dataUrl = extractImageFromResponse(response);
-    if (!dataUrl) {
-      const fallbackPrompt = `Abstract album artwork, mood: ${(concept.mood || []).join(", ")}, vibrant colors, ${styleInstruction}. ${noTextInstruction}`;
-      try {
-        response = await attemptGeneration(fallbackPrompt, false);
-        dataUrl = extractImageFromResponse(response);
-      } catch {
-        try {
-          response = await attemptGeneration(fallbackPrompt, false, FALLBACK_IMAGE_MODEL);
-          dataUrl = extractImageFromResponse(response);
-        } catch {
-          // keep dataUrl null
-        }
-      }
-    }
-    if (dataUrl) return dataUrl;
-    console.warn("Cover art: no image in response", response);
-  } catch (err: unknown) {
-    console.error("Cover art generation error:", err);
-    const msg = err instanceof Error ? err.message : String(err);
-    const isBillingOrQuota = /billing|429|quota|resource_exhausted|403|not supported|not available/i.test(msg);
-    if (isBillingOrQuota) {
-      throw new Error("Bildgenerierung fehlgeschlagen (Limit oder Berechtigung)." + freeTierHint);
-    }
-    throw new Error("Bildgenerierung fehlgeschlagen: " + (msg.slice(0, 80) || "Unbekannter Fehler") + "." + freeTierHint);
   }
+
+  // Letzter Versuch: vereinfachter Prompt (weniger Token, höhere Erfolgschance)
+  try {
+    const simplePrompt = `Abstract album artwork, mood: ${(concept.mood || []).join(", ") || "emotional"}, vibrant colors, ${styleInstruction}. No text.`;
+    const response = await withRetry(
+      () => ai.models.generateContent({
+        model: IMAGE_MODEL,
+        contents: simplePrompt,
+        config: { responseModalities: ["TEXT", "IMAGE"] },
+      }),
+      { maxRetries: 1, baseDelay: 5000 }
+    );
+    const dataUrl = extractImageFromResponse(response);
+    if (dataUrl) return dataUrl;
+  } catch {
+    // handled below
+  }
+
   throw new Error("Das Bild konnte nicht generiert werden." + freeTierHint);
 };
