@@ -402,14 +402,14 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAboutOpen(true)}
-                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
+                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 hover:text-suno-primary touch-target"
                 title="Über NilsP"
               >
                 <i className="fas fa-user text-suno-primary text-base sm:text-sm"></i>
                 <span className="hidden sm:inline">NilsP</span>
               </button>
               <a href="https://suno.com/create" target="_blank" rel="noopener noreferrer"
-                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary touch-target"
+                className="glass-btn flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 hover:text-suno-primary touch-target"
                 title="Suno Create">
                 <i className="fas fa-headphones text-suno-primary text-base sm:text-sm"></i>
                 <span className="hidden sm:inline">Suno</span>

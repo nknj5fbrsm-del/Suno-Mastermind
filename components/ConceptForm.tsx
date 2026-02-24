@@ -406,7 +406,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
             <select
               value={randomCategory}
               onChange={(e) => setRandomCategory(e.target.value)}
-              className="bg-transparent text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 outline-none px-2.5 py-2 cursor-pointer border-r border-white/20 dark:border-white/8"
+              className="bg-transparent text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 outline-none px-2.5 py-2 cursor-pointer border-r border-white/20 dark:border-white/8"
             >
               {opts.randomThemes.map(theme => <option key={theme} value={theme} className="bg-white dark:bg-zinc-900">{theme}</option>)}
             </select>
@@ -420,7 +420,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           {/* Inspiration */}
           <button type="button" onClick={handleAnalyze}
             disabled={isAnalyzing || !concept.topic}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] transition-all border ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] transition-all border ${
               isAnalyzing
                 ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
                 : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
@@ -433,7 +433,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           {/* Kreativ-Boost */}
           <button type="button" onClick={handleBoost}
             disabled={isBoosting}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.12em] transition-all border ${
               isBoosting
                 ? 'glass-btn text-suno-secondary border-suno-secondary/30 animate-pulse'
                 : 'glass-btn text-suno-secondary border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary'

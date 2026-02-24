@@ -149,11 +149,11 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               </div>
               <div className="flex items-center gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-                <button type="button" onClick={handleExport} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                <button type="button" onClick={handleExport} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
                   <i className="fas fa-arrow-up-from-bracket text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.export}</span>
                 </button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
                   <i className="fas fa-download text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.import}</span>
                 </button>
@@ -161,7 +161,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                   <button
                     type="button"
                     onClick={handleDeleteAllClick}
-                    className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[9px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
+                    className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[10px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
                   >
                     <i className="fas fa-trash text-[9px]"></i> {tr.dashboard.deleteAll}
                   </button>
