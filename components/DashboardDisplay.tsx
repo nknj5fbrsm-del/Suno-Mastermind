@@ -15,17 +15,20 @@ const TUTORIAL_ACCENTS = ['text-emerald-500', 'text-suno-secondary', 'text-blue-
 const TUTORIAL_BORDERS = ['border-emerald-500/25', 'border-pink-500/25', 'border-blue-400/25', 'border-yellow-500/25', 'border-purple-500/25'];
 const TUTORIAL_BG = ['from-emerald-500/10 to-emerald-500/3', 'from-pink-500/10 to-pink-500/3', 'from-blue-400/10 to-blue-400/3', 'from-yellow-500/10 to-yellow-500/3', 'from-purple-500/10 to-purple-500/3'];
 
-// Farben passen sich dem gewählten Theme an (mastermind / sunset / forest) über suno-primary / suno-secondary
-const WHATSNEW_ACCENTS = ['text-suno-primary', 'text-suno-secondary', 'text-suno-primary', 'text-suno-secondary', 'text-suno-primary', 'text-suno-secondary', 'text-suno-primary'];
-const WHATSNEW_BG     = ['bg-gradient-to-br from-suno-primary/10 to-suno-primary/3', 'bg-gradient-to-br from-suno-secondary/10 to-suno-secondary/3', 'bg-gradient-to-br from-suno-primary/10 to-suno-primary/3', 'bg-gradient-to-br from-suno-secondary/10 to-suno-secondary/3', 'bg-gradient-to-br from-suno-primary/10 to-suno-primary/3', 'bg-gradient-to-br from-suno-secondary/10 to-suno-secondary/3', 'bg-gradient-to-br from-suno-primary/10 to-suno-primary/3'];
-const WHATSNEW_BORDER = ['border-suno-primary/20', 'border-suno-secondary/20', 'border-suno-primary/20', 'border-suno-secondary/20', 'border-suno-primary/20', 'border-suno-secondary/20', 'border-suno-primary/20'];
-
 const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, onDelete, onStartNew }) => {
   const { tr, lang } = useLang();
   const { showToast } = useToast();
   const [tutorialOpen,  setTutorialOpen]  = useState(false);
   const [archiveOpen,   setArchiveOpen]   = useState(false);
+  const [whatsNewOpen,  setWhatsNewOpen]  = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDeleteAll = () => {
+    if (!history.length) return;
+    const confirmed = window.confirm(tr.dashboard.deleteAllConfirm || 'Wirklich alle Archiv-Einträge löschen?');
+    if (!confirmed) return;
+    history.forEach(item => onDelete(item.id));
+  };
 
   const handleExport = async () => {
     try {
@@ -125,6 +128,14 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                 <button onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-400 text-[9px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
                   <i className="fas fa-arrow-down-to-bracket text-[9px]"></i> {tr.dashboard.import}
                 </button>
+                {history.length > 0 && (
+                  <button
+                    onClick={handleDeleteAll}
+                    className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[9px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
+                  >
+                    <i className="fas fa-trash text-[9px]"></i> {tr.dashboard.deleteAll}
+                  </button>
+                )}
                 <button onClick={() => setArchiveOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400 ml-1">
                   <i className="fas fa-times text-sm"></i>
                 </button>
@@ -196,6 +207,42 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
         document.body
       )}
 
+      {/* ═══ WHAT'S NEW MODAL (Portal → body, damit über Header) ═══ */}
+      {whatsNewOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setWhatsNewOpen(false)}>
+          <div className="w-full max-w-lg rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar"
+            style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="section-pill">{tr.dashboard.whatsNew}</p>
+              <button onClick={() => setWhatsNewOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400">
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+            <div className="gradient-line"></div>
+
+            <ul className="space-y-2.5">
+              {tr.dashboard.whatsNewItems.map((item: { date: string; text: string }, idx: number) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-suno-primary mt-0.5 min-w-[70px]">
+                    {item.date}
+                  </span>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    {item.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <button onClick={() => setWhatsNewOpen(false)}
+              className="btn-create w-full py-3 rounded-2xl text-white font-black text-xs uppercase tracking-[0.18em] flex items-center justify-center gap-2">
+              <i className="fas fa-check"></i> {tr.tutorial.close}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ═══ HERO ═══ */}
       <div className="glass-card rounded-3xl p-7 md:p-10 relative overflow-hidden">
         <div className="absolute inset-0 suno-gradient-soft rounded-3xl pointer-events-none"></div>
@@ -214,6 +261,11 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               <i className="fas fa-circle-info text-suno-primary"></i>
               {tr.dashboard.tutorial}
             </button>
+            <button onClick={() => setWhatsNewOpen(true)}
+              className="glass-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider hover:text-suno-primary touch-target">
+              <i className="fas fa-sparkles text-suno-primary"></i>
+              {tr.dashboard.whatsNew}
+            </button>
             {history.length > 0 && (
               <button onClick={() => setArchiveOpen(true)}
                 className="glass-btn flex items-center gap-2 px-4 py-2.5 rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider hover:text-suno-secondary touch-target">
@@ -228,27 +280,6 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               {tr.dashboard.newProject}
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* ═══ WHAT'S NEW ═══ */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <p className="section-pill">{tr.dashboard.whatsNew}</p>
-          <div className="gradient-line flex-1"></div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {tr.dashboard.whatsNewItems.map((item, i) => (
-            <div key={i} className={`glass-card rounded-2xl p-5 flex items-start gap-4 ${WHATSNEW_BG[i]} border ${WHATSNEW_BORDER[i]}`}>
-              <div className={`w-9 h-9 rounded-xl bg-white/8 dark:bg-black/15 flex items-center justify-center flex-shrink-0 ${WHATSNEW_ACCENTS[i]}`}>
-                <i className={`fas ${item.icon} text-sm`}></i>
-              </div>
-              <div>
-                <p className={`text-[10px] font-black uppercase tracking-[0.15em] mb-1 ${WHATSNEW_ACCENTS[i]}`}>{item.title}</p>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
