@@ -629,20 +629,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
 
     </form>
 
-    {/* ═══ STICKY FLOATING CTA ═══ */}
-    {concept.topic.trim().length > 2 && (
-      <div className="fixed sticky-cta-safe left-1/2 -translate-x-1/2 z-40 animate-fade-up pointer-events-none">
-        <button
-          type="button"
-          onClick={() => onSubmit(concept)}
-          className="btn-create pointer-events-auto flex items-center gap-2.5 px-7 py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-[0.18em]"
-          style={{ boxShadow: '0 8px 40px rgba(168,85,247,0.5), 0 2px 16px rgba(0,0,0,0.35)' }}
-        >
-          <i className="fas fa-bolt"></i>
-          {tr.concept.createBtn}
-        </button>
-      </div>
-    )}
     </div>
   );
 };

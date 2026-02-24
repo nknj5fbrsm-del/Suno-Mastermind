@@ -32,15 +32,15 @@ const ValuePills: React.FC<{ weirdness: number; styleInfluence: number }> = ({ w
   const { tr } = useLang();
   return (
     <div className="flex flex-wrap gap-2">
-      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 dark:bg-black/20 border border-suno-primary/20">
+      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-suno-primary/10 dark:bg-suno-primary/15 border border-suno-primary/25">
         <i className="fas fa-brain text-suno-primary text-sm"></i>
-        <span className="text-[11px] font-black text-zinc-800 dark:text-zinc-200 tabular-nums">{weirdness}%</span>
-        <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{tr.style.weirdness}</span>
+        <span className="text-[13px] font-black text-suno-primary tabular-nums">{weirdness ?? 0}%</span>
+        <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{tr.style.weirdness}</span>
       </div>
-      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 dark:bg-black/20 border border-suno-secondary/20">
+      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-suno-secondary/10 dark:bg-suno-secondary/15 border border-suno-secondary/25">
         <i className="fas fa-dna text-suno-secondary text-sm"></i>
-        <span className="text-[11px] font-black text-zinc-800 dark:text-zinc-200 tabular-nums">{styleInfluence}%</span>
-        <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{tr.style.influence}</span>
+        <span className="text-[13px] font-black text-suno-secondary tabular-nums">{styleInfluence ?? 0}%</span>
+        <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">{tr.style.influence}</span>
       </div>
     </div>
   );
