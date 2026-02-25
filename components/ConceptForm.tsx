@@ -702,6 +702,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
   const [isBoosting, setIsBoosting] = useState(false);
   const [boostResult, setBoostResult] = useState<CreativeBoostResult | null>(null);
 
+  // Kreativ-Lab (gesamt ein-/ausklappbar)
+  const [isLabOpen, setIsLabOpen] = useState(false);
+
   useEffect(() => { setConcept(initialConcept); }, [initialConcept]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSubmit(concept); };
@@ -818,6 +821,198 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
     setBoostResult(null);
   };
 
+  const kreativLabContent = isLabOpen ? (
+    <div className="space-y-4 pt-2 border-t border-white/10 dark:border-white/5">
+      {/* Referenz-Mixer */}
+      <ReferenzMixer onApply={handleMixerApply} />
+
+      {/* Fusion & Boost nebeneinander */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Genre-Fusion Block */}
+        <div className="rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-shuffle text-suno-primary text-[10px]"></i>
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.fusionLab}</p>
+                <p className="text-[11px] text-zinc-200 dark:text-zinc-100">
+                  {concept.genre.length >= 2 ? concept.genre.join(' + ') : tr.concept.genre}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {concept.genre.length >= 2 ? (
+            <button
+              type="button"
+              onClick={handleFusion}
+              disabled={isFusing}
+              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.12em] transition-all border ${
+                isFusing
+                  ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
+                  : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
+              }`}
+            >
+              {isFusing ? (
+                <>
+                  <i className="fas fa-spinner animate-spin"></i> {tr.concept.fusionLabLoading}
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-shuffle"></i> {tr.concept.fusionLab}
+                </>
+              )}
+            </button>
+          ) : (
+            <p className="text-[9px] text-zinc-500 dark:text-zinc-500">
+              {tr.concept.fusionHintNeedsTwo}
+            </p>
+          )}
+
+          {fusionResult && (
+            <div className="rounded-2xl border border-suno-primary/40 bg-suno-primary/10 dark:bg-suno-primary/20 p-4 space-y-3 animate-scale-in">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-suno-primary/30 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-shuffle text-suno-primary text-[10px]"></i>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.fusionLab}</p>
+                    <p className="text-[13px] font-black text-zinc-800 dark:text-zinc-100">{fusionResult.fusionName}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setFusionResult(null)}
+                  className="w-5 h-5 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 text-[9px] flex-shrink-0">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed italic">{fusionResult.description}</p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {fusionResult.suggestedInstruments.map((inst, i) => (
+                  <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
+                  </span>
+                ))}
+                <span className="text-[9px] font-bold px-2 py-1 rounded-lg bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">
+                  <i className="fas fa-gauge-high mr-1 text-[7px]"></i>{fusionResult.suggestedBPM}
+                </span>
+                {fusionResult.suggestedMood.map((m, i) => (
+                  <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
+                    {m}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button type="button" onClick={applyFusion}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary hover:text-white transition-all">
+                  <i className="fas fa-check"></i> {tr.concept.fusionApply}
+                </button>
+                <button type="button" onClick={() => setFusionResult(null)}
+                  className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold glass-btn text-zinc-500 hover:text-red-500 transition-all">
+                  {tr.concept.fusionDismiss}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Kreativ-Boost Block */}
+        <div className="rounded-2xl border border-suno-secondary/25 bg-suno-secondary/5 dark:bg-suno-secondary/10 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-bolt text-suno-secondary text-sm"></i>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeBoost}</p>
+                <p className="text-[11px] text-zinc-200 dark:text-zinc-100">
+                  KI-Twist für Genre, Stimmung & Instrumente.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" onClick={handleBoost}
+            disabled={isBoosting}
+            className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+              isBoosting
+                ? 'glass-btn text-suno-secondary border-suno-secondary/30 animate-pulse'
+                : 'glass-btn text-suno-secondary border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary'
+            }`}>
+            {isBoosting
+              ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.creativeBoostLoading}</>
+              : <><i className="fas fa-bolt"></i> {tr.concept.creativeBoost}</>}
+          </button>
+
+          {boostResult && (
+            <div className="space-y-3 animate-scale-in">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-suno-secondary/25 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-bolt text-suno-secondary text-sm"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-zinc-800 dark:text-zinc-100">{boostResult.twistTitle}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setBoostResult(null)}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[10px] flex-shrink-0">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+
+              <p className="text-[12px] text-zinc-600 dark:text-zinc-300 leading-relaxed">{boostResult.twistDescription}</p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {boostResult.addGenres.map((g, i) => (
+                  <span key={`g${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-primary/10 text-suno-primary border border-suno-primary/20">
+                    <i className="fas fa-music mr-1 text-[7px]"></i>{g}
+                  </span>
+                ))}
+                {boostResult.addInstruments.map((inst, i) => (
+                  <span key={`i${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
+                  </span>
+                ))}
+                {boostResult.addMoods.map((m, i) => (
+                  <span key={`m${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
+                    <i className="fas fa-face-smile mr-1 text-[7px]"></i>{m}
+                  </span>
+                ))}
+              </div>
+
+              {boostResult.productionTip && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
+                  <i className="fas fa-lightbulb text-amber-500 text-[10px] mt-0.5 flex-shrink-0"></i>
+                  <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                    <span className="font-black uppercase tracking-wider text-amber-500 mr-1">{tr.concept.boostTip}:</span>
+                    {boostResult.productionTip}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button type="button" onClick={applyBoost}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary hover:text-white transition-all">
+                  <i className="fas fa-check"></i> {tr.concept.boostApply}
+                </button>
+                <button type="button" onClick={() => setBoostResult(null)}
+                  className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider glass-btn text-zinc-500 hover:text-red-500 transition-all">
+                  {tr.concept.boostDismiss}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="relative">
     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-up pb-24">
@@ -888,86 +1083,32 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
               ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.inspiring}</>
               : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
           </button>
-
-          {/* Kreativ-Boost */}
-          <button type="button" onClick={handleBoost}
-            disabled={isBoosting}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.12em] transition-all border ${
-              isBoosting
-                ? 'glass-btn text-suno-secondary border-suno-secondary/30 animate-pulse'
-                : 'glass-btn text-suno-secondary border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary'
-            }`}>
-            {isBoosting
-              ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.creativeBoostLoading}</>
-              : <><i className="fas fa-bolt"></i> {tr.concept.creativeBoost}</>}
-          </button>
         </div>
-
-        {/* ═══ KREATIV-BOOST RESULT ═══ */}
-        {boostResult && (
-          <div className="rounded-2xl border border-suno-secondary/30 bg-suno-secondary/5 dark:bg-suno-secondary/10 p-4 space-y-3 animate-scale-in">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
-                  <i className="fas fa-bolt text-suno-secondary text-sm"></i>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeBoost}</p>
-                  <p className="text-sm font-black text-zinc-800 dark:text-zinc-100">{boostResult.twistTitle}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setBoostResult(null)}
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[10px] flex-shrink-0">
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-
-            <p className="text-[12px] text-zinc-600 dark:text-zinc-300 leading-relaxed">{boostResult.twistDescription}</p>
-
-            <div className="flex flex-wrap gap-1.5">
-              {boostResult.addGenres.map((g, i) => (
-                <span key={`g${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-primary/10 text-suno-primary border border-suno-primary/20">
-                  <i className="fas fa-music mr-1 text-[7px]"></i>{g}
-                </span>
-              ))}
-              {boostResult.addInstruments.map((inst, i) => (
-                <span key={`i${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                  <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
-                </span>
-              ))}
-              {boostResult.addMoods.map((m, i) => (
-                <span key={`m${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
-                  <i className="fas fa-face-smile mr-1 text-[7px]"></i>{m}
-                </span>
-              ))}
-            </div>
-
-            {boostResult.productionTip && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
-                <i className="fas fa-lightbulb text-amber-500 text-[10px] mt-0.5 flex-shrink-0"></i>
-                <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                  <span className="font-black uppercase tracking-wider text-amber-500 mr-1">{tr.concept.boostTip}:</span>
-                  {boostResult.productionTip}
-                </p>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 pt-1">
-              <button type="button" onClick={applyBoost}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary hover:text-white transition-all">
-                <i className="fas fa-check"></i> {tr.concept.boostApply}
-              </button>
-              <button type="button" onClick={() => setBoostResult(null)}
-                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider glass-btn text-zinc-500 hover:text-red-500 transition-all">
-                {tr.concept.boostDismiss}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ═══ REFERENZ-MIXER ═══ */}
-      <ReferenzMixer onApply={handleMixerApply} />
+      {/* ═══ KREATIV-LAB ═══ */}
+      <div className="glass-card rounded-3xl p-6 space-y-4">
+        <button
+          type="button"
+          onClick={() => setIsLabOpen(v => !v)}
+          className="w-full flex items-center justify-between gap-3 group"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
+              <i className="fas fa-flask text-suno-secondary text-sm"></i>
+            </div>
+            <div className="text-left">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">Kreativ-Lab</p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                Optional · nutze Mixer, Fusion & Boost, um dein Konzept zu verfeinern.
+              </p>
+            </div>
+          </div>
+          <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform ${isLabOpen ? 'rotate-180' : ''}`}></i>
+        </button>
+
+        {kreativLabContent}
+      </div>
 
       {/* ═══ FIELDS GRID ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-6">
@@ -981,69 +1122,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           <div className="relative space-y-2">
             <SearchableMultiInput label={tr.concept.genre} icon="fa-music" options={opts.genres} selected={concept.genre}
               onToggle={(v) => toggle('genre', v)} placeholder={opts.genres.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} />
-
-            {/* Genre-Fusion Button */}
             {concept.genre.length >= 2 && (
-              <button type="button" onClick={handleFusion} disabled={isFusing}
-                className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.12em] transition-all border ${
-                  isFusing
-                    ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
-                    : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary/10'
-                }`}>
-                {isFusing
-                  ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.fusionLabLoading}</>
-                  : <><i className="fas fa-shuffle"></i> {tr.concept.fusionLab}: {concept.genre.join(' + ')}</>}
-              </button>
-            )}
-
-            {/* Genre-Fusion Result */}
-            {fusionResult && (
-              <div className="rounded-2xl border border-suno-primary/30 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 animate-scale-in">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
-                      <i className="fas fa-shuffle text-suno-primary text-[10px]"></i>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.fusionLab}</p>
-                      <p className="text-[13px] font-black text-zinc-800 dark:text-zinc-100">{fusionResult.fusionName}</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setFusionResult(null)}
-                    className="w-5 h-5 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 text-[9px] flex-shrink-0">
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed italic">{fusionResult.description}</p>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {fusionResult.suggestedInstruments.map((inst, i) => (
-                    <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                      <i className="fas fa-guitar mr-1 text-[7px]"></i>{inst}
-                    </span>
-                  ))}
-                  <span className="text-[9px] font-bold px-2 py-1 rounded-lg bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
-                    <i className="fas fa-gauge-high mr-1 text-[7px]"></i>{fusionResult.suggestedBPM}
-                  </span>
-                  {fusionResult.suggestedMood.map((m, i) => (
-                    <span key={i} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
-                      {m}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button type="button" onClick={applyFusion}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary hover:text-white transition-all">
-                    <i className="fas fa-check"></i> {tr.concept.fusionApply}
-                  </button>
-                  <button type="button" onClick={() => setFusionResult(null)}
-                    className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold glass-btn text-zinc-500 hover:text-red-500 transition-all">
-                    {tr.concept.fusionDismiss}
-                  </button>
-                </div>
-              </div>
+              <p className="mt-1 text-[9px] text-zinc-500 dark:text-zinc-500">
+                {tr.concept.fusionHintUseLab}
+              </p>
             )}
           </div>
           <div className="relative">
