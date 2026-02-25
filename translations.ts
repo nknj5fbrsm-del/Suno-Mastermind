@@ -29,6 +29,7 @@ export const t = {
       untitled: 'Ohne Titel',
       whatsNew: 'Was ist neu',
       whatsNewItems: [
+        { date: '2026-02-25', text: 'Referenz-Mixer im Konzept: Bis zu 3 Tracks per Datei-Upload oder Suno-Link (auch Share-Link suno.com/s/…). KI synthetisiert gemeinsame Stil-DNA und füllt Genre, Mood, Tempo & Instrumente.' },
         { date: '2026-02-24', text: 'Kreativ-Boost im Konzept: KI schlägt einen unerwarteten, aber musikalisch sinnvollen Twist mit Instrumenten, Genres und Produktionstipps vor.' },
         { date: '2026-02-24', text: 'Genre-Fusion Lab im Konzept: Aus mehreren Genres wird ein Hybrid-Style mit passendem BPM, Mood und Instrumenten generiert.' },
         { date: '2026-02-24', text: 'Style-Prompt: Anreichern-Pill und Würfel pro Variante, Soft-Limit 200 Zeichen (Hard-Limit 1000) für Suno V5 Style-Feld.' },
@@ -225,6 +226,7 @@ export const t = {
       untitled: 'Untitled',
       whatsNew: "What's New",
       whatsNewItems: [
+        { date: '2026-02-25', text: 'Reference Mixer in the Concept step: up to 3 tracks via file upload or Suno link (including Share link suno.com/s/…). AI synthesizes a shared style DNA and fills genre, mood, tempo & instruments.' },
         { date: '2026-02-24', text: 'Creative Boost in the Concept step: AI proposes a surprising but musically solid twist with instruments, genres and production tips.' },
         { date: '2026-02-24', text: 'Genre Fusion Lab in the Concept step: turn multiple genres into a hybrid style with matching BPM, mood and instrumentation.' },
         { date: '2026-02-24', text: 'Style prompt: Enrich pill and dice per variant, soft limit 200 characters (hard limit 1000) tailored for Suno V5.' },
