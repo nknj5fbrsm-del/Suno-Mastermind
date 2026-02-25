@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { SongConcept } from '../types';
 import {
   analyzeTopic, generateRandomTopic, analyzeAudio, AudioAnalysisResult,
@@ -149,95 +150,6 @@ const readAudioFile = (file: File): Promise<AudioFile> =>
     reader.readAsDataURL(file);
   });
 
-const AudioUploadBar: React.FC<{
-  onAnalysisComplete: (result: AudioAnalysisResult) => void;
-}> = ({ onAnalysisComplete }) => {
-  const { tr } = useLang();
-  const [audioFile, setAudioFile]     = useState<AudioFile | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isDragging, setIsDragging]   = useState(false);
-  const [error, setError]             = useState('');
-  const [success, setSuccess]         = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = async (file: File) => {
-    setError(''); setSuccess(false);
-    try { setAudioFile(await readAudioFile(file)); }
-    catch (e: any) { setError(e.message || 'Fehler'); }
-  };
-
-  const handleAnalyze = async () => {
-    if (!audioFile || isAnalyzing) return;
-    setIsAnalyzing(true); setError(''); setSuccess(false);
-    try {
-      const result = await analyzeAudio(audioFile.base64, audioFile.mimeType);
-      onAnalysisComplete(result);
-      setSuccess(true);
-    } catch (e: any) {
-      setError(e.message || 'Analyse fehlgeschlagen.');
-    } finally { setIsAnalyzing(false); }
-  };
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
-      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl border transition-all duration-200 ${
-        isDragging
-          ? 'border-suno-primary bg-suno-primary/8 scale-[1.01]'
-          : success
-          ? 'border-emerald-500/30 bg-emerald-500/5'
-          : 'border-zinc-200 dark:border-zinc-700/60 bg-white/30 dark:bg-white/[0.03]'
-      }`}
-    >
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <i className={`fas text-[10px] ${success ? 'fa-check-circle text-emerald-500' : isAnalyzing ? 'fa-spinner animate-spin text-suno-primary' : 'fa-waveform-lines text-suno-primary'}`}></i>
-        <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400 select-none">{tr.concept.referenceAudio}</span>
-      </div>
-
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 flex-shrink-0"></div>
-
-      {!audioFile && (
-        <button type="button" onClick={() => fileInputRef.current?.click()}
-          className="flex-1 flex items-center gap-1.5 text-[9px] font-medium text-zinc-400 dark:text-zinc-500 hover:text-suno-primary transition-colors text-left">
-          <i className="fas fa-arrow-up-from-bracket text-[8px]"></i>
-          {isDragging ? tr.concept.fileDrop : tr.concept.fileChoose}
-        </button>
-      )}
-
-      {audioFile && (
-        <div className="flex-1 flex items-center gap-2 min-w-0">
-          <i className="fas fa-file-audio text-suno-primary text-[9px] flex-shrink-0"></i>
-          <span className="text-[9px] font-medium text-zinc-600 dark:text-zinc-300 truncate" title={audioFile.name}>{audioFile.name}</span>
-          <span className="text-[8px] text-zinc-400 flex-shrink-0">{audioFile.sizeMB} MB</span>
-        </div>
-      )}
-
-      {audioFile && !success && (
-        <button type="button" onClick={handleAnalyze} disabled={isAnalyzing}
-          className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${
-            isAnalyzing ? 'text-suno-primary opacity-60 cursor-wait' : 'btn-create text-white shadow-sm'
-          }`}>
-            {isAnalyzing ? '…' : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.analyze}</>}
-        </button>
-      )}
-
-      {audioFile && (
-        <button type="button" onClick={() => { setAudioFile(null); setSuccess(false); setError(''); }}
-          className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[9px]">
-          <i className="fas fa-times"></i>
-        </button>
-      )}
-
-      <input ref={fileInputRef} type="file" accept={ACCEPTED_AUDIO} className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
-
-      {error && <span className="text-[8px] text-red-500 font-bold flex-shrink-0">{error}</span>}
-    </div>
-  );
-};
-
 // ─── REFERENZ-MIXER ───────────────────────────────────────────────────────
 // Browserzeile: suno.com/song/UUID
 // Share-Button: suno.com/s/KURZID → Redirect auf suno.com/song/UUID
@@ -337,7 +249,10 @@ const emptySlot = (): MixerSlot => ({
   sourceMode: 'upload', sunoUrl: '', sunoLoading: false,
 });
 
-const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void }> = ({ onApply }) => {
+const ReferenzMixer: React.FC<{
+  onApply: (result: ReferenceStyleResult) => void;
+  onApplySingle?: (result: AudioAnalysisResult) => void;
+}> = ({ onApply, onApplySingle }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const [isOpen, setIsOpen]           = useState(false);
@@ -470,7 +385,6 @@ const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void 
                 </span>
               )}
             </div>
-            <p className="text-[9px] text-zinc-500 dark:text-zinc-500 mt-0.5 truncate">{tr.concept.refMixerHint}</p>
           </div>
         </div>
         <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ml-3 ${isOpen ? 'rotate-180' : ''}`}></i>
@@ -511,13 +425,19 @@ const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void 
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-500">{tr.concept.refMixerSlot} {idx + 1}</span>
-                        <div className="flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-600">
-                          <button type="button" onClick={() => setSlot(idx, { ...slot, sourceMode: 'upload', error: '' })}
-                            className={`px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition-colors ${slot.sourceMode === 'upload' ? 'bg-suno-primary/20 text-suno-primary' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                        <div className="flex rounded-lg overflow-visible border border-zinc-200 dark:border-zinc-600 bg-zinc-100/50 dark:bg-zinc-800/30">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlot(idx, { ...slot, sourceMode: 'upload', error: '' });
+                              setTimeout(() => fileRefs[idx].current?.click(), 0);
+                            }}
+                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-l-md ${slot.sourceMode === 'upload' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-500 hover:bg-suno-secondary/25 hover:text-suno-secondary hover:ring-2 hover:ring-suno-secondary/50 hover:ring-inset'}`}
+                          >
                             {tr.concept.refMixerByFile}
                           </button>
                           <button type="button" onClick={() => setSlot(idx, { ...slot, sourceMode: 'url', error: '' })}
-                            className={`px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition-colors ${slot.sourceMode === 'url' ? 'bg-suno-primary/20 text-suno-primary' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-r-md ${slot.sourceMode === 'url' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-500 hover:bg-suno-primary/15 hover:text-suno-primary'}`}>
                             {tr.concept.refMixerByLink}
                           </button>
                         </div>
@@ -542,7 +462,6 @@ const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void 
                               {slot.sunoLoading ? tr.concept.refMixerSunoLoading : tr.concept.refMixerSunoLoad}
                             </button>
                           </div>
-                          <p className="text-[8px] text-zinc-500 dark:text-zinc-500">{tr.concept.refMixerSunoHint}</p>
                         </div>
                       )}
                     </div>
@@ -587,7 +506,18 @@ const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void 
               </button>
             )}
 
-            {analyzedCount > 0 && (
+            {analyzedCount === 1 && onApplySingle && (() => {
+              const slotWithAnalysis = slots.find(s => s.analysis !== null);
+              const singleAnalysis = slotWithAnalysis?.analysis ?? null;
+              return singleAnalysis ? (
+                <button type="button" onClick={() => onApplySingle(singleAnalysis)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] glass-btn text-suno-primary border border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary transition-all">
+                  <i className="fas fa-check"></i> {tr.concept.refMixerApplySingle}
+                </button>
+              ) : null;
+            })()}
+
+            {analyzedCount >= 2 && (
               <button type="button" onClick={handleSynthesize} disabled={isSynthesizing}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] transition-all border ${
                   isSynthesizing
@@ -704,8 +634,17 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
 
   // Kreativ-Lab (gesamt ein-/ausklappbar)
   const [isLabOpen, setIsLabOpen] = useState(false);
+  const [labHelpModalOpen, setLabHelpModalOpen] = useState(false);
+  const [genreFieldPulse, setGenreFieldPulse] = useState(false);
+  const genreFieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setConcept(initialConcept); }, [initialConcept]);
+
+  const focusGenreField = () => {
+    setGenreFieldPulse(true);
+    genreFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => setGenreFieldPulse(false), 2500);
+  };
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSubmit(concept); };
 
@@ -824,12 +763,18 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
   const kreativLabContent = isLabOpen ? (
     <div className="space-y-4 pt-2 border-t border-white/10 dark:border-white/5">
       {/* Referenz-Mixer */}
-      <ReferenzMixer onApply={handleMixerApply} />
+      <ReferenzMixer onApply={handleMixerApply} onApplySingle={handleAudioAnalysis} />
 
       {/* Fusion & Boost nebeneinander */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Genre-Fusion Block */}
-        <div className="rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3">
+        <div
+          className={`rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 ${concept.genre.length < 2 ? 'cursor-pointer hover:bg-suno-primary/10 dark:hover:bg-suno-primary/15 transition-colors' : ''}`}
+          onClick={concept.genre.length < 2 ? focusGenreField : undefined}
+          role={concept.genre.length < 2 ? 'button' : undefined}
+          tabIndex={concept.genre.length < 2 ? 0 : undefined}
+          onKeyDown={concept.genre.length < 2 ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusGenreField(); } } : undefined}
+        >
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
@@ -867,7 +812,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
             </button>
           ) : (
             <p className="text-[9px] text-zinc-500 dark:text-zinc-500">
-              {tr.concept.fusionHintNeedsTwo}
+              {tr.concept.fusionHintMinTwo}
             </p>
           )}
 
@@ -930,9 +875,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeBoost}</p>
-                <p className="text-[11px] text-zinc-200 dark:text-zinc-100">
-                  KI-Twist für Genre, Stimmung & Instrumente.
-                </p>
               </div>
             </div>
           </div>
@@ -1051,8 +993,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           />
         </div>
 
-        <AudioUploadBar onAnalysisComplete={handleAudioAnalysis} />
-
         {/* Controls row */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Randomize */}
@@ -1088,24 +1028,62 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
 
       {/* ═══ KREATIV-LAB ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-4">
-        <button
-          type="button"
-          onClick={() => setIsLabOpen(v => !v)}
-          className="w-full flex items-center justify-between gap-3 group"
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
-              <i className="fas fa-flask text-suno-secondary text-sm"></i>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsLabOpen(v => !v)}
+            className="flex-1 flex items-center justify-between gap-3 group min-w-0"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-flask text-suno-secondary text-sm"></i>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">{tr.concept.creativeLab}</p>
             </div>
-            <div className="text-left">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">Kreativ-Lab</p>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                Optional · nutze Mixer, Fusion & Boost, um dein Konzept zu verfeinern.
-              </p>
+            <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLabOpen ? 'rotate-180' : ''}`}></i>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setLabHelpModalOpen(true); }}
+            className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:text-suno-secondary transition-colors px-2 py-1 rounded-lg hover:bg-suno-secondary/10"
+          >
+            {tr.concept.creativeLabShortDescBtn}
+          </button>
+        </div>
+
+        {labHelpModalOpen && createPortal(
+          <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setLabHelpModalOpen(false)}>
+            <div className="w-full max-w-md rounded-3xl p-6 space-y-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeLabModalTitle}</h3>
+                <button type="button" onClick={() => setLabHelpModalOpen(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all">
+                  <i className="fas fa-times text-sm"></i>
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-waveform-lines text-suno-primary text-xs"></i>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescRefMixer}</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-shuffle text-suno-primary text-xs"></i>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescFusion}</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-bolt text-suno-secondary text-xs"></i>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescBoost}</p>
+                </div>
+              </div>
             </div>
-          </div>
-          <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform ${isLabOpen ? 'rotate-180' : ''}`}></i>
-        </button>
+          </div>,
+          document.body
+        )}
 
         {kreativLabContent}
       </div>
@@ -1119,7 +1097,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="relative space-y-2">
+          <div
+            ref={genreFieldRef}
+            className={`relative space-y-2 rounded-2xl transition-all duration-300 ${genreFieldPulse ? 'ring-2 ring-suno-primary/60 ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 animate-pulse' : ''}`}
+          >
             <SearchableMultiInput label={tr.concept.genre} icon="fa-music" options={opts.genres} selected={concept.genre}
               onToggle={(v) => toggle('genre', v)} placeholder={opts.genres.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} />
             {concept.genre.length >= 2 && (
