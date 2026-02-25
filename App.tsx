@@ -323,7 +323,7 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">Über</p>
-                  <p className="text-sm font-black text-zinc-100 leading-tight">Nils Pocklitz</p>
+                  <p className="text-sm font-black text-zinc-100 leading-tight">NilsP</p>
                 </div>
               </div>
               <button
@@ -339,7 +339,7 @@ const App: React.FC = () => {
               <p>
                 Ich bin Musiker mit über 40 Jahren Erfahrung, insbesondere an der Trompete.
                 Mein Verständnis von Musik basiert auf präziser Artikulation, komplexer Harmonik
-                und der emotionalen Wucht musikalischer Arrangements.
+                und der emotionalen Kraft musikalischer Arrangements.
               </p>
               <p>
                 Die Suno Mastermind App ist aus der Notwendigkeit entstanden, die Lücke zwischen
