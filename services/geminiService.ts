@@ -666,6 +666,66 @@ Rules:
   return JSON.parse(response.text || "{}");
 };
 
+// ——— Referenz-Mixer / Stil-Synthese ———
+export interface ReferenceStyleResult {
+  genre: string[];
+  mood: string[];
+  tempo: string[];
+  instrumentation: string[];
+  regieSeed: string;
+  stylePromptSeed: string;
+  fusionLabel: string;
+}
+
+export const synthesizeReferenceStyle = async (
+  analyses: AudioAnalysisResult[]
+): Promise<ReferenceStyleResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden.");
+  const ai = new GoogleGenAI({ apiKey });
+
+  const analysisText = analyses.map((a, i) => `Reference ${i + 1}:
+- Genres: ${(a.genre ?? []).join(', ') || 'unknown'}
+- Mood: ${(a.mood ?? []).join(', ') || 'unknown'}
+- Tempo: ${(a.tempo ?? []).join(', ') || 'unknown'}
+- Instrumentation: ${(a.instrumentation ?? []).join(', ') || 'unknown'}
+- Vocals: ${(a.vocals ?? []).join(', ') || 'instrumental'}
+- Topic/Character: ${a.topicSuggestion || 'not specified'}`).join('\n\n');
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Here are ${analyses.length} audio reference analysis result(s) from a music producer:\n\n${analysisText}\n\nExtract the common musical DNA and synthesize a unified style profile.`,
+    config: {
+      systemInstruction: `You are a senior music producer and sound designer. Analyze audio reference data and extract a unified creative style profile.
+
+Rules:
+- genre: 2-4 genre descriptors unifying all references (English, precise, e.g. "Neo-Soul Jazz", "Cinematic Trip-Hop")
+- mood: 3-5 mood words capturing the shared emotional character (German if most references seem German-context, else English)
+- tempo: 1-2 entries combining the tempos, e.g. "88 BPM, slow swing" or "120–128 BPM, driving"
+- instrumentation: 4-8 specific instruments that define the shared sonic identity (e.g. "Rhodes Piano", "Upright Bass", "Brush Kit")
+- regieSeed: One Suno Regie tag in square brackets capturing the shared production feel, e.g. "[Verse · Rhodes pno, upright bass, brush dr, close-miked, dry room]"
+- stylePromptSeed: A 60-150 char Suno V5 style prompt capturing this sonic DNA (English only, comma-separated descriptors, no brackets)
+- fusionLabel: A 2-4 word catchy label for this synthesized style (English)
+Respond only with valid JSON.`,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          genre:           { type: Type.ARRAY, items: { type: Type.STRING } },
+          mood:            { type: Type.ARRAY, items: { type: Type.STRING } },
+          tempo:           { type: Type.ARRAY, items: { type: Type.STRING } },
+          instrumentation: { type: Type.ARRAY, items: { type: Type.STRING } },
+          regieSeed:       { type: Type.STRING },
+          stylePromptSeed: { type: Type.STRING },
+          fusionLabel:     { type: Type.STRING },
+        },
+        required: ["genre", "mood", "tempo", "instrumentation", "regieSeed", "stylePromptSeed", "fusionLabel"],
+      },
+    },
+  }));
+  return JSON.parse(response.text || "{}");
+};
+
 export const generateCoverArt = async (concept: SongConcept, artStyle: string = "Default"): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");

@@ -5,6 +5,7 @@ import {
   analyzeTopic, generateRandomTopic, analyzeAudio, AudioAnalysisResult,
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
+  synthesizeReferenceStyle, ReferenceStyleResult,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 
@@ -132,6 +133,22 @@ interface AudioFile {
   mimeType: string;
 }
 
+const readAudioFile = (file: File): Promise<AudioFile> =>
+  new Promise((resolve, reject) => {
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      reject(new Error(`Max. ${MAX_FILE_MB} MB`));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const base64 = dataUrl.split(',')[1];
+      resolve({ name: file.name, sizeMB: Math.round((file.size / 1024 / 1024) * 10) / 10, base64, mimeType: file.type || 'audio/mpeg' });
+    };
+    reader.onerror = () => reject(new Error('Lesefehler'));
+    reader.readAsDataURL(file);
+  });
+
 const AudioUploadBar: React.FC<{
   onAnalysisComplete: (result: AudioAnalysisResult) => void;
 }> = ({ onAnalysisComplete }) => {
@@ -143,25 +160,9 @@ const AudioUploadBar: React.FC<{
   const [success, setSuccess]         = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const readFile = (file: File): Promise<AudioFile> =>
-    new Promise((resolve, reject) => {
-      if (file.size > MAX_FILE_MB * 1024 * 1024) {
-        reject(new Error(`Max. ${MAX_FILE_MB} MB`));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const base64 = dataUrl.split(',')[1];
-        resolve({ name: file.name, sizeMB: Math.round((file.size / 1024 / 1024) * 10) / 10, base64, mimeType: file.type || 'audio/mpeg' });
-      };
-      reader.onerror = () => reject(new Error('Lesefehler'));
-      reader.readAsDataURL(file);
-    });
-
   const handleFile = async (file: File) => {
     setError(''); setSuccess(false);
-    try { setAudioFile(await readFile(file)); }
+    try { setAudioFile(await readAudioFile(file)); }
     catch (e: any) { setError(e.message || 'Fehler'); }
   };
 
@@ -237,6 +238,452 @@ const AudioUploadBar: React.FC<{
   );
 };
 
+// ─── REFERENZ-MIXER ───────────────────────────────────────────────────────
+// Browserzeile: suno.com/song/UUID
+// Share-Button: suno.com/s/KURZID → Redirect auf suno.com/song/UUID
+const SUNO_PATH_REGEX = /(?:suno\.com|app\.suno\.ai|[\w-]+\.suno\.\w+)\/(?:song|track)\/([a-f0-9-]{36})/i;
+const SUNO_SHORT_REGEX = /(?:https?:\/\/)?(?:suno\.com|app\.suno\.ai)\/s\/([a-zA-Z0-9_-]+)/i;
+const UUID_REGEX = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i;
+const SUNO_CDN_BASE = 'https://cdn1.suno.ai';
+
+function extractSunoId(url: string): string | null {
+  const trimmed = url.trim();
+  const fromPath = trimmed.match(SUNO_PATH_REGEX);
+  if (fromPath?.[1]) return fromPath[1];
+  if (/suno/i.test(trimmed)) {
+    const uuid = trimmed.match(UUID_REGEX);
+    if (uuid?.[0]) return uuid[0];
+  }
+  return null;
+}
+
+/** Erkennt Share-Link (suno.com/s/KURZID). Gibt die Short-URL zurück zum Auflösen. */
+function getSunoShortUrl(url: string): string | null {
+  const trimmed = url.trim();
+  const m = trimmed.match(SUNO_SHORT_REGEX);
+  if (!m) return null;
+  const path = m[0]!;
+  return path.startsWith('http') ? path : `https://suno.com/s/${m[1]}`;
+}
+
+/** Sucht Song-UUID in HTML (z. B. /song/UUID). */
+const SONG_UUID_IN_HTML = /\/song\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i;
+
+async function fetchViaProxy(targetUrl: string): Promise<string> {
+  const encoded = encodeURIComponent(targetUrl);
+  const proxies = [
+    'https://api.allorigins.win/raw?url=' + encoded,
+    'https://corsproxy.io/?' + encoded,
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, { method: 'GET' });
+      if (res.ok) return await res.text();
+    } catch {
+      continue;
+    }
+  }
+  throw new Error('Proxy nicht erreichbar');
+}
+
+/** Löst Suno-Share-Link (z. B. https://suno.com/s/KURZID) auf und liefert die Song-UUID. */
+async function resolveSunoShortLink(fullShortUrl: string): Promise<string | null> {
+  const url = fullShortUrl.trim().startsWith('http') ? fullShortUrl.trim() : `https://suno.com/s/${fullShortUrl.trim().replace(/^\/s\/?/, '')}`;
+
+  // 1. Direkt (funktioniert nur ohne CORS-Block)
+  try {
+    const res = await fetch(url, { redirect: 'follow', method: 'GET' });
+    const fromUrl = extractSunoId(res.url || '');
+    if (fromUrl) return fromUrl;
+  } catch {
+    /* CORS – Fallback über Proxy */
+  }
+
+  // 2. Über CORS-Proxy: Short-URL abrufen (Proxy folgt Redirects), UUID aus HTML
+  try {
+    const html = await fetchViaProxy(url);
+    const m = html.match(SONG_UUID_IN_HTML);
+    return m ? m[1]! : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchSunoAudio(songId: string): Promise<{ base64: string; mimeType: string; sizeBytes: number }> {
+  const url = `${SUNO_CDN_BASE}/${songId}.mp3`;
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error(res.status === 404 ? 'Song nicht gefunden (privat oder abgelaufen?).' : `Laden fehlgeschlagen (${res.status}).`);
+  const buf = await res.arrayBuffer();
+  const sizeBytes = buf.byteLength;
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  const base64 = btoa(binary);
+  return { base64, mimeType: 'audio/mpeg', sizeBytes };
+}
+
+interface MixerSlot {
+  file: AudioFile | null;
+  analysis: AudioAnalysisResult | null;
+  analyzing: boolean;
+  error: string;
+  sourceMode: 'upload' | 'url';
+  sunoUrl: string;
+  sunoLoading: boolean;
+}
+
+const emptySlot = (): MixerSlot => ({
+  file: null, analysis: null, analyzing: false, error: '',
+  sourceMode: 'upload', sunoUrl: '', sunoLoading: false,
+});
+
+const ReferenzMixer: React.FC<{ onApply: (result: ReferenceStyleResult) => void }> = ({ onApply }) => {
+  const { tr } = useLang();
+  const { showToast } = useToast();
+  const [isOpen, setIsOpen]           = useState(false);
+  const [slots, setSlots]             = useState<MixerSlot[]>([emptySlot(), emptySlot(), emptySlot()]);
+  const [isSynthesizing, setIsSynth]  = useState(false);
+  const [synthResult, setSynthResult] = useState<ReferenceStyleResult | null>(null);
+  const fileRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  const setSlot = (idx: number, patch: Partial<MixerSlot>) =>
+    setSlots(prev => prev.map((s, i) => i === idx ? { ...s, ...patch } : s));
+
+  const handleFile = async (idx: number, file: File) => {
+    setSlot(idx, { error: '', analysis: null, sourceMode: 'upload' });
+    try {
+      const af = await readAudioFile(file);
+      setSlot(idx, { file: af });
+    } catch (e: any) {
+      setSlot(idx, { error: e.message || 'Fehler' });
+    }
+  };
+
+  const handleSunoLoad = async (idx: number) => {
+    const slot = slots[idx];
+    let id = extractSunoId(slot.sunoUrl);
+    if (!id) {
+      const shortUrl = getSunoShortUrl(slot.sunoUrl);
+      if (shortUrl) {
+        setSlot(idx, { sunoLoading: true, error: '' });
+        try {
+          id = await resolveSunoShortLink(shortUrl);
+        } catch {
+          setSlot(idx, { sunoLoading: false, error: tr.concept.refMixerSunoShareCors });
+          return;
+        }
+        if (!id) {
+          setSlot(idx, { sunoLoading: false, error: tr.concept.refMixerSunoInvalid });
+          return;
+        }
+      } else {
+        setSlot(idx, { error: tr.concept.refMixerSunoInvalid });
+        return;
+      }
+    }
+    setSlot(idx, { sunoLoading: true, error: '' });
+    try {
+      const { base64, mimeType, sizeBytes } = await fetchSunoAudio(id);
+      const sizeMB = Math.round((sizeBytes / 1024 / 1024) * 10) / 10;
+      setSlot(idx, {
+        file: { name: `Suno-${id.slice(0, 8)}.mp3`, sizeMB, base64, mimeType },
+        sunoLoading: false,
+        sourceMode: 'url',
+      });
+    } catch (e: any) {
+      const msg = e?.message || (e?.name === 'TypeError' && e?.message?.includes('Failed to fetch') ? tr.concept.refMixerSunoCors : 'Laden fehlgeschlagen.');
+      setSlot(idx, { sunoLoading: false, error: msg });
+    }
+  };
+
+  const clearSlot = (idx: number) => {
+    setSlot(idx, emptySlot());
+  };
+
+  const analyzeSlot = async (idx: number) => {
+    const slot = slots[idx];
+    if (!slot.file || slot.analyzing) return;
+    setSlot(idx, { analyzing: true, error: '', analysis: null });
+    try {
+      const result = await analyzeAudio(slot.file.base64, slot.file.mimeType);
+      setSlot(idx, { analysis: result, analyzing: false });
+    } catch (e: any) {
+      setSlot(idx, { error: e.message || 'Analyse fehlgeschlagen.', analyzing: false });
+    }
+  };
+
+  const analyzeAll = async () => {
+    for (let i = 0; i < slots.length; i++) {
+      if (slots[i].file && !slots[i].analysis && !slots[i].analyzing) {
+        await analyzeSlot(i);
+      }
+    }
+  };
+
+  const handleSynthesize = async () => {
+    const completed = slots.filter(s => s.analysis !== null).map(s => s.analysis!);
+    if (completed.length === 0) return;
+    setIsSynth(true);
+    setSynthResult(null);
+    try {
+      const result = await synthesizeReferenceStyle(completed);
+      setSynthResult(result);
+    } catch (e: any) {
+      showToast(e.message || 'Synthese fehlgeschlagen.', 'error');
+    } finally { setIsSynth(false); }
+  };
+
+  const handleApply = () => {
+    if (!synthResult) return;
+    onApply(synthResult);
+    setSynthResult(null);
+  };
+
+  const analyzedCount = slots.filter(s => s.analysis !== null).length;
+  const pendingAnalysis = slots.filter(s => s.file && !s.analysis && !s.analyzing).length;
+  const anyAnalyzing   = slots.some(s => s.analyzing);
+
+  return (
+    <div className="glass-card rounded-3xl overflow-hidden">
+      {/* ── Header / Toggle ── */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(p => !p)}
+        className="w-full flex items-center justify-between px-6 py-4 group hover:bg-white/5 transition-colors"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-7 h-7 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+            <i className="fas fa-layer-group text-suno-primary text-[11px]"></i>
+          </div>
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
+                {tr.concept.refMixer}
+              </span>
+              {analyzedCount > 0 && (
+                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                  {analyzedCount} {tr.concept.refMixerAnalyzed}
+                </span>
+              )}
+            </div>
+            <p className="text-[9px] text-zinc-500 dark:text-zinc-500 mt-0.5 truncate">{tr.concept.refMixerHint}</p>
+          </div>
+        </div>
+        <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ml-3 ${isOpen ? 'rotate-180' : ''}`}></i>
+      </button>
+
+      {/* ── Body ── */}
+      {isOpen && (
+        <div className="px-6 pb-6 space-y-4 border-t border-white/10 dark:border-white/8 pt-4">
+
+          {/* Slots */}
+          <div className="space-y-2">
+            {slots.map((slot, idx) => (
+              <div key={idx} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl border transition-all ${
+                slot.analysis
+                  ? 'border-emerald-500/30 bg-emerald-500/5'
+                  : slot.error
+                  ? 'border-red-500/30 bg-red-500/5'
+                  : 'border-zinc-200 dark:border-zinc-700/60 bg-white/30 dark:bg-white/[0.03]'
+              }`}>
+                {/* Slot icon */}
+                <div className="flex-shrink-0">
+                  {slot.analysis
+                    ? <i className="fas fa-check-circle text-emerald-500 text-[12px]"></i>
+                    : slot.analyzing
+                    ? <i className="fas fa-spinner animate-spin text-suno-primary text-[11px]"></i>
+                    : <i className="fas fa-waveform-lines text-zinc-400 text-[11px]"></i>}
+                </div>
+
+                {/* Label / file info or empty slot (upload vs link) */}
+                <div className="flex-1 min-w-0">
+                  {slot.file ? (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <i className={`${slot.sourceMode === 'url' ? 'fas fa-link' : 'fas fa-file-audio'} text-suno-primary text-[9px] flex-shrink-0`}></i>
+                      <span className="text-[9px] font-medium text-zinc-600 dark:text-zinc-300 truncate" title={slot.file.name}>{slot.file.name}</span>
+                      <span className="text-[8px] text-zinc-400 flex-shrink-0">{slot.file.sizeMB} MB</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-500">{tr.concept.refMixerSlot} {idx + 1}</span>
+                        <div className="flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-600">
+                          <button type="button" onClick={() => setSlot(idx, { ...slot, sourceMode: 'upload', error: '' })}
+                            className={`px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition-colors ${slot.sourceMode === 'upload' ? 'bg-suno-primary/20 text-suno-primary' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                            {tr.concept.refMixerByFile}
+                          </button>
+                          <button type="button" onClick={() => setSlot(idx, { ...slot, sourceMode: 'url', error: '' })}
+                            className={`px-2 py-1 text-[8px] font-bold uppercase tracking-wider transition-colors ${slot.sourceMode === 'url' ? 'bg-suno-primary/20 text-suno-primary' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
+                            {tr.concept.refMixerByLink}
+                          </button>
+                        </div>
+                      </div>
+                      {slot.sourceMode === 'upload' && (
+                        <button type="button" onClick={() => fileRefs[idx].current?.click()}
+                          className="flex items-center gap-1.5 text-[9px] font-medium text-zinc-400 hover:text-suno-primary transition-colors">
+                          <i className="fas fa-arrow-up-from-bracket text-[8px]"></i>
+                          {tr.concept.fileChoose}
+                        </button>
+                      )}
+                      {slot.sourceMode === 'url' && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input type="url" placeholder={tr.concept.refMixerSunoPlaceholder}
+                              value={slot.sunoUrl} onChange={(e) => setSlot(idx, { sunoUrl: e.target.value, error: '' })}
+                              className="flex-1 min-w-[140px] max-w-[220px] px-2.5 py-1.5 rounded-lg text-[10px] glass-input border border-zinc-200 dark:border-zinc-600 placeholder:text-zinc-400"
+                            />
+                            <button type="button" onClick={() => handleSunoLoad(idx)} disabled={slot.sunoLoading}
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all ${slot.sunoLoading ? 'glass-btn text-suno-primary opacity-70' : 'btn-create text-white shadow-sm'}`}>
+                              {slot.sunoLoading ? <i className="fas fa-spinner animate-spin"></i> : <i className="fas fa-download"></i>}
+                              {slot.sunoLoading ? tr.concept.refMixerSunoLoading : tr.concept.refMixerSunoLoad}
+                            </button>
+                          </div>
+                          <p className="text-[8px] text-zinc-500 dark:text-zinc-500">{tr.concept.refMixerSunoHint}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {slot.error && <p className="text-[8px] text-red-500 font-bold mt-0.5">{slot.error}</p>}
+                  {slot.analysis && (
+                    <p className="text-[8px] text-emerald-500 font-bold mt-0.5 truncate">
+                      {(slot.analysis.genre ?? []).slice(0, 2).join(' · ')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Analyze button */}
+                {slot.file && !slot.analysis && !slot.analyzing && (
+                  <button type="button" onClick={() => analyzeSlot(idx)}
+                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider btn-create text-white shadow-sm transition-all">
+                    <i className="fas fa-wand-magic-sparkles"></i> {tr.concept.refMixerAnalyze}
+                  </button>
+                )}
+
+                {/* Remove button */}
+                {slot.file && (
+                  <button type="button" onClick={() => clearSlot(idx)}
+                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[9px]">
+                    <i className="fas fa-times"></i>
+                  </button>
+                )}
+
+                <input ref={fileRefs[idx]} type="file" accept={ACCEPTED_AUDIO} className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(idx, f); e.target.value = ''; }} />
+              </div>
+            ))}
+          </div>
+
+          {/* Action row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {pendingAnalysis > 1 && (
+              <button type="button" onClick={analyzeAll} disabled={anyAnalyzing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-suno-primary border border-suno-primary/20 hover:bg-suno-primary/10 transition-all">
+                <i className={`fas fa-wand-magic-sparkles ${anyAnalyzing ? 'animate-spin' : ''}`}></i>
+                {tr.concept.refMixerAnalyzeAll}
+              </button>
+            )}
+
+            {analyzedCount > 0 && (
+              <button type="button" onClick={handleSynthesize} disabled={isSynthesizing}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] transition-all border ${
+                  isSynthesizing
+                    ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
+                    : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
+                }`}>
+                {isSynthesizing
+                  ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.refMixerSynthesizing}</>
+                  : <><i className="fas fa-layer-group"></i> {tr.concept.refMixerSynthesize}</>}
+              </button>
+            )}
+          </div>
+
+          {/* ── Synthesis Result ── */}
+          {synthResult && (
+            <div className="rounded-2xl border border-suno-primary/30 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 animate-scale-in">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-layer-group text-suno-primary text-[11px]"></i>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.refMixerFusionLabel}</p>
+                    <p className="text-sm font-black text-zinc-800 dark:text-zinc-100">{synthResult.fusionLabel}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setSynthResult(null)}
+                  className="w-5 h-5 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 text-[9px] flex-shrink-0 transition-all">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+
+              {/* Genre / Mood / Tempo pills */}
+              <div className="flex flex-wrap gap-1.5">
+                {synthResult.genre.map((g, i) => (
+                  <span key={`g${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-primary/10 text-suno-primary border border-suno-primary/20">
+                    <i className="fas fa-music mr-1 text-[7px]"></i>{g}
+                  </span>
+                ))}
+                {synthResult.mood.map((m, i) => (
+                  <span key={`m${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">
+                    {m}
+                  </span>
+                ))}
+                {synthResult.tempo.map((t, i) => (
+                  <span key={`t${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                    <i className="fas fa-gauge-high mr-1 text-[7px]"></i>{t}
+                  </span>
+                ))}
+                {synthResult.instrumentation.map((ins, i) => (
+                  <span key={`i${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    <i className="fas fa-guitar mr-1 text-[7px]"></i>{ins}
+                  </span>
+                ))}
+              </div>
+
+              {/* Seeds */}
+              <div className="space-y-1.5">
+                {synthResult.stylePromptSeed && (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
+                    <i className="fas fa-tag text-suno-primary text-[9px] mt-0.5 flex-shrink-0"></i>
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-black uppercase tracking-wider text-suno-primary mb-0.5">{tr.concept.refMixerStyleSeed}</p>
+                      <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed italic">{synthResult.stylePromptSeed}</p>
+                    </div>
+                  </div>
+                )}
+                {synthResult.regieSeed && (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
+                    <i className="fas fa-clapperboard text-amber-500 text-[9px] mt-0.5 flex-shrink-0"></i>
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-black uppercase tracking-wider text-amber-500 mb-0.5">{tr.concept.refMixerRegieSeed}</p>
+                      <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed font-mono">{synthResult.regieSeed}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button type="button" onClick={handleApply}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary hover:text-white transition-all">
+                  <i className="fas fa-check"></i> {tr.concept.refMixerApply}
+                </button>
+                <button type="button" onClick={() => setSynthResult(null)}
+                  className="px-3 py-2 rounded-xl text-[10px] font-bold glass-btn text-zinc-500 hover:text-red-500 transition-all">
+                  {tr.concept.refMixerDismiss}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONCEPT FORM ─────────────────────────────────────────────────────────
 const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) => {
   const { tr } = useLang();
@@ -305,6 +752,18 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
       vocals:          result.isInstrumental ? [] : (prev.vocals.length   ? prev.vocals            : (result.vocals    ?? [])),
       language:        result.isInstrumental ? [] : (prev.language.length ? prev.language          : (result.language  ?? [])),
     }));
+  };
+
+  // ─── Referenz-Mixer ───
+  const handleMixerApply = (result: ReferenceStyleResult) => {
+    setConcept(prev => ({
+      ...prev,
+      genre:           result.genre.length           ? [...new Set([...prev.genre, ...result.genre])]                       : prev.genre,
+      mood:            result.mood.length            ? [...new Set([...prev.mood, ...result.mood])]                        : prev.mood,
+      tempo:           result.tempo.length           ? [...new Set([...prev.tempo, ...result.tempo])]                      : prev.tempo,
+      instrumentation: result.instrumentation.length ? [...new Set([...(prev.instrumentation ?? []), ...result.instrumentation])] : prev.instrumentation,
+    }));
+    showToast('Referenz-Stil übernommen ✓', 'success');
   };
 
   // ─── Genre-Fusion Lab ───
@@ -506,6 +965,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
           </div>
         )}
       </div>
+
+      {/* ═══ REFERENZ-MIXER ═══ */}
+      <ReferenzMixer onApply={handleMixerApply} />
 
       {/* ═══ FIELDS GRID ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-6">

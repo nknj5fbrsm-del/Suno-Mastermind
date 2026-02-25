@@ -14,6 +14,7 @@ interface ArtworkDisplayProps {
   stylePrompt: string;
   /** Wenn gesetzt (zwei Style-Varianten): Copy „Style“ nutzt pro Variante den passenden Prompt. */
   styleVariants?: [GeneratedStyle, GeneratedStyle] | null;
+  coverError?: string | null;
   onUpdateStory: (newStory: string) => void;
   onRegenerateCover: (style: string) => Promise<void>;
 }
@@ -30,7 +31,7 @@ const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 
 const SUNO_CREATE_URL = 'https://suno.com/create';
 
-const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, onUpdateStory, onRegenerateCover }) => {
+const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const [expandedVariant, setExpandedVariant] = useState<1 | 2 | null>(null);
@@ -295,21 +296,34 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
             </button>
           </div>
 
-          {/* Image */}
+          {/* Image / Fehleranzeige */}
           <div className="relative group cursor-pointer rounded-2xl overflow-hidden" onClick={() => coverUrl && setIsZoomed(true)}>
             {coverUrl ? (
               <>
-                <img src={coverUrl} alt="Album Cover"
-                  className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+                <img
+                  src={coverUrl}
+                  alt="Album Cover"
+                  className="w-full aspect-square object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/35 backdrop-blur-[2px]">
                   <div className="w-12 h-12 rounded-full bg-white/15 border border-white/30 flex items-center justify-center text-white shadow-xl">
                     <i className="fas fa-magnifying-glass-plus text-lg"></i>
                   </div>
                 </div>
               </>
+            ) : coverError ? (
+              <div className="w-full aspect-square rounded-2xl border border-red-500/40 bg-red-500/10 flex flex-col items-center justify-center text-center px-4 space-y-2">
+                <i className="fas fa-triangle-exclamation text-red-400 text-2xl"></i>
+                <p className="text-[11px] font-black uppercase tracking-wider text-red-300">
+                  {tr.artwork.coverErrorTitle}
+                </p>
+                <p className="text-[10px] text-red-200 leading-relaxed">
+                  {coverError}
+                </p>
+              </div>
             ) : (
               <div className="w-full aspect-square rounded-2xl glass-btn flex items-center justify-center">
-                <i className="fas fa-compact-disc text-zinc-300 dark:text-zinc-600 text-5xl" style={{animation:'spin 8s linear infinite'}}></i>
+                <i className="fas fa-compact-disc text-zinc-300 dark:text-zinc-600 text-5xl" style={{ animation: 'spin 8s linear infinite' }}></i>
               </div>
             )}
           </div>

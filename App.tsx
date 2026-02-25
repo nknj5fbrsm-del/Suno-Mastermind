@@ -90,6 +90,7 @@ const App: React.FC = () => {
   /** Zwei Style-Varianten (passend zu Lyrics 1 und 2); beim Create-Flow beide generiert, auf Style-Seite nebeneinander. */
   const [styleVariants, setStyleVariants] = useState<[GeneratedStyle, GeneratedStyle] | null>(null);
   const [coverUrl, setCoverUrl] = useState<string>('');
+  const [coverError, setCoverError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>('Generating Magic...');
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
@@ -495,6 +496,7 @@ const App: React.FC = () => {
               setIsLoading(true);
               setLoadingText(tr.loading.generatingCover);
               setLoadingProgress(50);
+              setCoverError(null);
               try {
                 const genCover = await generateCoverArt(concept);
                 setCoverUrl(genCover);
@@ -510,9 +512,15 @@ const App: React.FC = () => {
                 };
                 await saveSongToDB(item);
                 setHistory(prev => [item, ...prev]);
+              } catch (e) {
+                handleError(e);
+                const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
+                setCoverError(msg);
+              } finally {
+                setIsLoading(false);
+                setLoadingProgress(0);
                 setActiveStep(WorkflowStep.ARTWORK);
-              } catch (e) { handleError(e); }
-              finally { setIsLoading(false); setLoadingProgress(0); }
+              }
               return;
             }
             setActiveStep(step);
@@ -597,7 +605,37 @@ const App: React.FC = () => {
             <StyleDisplay data={styleData} onRegenerate={async () => { setLoadingText(tr.loading.generatingStyle); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); setStyleData(await generateStylePrompt(concept, lang, lyricsVariants ?? undefined)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdatePrompt={(prompt) => setStyleData(prev => prev ? { ...prev, prompt } : null)} onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)} />
           )
         )}
-        {activeStep === WorkflowStep.ARTWORK && styleData && <ArtworkDisplay coverUrl={coverUrl} songDescription={styleData.songDescription} lyrics={lyrics} lyricsVariants={lyricsVariants} stylePrompt={styleData.prompt} styleVariants={styleVariants} onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)} onRegenerateCover={async (style) => { setLoadingText(tr.loading.generatingCover); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); setCoverUrl(await generateCoverArt(concept, style)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} />}
+        {activeStep === WorkflowStep.ARTWORK && styleData && (
+          <ArtworkDisplay
+            coverUrl={coverUrl}
+            songDescription={styleData.songDescription}
+            lyrics={lyrics}
+            lyricsVariants={lyricsVariants}
+            stylePrompt={styleData.prompt}
+            styleVariants={styleVariants}
+            coverError={coverError}
+            onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)}
+            onRegenerateCover={async (style) => {
+              setLoadingText(tr.loading.generatingCover);
+              setLoadingProgress(10);
+              setIsLoading(true);
+              setCoverError(null);
+              try {
+                setLoadingProgress(50);
+                const genCover = await generateCoverArt(concept, style);
+                setCoverUrl(genCover);
+                setLoadingProgress(100);
+              } catch (e) {
+                handleError(e);
+                const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
+                setCoverError(msg);
+              } finally {
+                setIsLoading(false);
+                setLoadingProgress(0);
+              }
+            }}
+          />
+        )}
       </Suspense>
       </main>
     </div>
