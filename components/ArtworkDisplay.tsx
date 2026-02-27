@@ -452,7 +452,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
 
       {/* ─── Zoom Modal ─── */}
       {isZoomed && coverUrl && (
-        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-scale-in cursor-zoom-out"
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md md:backdrop-blur-xl flex items-center justify-center p-4 animate-scale-in cursor-zoom-out"
           onClick={() => setIsZoomed(false)}>
           <div className="relative max-w-2xl w-full">
             <button className="absolute -top-10 right-0 text-white/70 hover:text-white text-2xl transition-colors"

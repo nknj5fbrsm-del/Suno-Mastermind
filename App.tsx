@@ -76,8 +76,8 @@ const App: React.FC = () => {
   const [themeDropdownAnchor, setThemeDropdownAnchor] = useState<{ top: number; right: number } | null>(null);
   
   // BYOK State: Wir nutzen jetzt einen String statt nur eines Booleans
-  const [manualApiKey, setManualApiKey] = useState<string>(localStorage.getItem('gemini_api_key') || '');
-  const [isKeySaved, setIsKeySaved] = useState<boolean>(!!localStorage.getItem('gemini_api_key'));
+  const [manualApiKey, setManualApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
+  const [isKeySaved, setIsKeySaved] = useState<boolean>(() => !!localStorage.getItem('gemini_api_key'));
 
   const [concept, setConcept] = useState<SongConcept>({
     topic: '', genre: [], mood: [], tempo: [], language: [], isInstrumental: false, vocals: [], instrumentation: [], excludedStyles: []
@@ -95,10 +95,11 @@ const App: React.FC = () => {
   const [loadingText, setLoadingText] = useState<string>('Generating Magic...');
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [history, setHistory] = useState<SongHistoryItem[]>([]);
-  const [lang, setLang] = useState<Lang>((localStorage.getItem('suno-lang') as Lang) || 'de');
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('suno-lang') as Lang) || 'de');
   const [toast, setToast] = useState<ToastState>(null);
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
   const tr = useMemo(() => t[lang], [lang]);
+  const langValue = useMemo(() => ({ lang, tr }), [lang, tr]);
 
   useEffect(() => {
     // Theme Initialisierung
@@ -306,7 +307,7 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : (
-    <LangContext.Provider value={{ lang, tr }}>
+    <LangContext.Provider value={langValue}>
     <div className="min-h-screen flex flex-col bg-suno-bg text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
 
       {/* ─── ABOUT MODAL (NilsP) ─── */}
@@ -535,7 +536,7 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6 md:px-8 md:py-10">
         {isLoading && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-lg flex items-center justify-center z-[9999]">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md md:backdrop-blur-lg flex items-center justify-center z-[9999]">
             <div className="glass-card animate-scale-in text-center px-10 py-8 rounded-3xl min-w-[300px] max-w-[90vw] space-y-5">
               {/* Spinning disc icon */}
               <div className="flex items-center justify-center">

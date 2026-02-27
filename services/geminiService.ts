@@ -352,12 +352,28 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
     contents: prompt,
     config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 1.0, ...DEFAULT_THINKING },
   }));
+
+  // Streaming-Updates leicht drosseln, um unnötig viele Re-Renders zu vermeiden
+  let lastEmit = 0;
+  const EMIT_INTERVAL_MS = 80;
+
   for await (const chunk of stream) {
     const text = chunk.text ?? "";
     if (text) {
       accumulated += text;
-      onChunk?.(accumulated);
+      if (onChunk) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (!lastEmit || now - lastEmit >= EMIT_INTERVAL_MS) {
+          lastEmit = now;
+          onChunk(accumulated);
+        }
+      }
     }
+  }
+
+  // Sicherstellen, dass das finale Ergebnis mindestens einmal im Callback landet
+  if (onChunk && accumulated) {
+    onChunk(accumulated);
   }
   const cleaned = cleanText(accumulated);
   return stripLyricsPreamble(cleaned);

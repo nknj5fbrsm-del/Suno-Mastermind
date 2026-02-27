@@ -33,8 +33,11 @@ const SearchableMultiInput: React.FC<{
   const wrapperRef = useRef<HTMLDivElement>(null);
   const justOpenedRef = useRef(false);
 
+  // Outside-Click-Listener nur aktiv, solange das Dropdown geöffnet ist
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -43,7 +46,7 @@ const SearchableMultiInput: React.FC<{
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, []);
+  }, [isOpen]);
 
   const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()) && !selected.includes(o));
 
@@ -225,13 +228,26 @@ async function fetchSunoAudio(songId: string): Promise<{ base64: string; mimeTyp
   const url = `${SUNO_CDN_BASE}/${songId}.mp3`;
   const res = await fetch(url, { mode: 'cors' });
   if (!res.ok) throw new Error(res.status === 404 ? 'Song nicht gefunden (privat oder abgelaufen?).' : `Laden fehlgeschlagen (${res.status}).`);
-  const buf = await res.arrayBuffer();
-  const sizeBytes = buf.byteLength;
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
-  const base64 = btoa(binary);
-  return { base64, mimeType: 'audio/mpeg', sizeBytes };
+
+  const blob = await res.blob();
+  const sizeBytes = blob.size;
+
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string | null;
+      if (!result) {
+        reject(new Error('Lesefehler'));
+        return;
+      }
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Lesefehler'));
+    reader.readAsDataURL(blob);
+  });
+
+  return { base64, mimeType: blob.type || 'audio/mpeg', sizeBytes };
 }
 
 interface MixerSlot {
