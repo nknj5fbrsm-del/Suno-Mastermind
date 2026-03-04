@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { GeneratedStyle } from '../types';
 import { useLang } from '../App';
+import StyleDictionary from './StyleDictionary';
 
 interface StyleDisplayProps {
   data: GeneratedStyle;
@@ -162,9 +163,34 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
   const [editablePrompt, setEditablePrompt] = useState(data.prompt);
   const [editableVariant0, setEditableVariant0] = useState(dataVariants?.[0]?.prompt ?? data.prompt);
   const [editableVariant1, setEditableVariant1] = useState(dataVariants?.[1]?.prompt ?? data.prompt);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [insertTarget, setInsertTarget] = useState<0 | 1>(0);
   const [busyA, setBusyA] = useState(false);
   const [busyB, setBusyB] = useState(false);
   const [busySingle, setBusySingle] = useState(false);
+
+  const appendToPrompt = (text: string, target: 'single' | 0 | 1) => {
+    const prepare = (p: string) => {
+      let base = p.trim();
+      if (base.endsWith('.')) base = base.slice(0, -1).trim();
+      return base ? base + ', ' + text : text;
+    };
+    if (target === 'single') {
+      const next = prepare(editablePrompt);
+      setEditablePrompt(next);
+      onUpdatePrompt?.(next);
+    } else {
+      const current = target === 0 ? editableVariant0 : editableVariant1;
+      const next = prepare(current);
+      if (target === 0) {
+        setEditableVariant0(next);
+        onUpdatePromptVariant?.(0, next);
+      } else {
+        setEditableVariant1(next);
+        onUpdatePromptVariant?.(1, next);
+      }
+    }
+  };
 
   useEffect(() => { setEditablePrompt(data.prompt); }, [data.prompt]);
   useEffect(() => { if (dataVariants?.[0]) setEditableVariant0(dataVariants[0].prompt); }, [dataVariants?.[0]?.prompt]);
@@ -261,6 +287,29 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             onEnrich={onEnrichStyleB ? handleEnrichB : undefined}
             onRegenerate={onRegenerateB ? handleRegenB : undefined}
           />
+        </div>
+        <div className="border-t border-white/10 dark:border-white/5 pt-4">
+          <button
+            type="button"
+            onClick={() => setDictionaryOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl glass-card hover:bg-white/10 dark:hover:bg-black/20 transition-colors text-left"
+          >
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-300 flex items-center gap-2">
+              <i className="fas fa-book text-suno-primary"></i>
+              {tr.style.dictionaryTitle}
+            </span>
+            <i className={`fas fa-chevron-down text-[10px] text-zinc-400 transition-transform flex-shrink-0 ${dictionaryOpen ? '' : '-rotate-90'}`}></i>
+          </button>
+          {dictionaryOpen && (
+            <div className="mt-3">
+              <StyleDictionary
+                onInsert={(text) => appendToPrompt(text, insertTarget)}
+                insertTarget={insertTarget}
+                onInsertTargetChange={setInsertTarget}
+                variantLabels={[tr.lyrics.variant1, tr.lyrics.variant2]}
+              />
+            </div>
+          )}
         </div>
       </section>
     );
@@ -370,6 +419,24 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             <p className="text-[10px] text-center font-black uppercase tracking-[0.15em] text-zinc-500 dark:text-zinc-400 italic leading-snug">{tr.style.aiNote}</p>
           </div>
         </div>
+      </div>
+      <div className="border-t border-white/10 dark:border-white/5 pt-4">
+        <button
+          type="button"
+          onClick={() => setDictionaryOpen((o) => !o)}
+          className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl glass-card hover:bg-white/10 dark:hover:bg-black/20 transition-colors text-left"
+        >
+          <span className="text-[10px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-300 flex items-center gap-2">
+            <i className="fas fa-book text-suno-primary"></i>
+            {tr.style.dictionaryTitle}
+          </span>
+          <i className={`fas fa-chevron-down text-[10px] text-zinc-400 transition-transform flex-shrink-0 ${dictionaryOpen ? '' : '-rotate-90'}`}></i>
+        </button>
+        {dictionaryOpen && (
+          <div className="mt-3">
+            <StyleDictionary onInsert={(text) => appendToPrompt(text, 'single')} />
+          </div>
+        )}
       </div>
     </section>
   );

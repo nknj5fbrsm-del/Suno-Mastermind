@@ -29,6 +29,8 @@ export const t = {
       untitled: 'Ohne Titel',
       whatsNew: 'Was ist neu',
       whatsNewItems: [
+        { date: '2026-02-26', text: 'Style-Wörterbuch im Style-Tab: Fachbegriffe zu Artikulation, Dynamik, Harmonik, Rhythmus & Feel sowie Produktion & Raum – mit Erklärungen, Suchfunktion und Klick zum Einfügen ins Style-Feld. Gruppen beim Aufklappen eingeklappt, einzeln aufklappbar.' },
+        { date: '2026-02-26', text: 'Style-Mix: Eine Konzept-Style und eine Kontrast-Style (bewusst andere Richtung). Optionaler Slider zum Morphen zwischen beiden – der gemixte Style wird für Cover & Suno genutzt.' },
         { date: '2026-02-25', text: 'Kreativ & Analyse Lab im Konzept: Referenz-Mixer, Genre-Fusion und Kreativ-Boost in einem aufklappbaren Block gebündelt – bessere Übersicht, besonders auf Mobile.' },
         { date: '2026-02-25', text: 'Referenz-Mixer im Konzept: Bis zu 3 Tracks per Datei-Upload oder Suno-Link (auch Share-Link suno.com/s/…). KI synthetisiert gemeinsame Stil-DNA und füllt Genre, Mood, Tempo & Instrumente.' },
         { date: '2026-02-24', text: 'Kreativ-Boost im Konzept: KI schlägt einen unerwarteten, aber musikalisch sinnvollen Twist mit Instrumenten, Genres und Produktionstipps vor.' },
@@ -131,6 +133,10 @@ export const t = {
       insightTitle: 'Style Insight', effect: 'Wirkung & Technik', references: 'Referenzen',
       aiNote: 'KI-generierte Analyse · Alle Werte empfohlen',
       copyOnLastPage: 'Lyrics, Style, Story und Cover kannst du auf der letzten Seite (Cover & Story) kopieren.',
+      dictionaryTitle: 'Style-Wörterbuch',
+      dictionarySearch: 'Begriffe suchen…',
+      dictionaryNoResults: 'Keine Treffer.',
+      insertInto: 'Einfügen in:',
     },
     artwork: {
       pill: 'Cover & Story', regenerate: 'Cover neu erstellen',
@@ -237,6 +243,8 @@ export const t = {
       untitled: 'Untitled',
       whatsNew: "What's New",
       whatsNewItems: [
+        { date: '2026-02-26', text: 'Style Dictionary in the Style step: terms for articulation, dynamics, harmony, rhythm & feel, and production & space – with short explanations, search, and click-to-insert into the style field. Groups start collapsed and can be expanded individually.' },
+        { date: '2026-02-26', text: 'Style Mix: One concept-aligned style and one contrast style (deliberately different direction). Optional slider to morph between both – the mixed style is used for cover & Suno.' },
         { date: '2026-02-25', text: 'Creative & Analysis Lab in the Concept step: reference mixer, genre fusion and creative boost grouped into one collapsible block – cleaner layout, especially on mobile.' },
         { date: '2026-02-25', text: 'Reference Mixer in the Concept step: up to 3 tracks via file upload or Suno link (including Share link suno.com/s/…). AI synthesizes a shared style DNA and fills genre, mood, tempo & instruments.' },
         { date: '2026-02-24', text: 'Creative Boost in the Concept step: AI proposes a surprising but musically solid twist with instruments, genres and production tips.' },
@@ -339,6 +347,10 @@ export const t = {
       insightTitle: 'Style Insight', effect: 'Effect & Technique', references: 'References',
       aiNote: 'AI-generated analysis · All values recommended',
       copyOnLastPage: 'You can copy lyrics, style, story and cover on the last page (Cover & Story).',
+      dictionaryTitle: 'Style Dictionary',
+      dictionarySearch: 'Search terms…',
+      dictionaryNoResults: 'No results.',
+      insertInto: 'Insert into:',
     },
     artwork: {
       pill: 'Cover & Story', regenerate: 'Regenerate Cover',
