@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { SongConcept } from '../types';
 import { useLang } from '../App';
+import SearchableMultiInput from './SearchableMultiInput';
 
 interface LyricsCompareViewProps {
   variantA: string;
   variantB: string;
+  concept?: SongConcept;
+  isInstrumental?: boolean;
+  onConceptChange?: (patch: Partial<SongConcept>) => void;
   onUpdateVariantA?: (value: string) => void;
   onUpdateVariantB?: (value: string) => void;
   onEnrichRegieA?: (lyrics: string) => Promise<string>;
@@ -14,10 +19,26 @@ interface LyricsCompareViewProps {
 
 const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
   variantA, variantB,
+  concept,
+  isInstrumental = false,
+  onConceptChange,
   onUpdateVariantA, onUpdateVariantB,
   onEnrichRegieA, onEnrichRegieB, onRegenerateA, onRegenerateB,
 }) => {
   const { tr } = useLang();
+
+  const toggleLanguage = (val: string) => {
+    if (!concept || !onConceptChange) return;
+    const cur = concept.language ?? [];
+    const next = cur.includes(val) ? cur.filter(i => i !== val) : [...cur, val];
+    onConceptChange({ language: next });
+  };
+  const toggleVocals = (val: string) => {
+    if (!concept || !onConceptChange) return;
+    const cur = concept.vocals ?? [];
+    const next = cur.includes(val) ? cur.filter(i => i !== val) : [...cur, val];
+    onConceptChange({ vocals: next });
+  };
   const [editA, setEditA] = useState(variantA);
   const [editB, setEditB] = useState(variantB);
   const [busyA, setBusyA] = useState(false);
@@ -80,6 +101,35 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
         <i className="fas fa-info-circle text-suno-primary text-sm flex-shrink-0"></i>
         <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">{tr.lyrics.twoVariantsSub}</p>
       </div>
+
+      {/* Sprache & Gesangsstil (aus KI-Inspiration im Konzept); relative z-10 damit Dropdowns über Lyrics-Bereich liegen */}
+      {!isInstrumental && concept && onConceptChange && (
+        <div className="glass-card rounded-2xl p-4 relative z-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-600 dark:text-zinc-400 mb-3">{tr.concept.details}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SearchableMultiInput
+              label={tr.concept.language}
+              icon="fa-globe"
+              options={tr.conceptOptions.languages}
+              selected={concept.language ?? []}
+              onToggle={toggleLanguage}
+              placeholder={tr.conceptOptions.languages.slice(0, 2).join(', ') + '…'}
+              disabled={isInstrumental}
+              accent="text-emerald-500"
+            />
+            <SearchableMultiInput
+              label={tr.concept.vocals}
+              icon="fa-microphone"
+              options={tr.conceptOptions.vocals}
+              selected={concept.vocals ?? []}
+              onToggle={toggleVocals}
+              placeholder={tr.conceptOptions.vocals.slice(0, 2).join(', ') + '…'}
+              disabled={isInstrumental}
+              accent="text-blue-500"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Variante 1 */}

@@ -9,122 +9,14 @@ import {
   synthesizeReferenceStyle, ReferenceStyleResult,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
+import SearchableMultiInput from './SearchableMultiInput';
 
 interface ConceptFormProps {
   initialConcept: SongConcept;
   onSubmit: (concept: SongConcept) => void;
+  /** Wird bei jeder Änderung aufgerufen, damit die App den aktuellen Konzept-Stand behält (z. B. beim Tab-Wechsel ohne „Weiter“). */
+  onConceptChange?: (concept: SongConcept) => void;
 }
-
-// ─── SEARCHABLE MULTI INPUT ───────────────────────────────────────────────
-const SearchableMultiInput: React.FC<{
-  label: string;
-  icon: string;
-  options: string[];
-  selected: string[];
-  onToggle: (val: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  isLoading?: boolean;
-  accent?: string;
-}> = ({ label, icon, options, selected, onToggle, placeholder, disabled, isLoading, accent = 'text-suno-primary' }) => {
-  const { tr } = useLang();
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const justOpenedRef = useRef(false);
-
-  // Outside-Click-Listener nur aktiv, solange das Dropdown geöffnet ist
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()) && !selected.includes(o));
-
-  const handleAdd = () => {
-    const val = searchTerm.trim();
-    if (val && !selected.includes(val)) { onToggle(val); }
-    setSearchTerm(''); setIsOpen(false);
-  };
-
-  const handleInputClick = () => {
-    if (disabled) return;
-    if (justOpenedRef.current) {
-      justOpenedRef.current = false;
-      return;
-    }
-    setIsOpen(prev => !prev);
-  };
-
-  const handleInputFocus = () => {
-    if (disabled) return;
-    justOpenedRef.current = true;
-    setIsOpen(true);
-  };
-
-  return (
-    <div className={`space-y-2 transition-opacity ${disabled ? 'opacity-40 pointer-events-none' : ''}`} ref={wrapperRef}>
-      <div className="flex items-center justify-between">
-        <label className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] ${disabled ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-700 dark:text-zinc-400'}`}>
-          <i className={`fas ${icon} text-[10px] ${accent}`}></i> {label}
-        </label>
-        {isLoading && <span className={`text-[8px] font-black uppercase tracking-wider ${accent} animate-pulse`}><i className="fas fa-wand-magic-sparkles mr-1"></i>{tr.concept.inspiring}</span>}
-      </div>
-      <div className="relative">
-        <input
-          type="text"
-          disabled={disabled}
-          autoComplete="off"
-          className={`w-full glass-input rounded-xl px-3.5 py-3 pr-10 text-sm outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100 ${isLoading ? 'border-suno-primary/50' : ''}`}
-          value={searchTerm}
-          placeholder={placeholder}
-          onFocus={handleInputFocus}
-          onClick={handleInputClick}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-        />
-        <button type="button" disabled={disabled || !searchTerm.trim()} onClick={handleAdd}
-          className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] transition-all ${searchTerm.trim() ? 'bg-suno-primary text-white' : 'text-zinc-400 opacity-40'}`}>
-          <i className="fas fa-plus"></i>
-        </button>
-      </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix concept-dropdown-options">
-          {filtered.length > 0 ? filtered.map(opt => (
-            <button key={opt} type="button"
-              className="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-800 dark:text-zinc-200 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
-              onClick={() => { onToggle(opt); setSearchTerm(''); setIsOpen(false); }}>
-              {opt}
-            </button>
-          )) : (
-            <p className="px-4 py-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.concept.optional}</p>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
-        {selected.map(tag => (
-          <span key={tag} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-medium bg-suno-primary/10 border border-suno-primary/20 ${accent} group hover:bg-red-500/10 hover:border-red-500/20 transition-all`}>
-            {tag}
-            <button type="button" onClick={() => onToggle(tag)} className="hover:text-red-500 transition-colors ml-0.5">
-              <i className="fas fa-times text-[8px]"></i>
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 // ─── AUDIO UPLOAD ZONE ────────────────────────────────────────────────────
 const ACCEPTED_AUDIO = '.mp3,.wav,.ogg,.flac,.aac,.webm,.m4a';
@@ -631,7 +523,7 @@ const ReferenzMixer: React.FC<{
 };
 
 // ─── CONCEPT FORM ─────────────────────────────────────────────────────────
-const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) => {
+const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onConceptChange }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const opts = tr.conceptOptions;
@@ -655,6 +547,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
   const genreFieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setConcept(initialConcept); }, [initialConcept]);
+
+  // Jede Änderung an die App melden, damit beim Tab-Wechsel (ohne „Weiter“) nichts verloren geht
+  useEffect(() => { onConceptChange?.(concept); }, [concept]);
 
   const focusGenreField = () => {
     setGenreFieldPulse(true);
@@ -1130,16 +1025,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
               onToggle={(v) => toggle('mood', v)} placeholder={opts.moods.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-suno-secondary" />
           </div>
           <div className="relative">
-            <SearchableMultiInput label={tr.concept.language} icon="fa-globe" options={opts.languages} selected={concept.language}
-              onToggle={(v) => toggle('language', v)} placeholder={opts.languages.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing}
-              disabled={concept.isInstrumental} accent="text-emerald-500" />
-          </div>
-          <div className="relative">
-            <SearchableMultiInput label={tr.concept.vocals} icon="fa-microphone" options={opts.vocals} selected={concept.vocals}
-              onToggle={(v) => toggle('vocals', v)} placeholder={opts.vocals.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing}
-              disabled={concept.isInstrumental} accent="text-blue-500" />
-          </div>
-          <div className="relative">
             <SearchableMultiInput label={tr.concept.tempo} icon="fa-gauge-high" options={opts.tempos} selected={concept.tempo}
               onToggle={(v) => toggle('tempo', v)} placeholder={opts.tempos.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-yellow-500" />
           </div>
@@ -1155,15 +1040,15 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit }) =
         </div>
       </div>
 
-      {/* ═══ CREATE BUTTON ═══ */}
+      {/* ═══ WEITER (zu Lyrics) ═══ */}
       <div className="relative z-0 mt-20 md:mt-24">
         <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
         <button type="submit"
           className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3">
-          <i className="fas fa-bolt text-lg"></i>
-          {tr.concept.createBtn}
+          <i className="fas fa-arrow-right text-lg"></i>
+          {tr.concept.nextBtn}
           <span className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium normal-case tracking-normal hidden md:block">
-            Lyrics · Style · Cover
+            Zum Lyrics-Tab
           </span>
         </button>
       </div>

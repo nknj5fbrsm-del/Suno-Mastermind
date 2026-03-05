@@ -1,8 +1,46 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { GeneratedStyle } from '../types';
 import { useLang } from '../App';
 import StyleDictionary from './StyleDictionary';
+
+/** Inhalt für das Style-Info-Modal (Referenzen, Wirkung, Warum Empfehlung) – gleiche Darstellung wie zuvor. */
+const StyleInfoModalContent: React.FC<{ data: GeneratedStyle }> = ({ data }) => {
+  const { tr } = useLang();
+  return (
+    <div className="space-y-4 p-1">
+      {data.similarArtists && (
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-1.5 flex items-center gap-1">
+            <i className="fas fa-users text-suno-secondary text-[7px]"></i> {tr.style.references}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {data.similarArtists.split(',').map((a, i) => (
+              <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">{a.trim()}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.promptEffect && (
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-1 flex items-center gap-1">
+            <i className="fas fa-wave-square text-suno-primary text-[7px]"></i> {tr.style.effect}
+          </p>
+          <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed italic">{data.promptEffect}</p>
+        </div>
+      )}
+      {data.recommendationReason && (
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-1 flex items-center gap-1">
+            <i className="fas fa-lightbulb text-suno-primary text-[7px]"></i> {tr.style.whyRec}
+          </p>
+          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{data.recommendationReason}</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface StyleDisplayProps {
   data: GeneratedStyle;
@@ -59,12 +97,14 @@ const StyleCard: React.FC<{
   onRegenerate?: () => void;
 }> = ({ data, editablePrompt, onPromptChange, variantLabel, variantColor, accentClass, busy, onEnrich, onRegenerate }) => {
   const { tr } = useLang();
+  const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
   const weirdness = clampSafe(normalize(data.weirdness));
   const styleInfluence = clampSafe(normalize(data.styleInfluence));
   const charCount = editablePrompt.length;
   const isOverSoft = charCount > SOFT_LIMIT;
   const isOverHard = charCount > HARD_LIMIT;
   const accent = accentClass || 'suno-primary';
+  const hasStyleInfo = data.similarArtists || data.promptEffect || data.recommendationReason;
 
   return (
     <div className="glass-card rounded-2xl p-5 flex flex-col min-h-[420px] max-h-[70vh]">
@@ -120,34 +160,38 @@ const StyleCard: React.FC<{
           </p>
           <ValuePills weirdness={weirdness} styleInfluence={styleInfluence} />
         </div>
-        <div className="flex-1 overflow-auto rounded-xl bg-white/5 dark:bg-black/10 p-4 space-y-3 custom-scrollbar min-h-0">
-          {data.similarArtists && (
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-2 flex items-center gap-1">
-                <i className="fas fa-users text-suno-secondary text-[8px]"></i> {tr.style.references}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {data.similarArtists.split(',').map((a, i) => (
-                  <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">{a.trim()}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          {data.promptEffect && (
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-1 flex items-center gap-1">
-                <i className="fas fa-wave-square text-suno-primary text-[8px]"></i> {tr.style.effect}
-              </p>
-              <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed italic">{data.promptEffect}</p>
-            </div>
-          )}
-          {data.recommendationReason && (
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-suno-primary mb-1 flex items-center gap-1">
-                <i className="fas fa-lightbulb text-[8px]"></i> {tr.style.whyRec}
-              </p>
-              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{data.recommendationReason}</p>
-            </div>
+        <div className="flex-1 min-h-0 flex flex-col">
+          {hasStyleInfo && (
+            <>
+              <button
+                type="button"
+                onClick={() => setStyleInfoModalOpen(true)}
+                className="flex items-center gap-1.5 mb-2 flex-shrink-0 w-fit rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary border border-suno-secondary/25 bg-suno-secondary/5 hover:bg-suno-secondary/15 transition-colors"
+              >
+                <i className="fas fa-circle-info text-suno-secondary text-[8px]"></i> {tr.style.styleInfo}
+              </button>
+              {styleInfoModalOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
+                  <div
+                    className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary flex items-center gap-2">
+                        <i className="fas fa-circle-info text-suno-secondary"></i> {tr.style.styleInfo}
+                      </span>
+                      <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                        <i className="fas fa-times text-sm"></i>
+                      </button>
+                    </div>
+                    <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar">
+                      <StyleInfoModalContent data={data} />
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
+            </>
           )}
         </div>
       </div>
@@ -168,6 +212,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
   const [busyA, setBusyA] = useState(false);
   const [busyB, setBusyB] = useState(false);
   const [busySingle, setBusySingle] = useState(false);
+  const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
 
   const appendToPrompt = (text: string, target: 'single' | 0 | 1) => {
     const prepare = (p: string) => {
@@ -374,50 +419,47 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-2xl p-5 space-y-4">
+        <div className="glass-card rounded-2xl p-5">
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary flex items-center gap-1.5">
             <i className="fas fa-chart-simple text-[8px]"></i> {tr.style.algorithm}
           </p>
           <ValuePills weirdness={clampSafe(normalize(data.weirdness))} styleInfluence={clampSafe(normalize(data.styleInfluence))} />
-          {data.recommendationReason && (
-            <>
-              <div className="gradient-line"></div>
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-suno-primary mb-1.5 flex items-center gap-1">
-                  <i className="fas fa-lightbulb text-[8px]"></i> {tr.style.whyRec}
-                </p>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{data.recommendationReason}</p>
-              </div>
-            </>
-          )}
         </div>
         <div className="glass-card rounded-2xl p-5 flex flex-col gap-4">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-suno-primary flex items-center gap-1.5">
-            <i className="fas fa-microchip text-[8px]"></i> {tr.style.insightTitle}
-          </p>
-          {data.promptEffect && (
-            <div>
-              <p className="text-[8px] font-black uppercase tracking-[0.12em] text-zinc-400 mb-1.5 flex items-center gap-1">
-                <i className="fas fa-wave-square text-suno-primary text-[7px]"></i> {tr.style.effect}
-              </p>
-              <p className="text-[13px] text-zinc-600 dark:text-zinc-300 leading-relaxed italic">{data.promptEffect}</p>
-            </div>
-          )}
-          {data.similarArtists && (
-            <div className="pt-3 border-t border-white/15 dark:border-white/8">
-              <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-2 flex items-center gap-1">
-                <i className="fas fa-users text-suno-secondary text-[8px]"></i> {tr.style.references}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {data.similarArtists.split(',').map((a, i) => (
-                  <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">{a.trim()}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mt-auto pt-3 border-t border-white/15 dark:border-white/8">
+          <button
+            type="button"
+            onClick={() => setStyleInfoModalOpen(true)}
+            className="flex items-center gap-1.5 flex-shrink-0 w-fit rounded-xl px-3 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary border border-suno-secondary/25 bg-suno-secondary/5 hover:bg-suno-secondary/15 transition-colors"
+          >
+            <i className="fas fa-circle-info text-suno-secondary text-[8px]"></i> {tr.style.styleInfo}
+          </button>
+          <div className="pt-3 flex-shrink-0">
             <p className="text-[10px] text-center font-black uppercase tracking-[0.15em] text-zinc-500 dark:text-zinc-400 italic leading-snug">{tr.style.aiNote}</p>
           </div>
+          {styleInfoModalOpen && createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
+              <div
+                className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary flex items-center gap-2">
+                    <i className="fas fa-circle-info text-suno-secondary"></i> {tr.style.styleInfo}
+                  </span>
+                  <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                    <i className="fas fa-times text-sm"></i>
+                  </button>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar space-y-4">
+                  <StyleInfoModalContent data={data} />
+                  <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                    <p className="text-[10px] text-center font-black uppercase tracking-[0.15em] text-zinc-500 dark:text-zinc-400 italic leading-snug">{tr.style.aiNote}</p>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
         </div>
       </div>
       <div className="border-t border-white/10 dark:border-white/5 pt-4">

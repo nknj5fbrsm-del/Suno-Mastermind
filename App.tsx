@@ -66,7 +66,7 @@ const HeaderLogo = () => (
 );
 
 const App: React.FC = () => {
-  const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
+  const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.LYRICS);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
@@ -171,7 +171,7 @@ const App: React.FC = () => {
   const handleStartNew = () => {
     setConcept({ topic: '', genre: [], mood: [], tempo: [], language: [], isInstrumental: false, vocals: [], instrumentation: [], excludedStyles: [] });
     setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setCoverUrl('');
-    setActiveStep(WorkflowStep.CONCEPT);
+    setActiveStep(WorkflowStep.LYRICS);
   };
 
   // Helper zum Bereinigen von %20 und anderen Encodings
@@ -183,21 +183,31 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConceptSubmit = async (inputConcept: SongConcept) => {
+  /** Nur Konzept übernehmen und zum Lyrics-Tab wechseln („Weiter“ im Konzept). */
+  const handleConceptNext = (inputConcept: SongConcept) => {
+    setConcept(inputConcept);
+    setActiveStep(WorkflowStep.LYRICS);
+  };
+
+  /** Create-Flow: Konzept aus State, ggf. analysieren, 2 Lyrics + 2 Styles generieren (von Lyrics-Tab aus). */
+  const handleGenerateLyrics = async () => {
     if (!manualApiKey) {
       showToast(tr.errors.noApiKey, 'error');
       setIsKeySaved(false);
       return;
     }
-
+    if (!concept.topic?.trim()) {
+      showToast(tr.concept.enterTopicFirst, 'error');
+      setActiveStep(WorkflowStep.CONCEPT);
+      return;
+    }
     setIsLoading(true);
     setLoadingProgress(5);
     setLoadingText(tr.loading.analyzingConcept);
     try {
-      let finalConcept = { ...inputConcept };
-      if (!finalConcept.topic.trim()) finalConcept.topic = await generateRandomTopic();
+      let finalConcept = { ...concept };
+      if (!finalConcept.topic.trim()) finalConcept = { ...finalConcept, topic: await generateRandomTopic() };
       setLoadingProgress(15);
-      
       const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental);
       finalConcept = {
         ...finalConcept,
@@ -210,7 +220,6 @@ const App: React.FC = () => {
       };
       setConcept(finalConcept);
       setLoadingProgress(30);
-
       setLoadingText(tr.loading.generatingLyrics);
       setLoadingProgress(35);
       const [genLyricsA, genLyricsB] = await Promise.all([
@@ -223,7 +232,6 @@ const App: React.FC = () => {
       setLyrics(lyricsA);
       setLoadingProgress(50);
       setLoadingText(tr.loading.generatingStyle);
-      // Zwei Style-Varianten: je eine passend zu Lyrics 1 bzw. 2
       const [styleA, styleB] = await Promise.all([
         generateStylePrompt(finalConcept, lang, [lyricsA]),
         generateStylePrompt(finalConcept, lang, [lyricsB])
@@ -232,9 +240,9 @@ const App: React.FC = () => {
       setStyleData(styleA);
       setLoadingProgress(100);
       setActiveStep(WorkflowStep.LYRICS);
-    } catch (error) { 
-      handleError(error); 
-    } finally { 
+    } catch (error) {
+      handleError(error);
+    } finally {
       setIsLoading(false);
       setLoadingProgress(0);
     }
@@ -563,12 +571,15 @@ const App: React.FC = () => {
         )}
         <Suspense fallback={<div className="min-h-[280px] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-suno-primary border-t-transparent animate-spin" /></div>}>
         {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={(item) => { setConcept(item.concept); setLyrics(item.lyrics); setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null); setStyleData(item.styleData); setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null); setCoverUrl(item.coverUrl); setActiveStep(WorkflowStep.LYRICS); }} onDelete={async (id) => { await deleteSongFromDB(id); setHistory(prev => prev.filter(h => h.id !== id)); }} onStartNew={handleStartNew} />}
-        {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptSubmit} />}
+        {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptNext} onConceptChange={setConcept} />}
         {activeStep === WorkflowStep.LYRICS && (
           lyricsVariants ? (
             <LyricsCompareView
               variantA={lyricsVariants[0]}
               variantB={lyricsVariants[1]}
+              concept={concept}
+              isInstrumental={concept.isInstrumental}
+              onConceptChange={(patch) => setConcept(prev => ({ ...prev, ...patch }))}
               onUpdateVariantA={(v) => { setLyricsVariants(prev => prev ? [v, prev[1]] : null); setLyrics(v); }}
               onUpdateVariantB={(v) => { setLyricsVariants(prev => prev ? [prev[0], v] : null); }}
               onEnrichRegieA={(lyrics) => enrichRegie(lyrics, concept)}
@@ -596,7 +607,7 @@ const App: React.FC = () => {
               }}
             />
           ) : (
-            <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={(l) => setLyrics(l)} />
+            <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={(l) => setLyrics(l)} onConceptChange={(patch) => setConcept(prev => ({ ...prev, ...patch }))} onGenerateLyrics={handleGenerateLyrics} isGenerating={isLoading} />
           )
         )}
         {activeStep === WorkflowStep.STYLE && styleData && (

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { SongConcept } from '../types';
 import { suggestStyleTags } from '../services/geminiService';
 import { useLang } from '../App';
+import SearchableMultiInput from './SearchableMultiInput';
 
 interface LyricDisplayProps {
   lyrics: string;
@@ -10,10 +11,24 @@ interface LyricDisplayProps {
   isInstrumental: boolean;
   onRegenerate: () => void;
   onUpdate: (lyrics: string) => void;
+  onConceptChange?: (patch: Partial<SongConcept>) => void;
+  onGenerateLyrics?: () => Promise<void>;
+  isGenerating?: boolean;
 }
 
-const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, concept, isInstrumental, onRegenerate, onUpdate }) => {
+const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, concept, isInstrumental, onRegenerate, onUpdate, onConceptChange, onGenerateLyrics, isGenerating }) => {
   const { tr } = useLang();
+
+  const toggleLanguage = (val: string) => {
+    const cur = concept.language ?? [];
+    const next = cur.includes(val) ? cur.filter(i => i !== val) : [...cur, val];
+    onConceptChange?.({ language: next });
+  };
+  const toggleVocals = (val: string) => {
+    const cur = concept.vocals ?? [];
+    const next = cur.includes(val) ? cur.filter(i => i !== val) : [...cur, val];
+    onConceptChange?.({ vocals: next });
+  };
   const [editableLyrics, setEditableLyrics] = useState(initialLyrics);
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
@@ -122,21 +137,66 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
           )}
           <div className="gradient-line w-16"></div>
         </div>
+        {initialLyrics && (
         <div className="flex items-center gap-2">
           <button onClick={onRegenerate} title={tr.lyrics.regenerate}
             className="glass-btn w-9 h-9 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-suno-primary text-sm">
             <i className="fas fa-dice"></i>
           </button>
         </div>
+        )}
       </div>
 
+      {/* Sprache & Gesangsstil (aus KI-Inspiration im Konzept); relative z-10 damit Dropdowns über Lyrics-Bereich liegen */}
+      {!isInstrumental && onConceptChange && (
+        <div className="glass-card rounded-2xl p-4 relative z-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-600 dark:text-zinc-400 mb-3">{tr.concept.details}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SearchableMultiInput
+              label={tr.concept.language}
+              icon="fa-globe"
+              options={tr.conceptOptions.languages}
+              selected={concept.language ?? []}
+              onToggle={toggleLanguage}
+              placeholder={tr.conceptOptions.languages.slice(0, 2).join(', ') + '…'}
+              disabled={isInstrumental}
+              accent="text-emerald-500"
+            />
+            <SearchableMultiInput
+              label={tr.concept.vocals}
+              icon="fa-microphone"
+              options={tr.conceptOptions.vocals}
+              selected={concept.vocals ?? []}
+              onToggle={toggleVocals}
+              placeholder={tr.conceptOptions.vocals.slice(0, 2).join(', ') + '…'}
+              disabled={isInstrumental}
+              accent="text-blue-500"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Leer: Lyrics generieren (Create-Flow) */}
+      {!initialLyrics && onGenerateLyrics && (
+        <div className="glass-card rounded-2xl p-6 space-y-4">
+          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.concept.generateLyricsHint}</p>
+          <button type="button" onClick={onGenerateLyrics} disabled={isGenerating || !concept.topic?.trim()}
+            className="btn-create w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-[0.15em] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+            {isGenerating ? <><i className="fas fa-spinner animate-spin"></i> {tr.loading.generatingLyrics}</> : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.generateLyricsBtn}</>}
+          </button>
+        </div>
+      )}
+
       {/* Hinweis: Kopieren auf letzter Seite */}
+      {initialLyrics && (
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-suno-primary/10 dark:bg-suno-primary/15 border border-suno-primary/25">
         <i className="fas fa-info-circle text-suno-primary text-sm flex-shrink-0"></i>
         <p className="text-[10px] text-zinc-700 dark:text-zinc-300 leading-snug">{tr.lyrics.copyOnLastPage}</p>
       </div>
+      )}
 
-      {/* ─── Tag Toolbar ─── */}
+      {/* ─── Tag Toolbar (nur wenn Lyrics vorhanden) ─── */}
+      {initialLyrics && (
       <div className="glass-card rounded-2xl p-4 space-y-3">
         {/* Strukturvorlagen: komplette Songstruktur einfügen */}
         <div className="flex flex-wrap gap-1.5 items-center">
@@ -197,8 +257,10 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
           </div>
         </div>
       </div>
+      )}
 
       {/* ─── Editor ─── */}
+      {initialLyrics && (
       <div className="relative">
         <textarea
           ref={textareaRef}
@@ -230,6 +292,7 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
           {editableLyrics.split('\n').length} {tr.lyrics.lines}
         </div>
       </div>
+      )}
 
     </section>
   );

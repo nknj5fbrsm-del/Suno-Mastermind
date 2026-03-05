@@ -16,7 +16,7 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, set
   const steps = [
     { id: WorkflowStep.DASHBOARD, icon: 'fa-house',         label: tr.nav.home,    enabled: true },
     { id: WorkflowStep.CONCEPT,   icon: 'fa-wand-sparkles', label: tr.nav.concept, enabled: true },
-    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: hasLyrics },
+    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: true },
     { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: hasStyle || !!hasLyricsVariants },
     { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: hasStyle },
   ];
