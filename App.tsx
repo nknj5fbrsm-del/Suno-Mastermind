@@ -171,7 +171,7 @@ const App: React.FC = () => {
   const handleStartNew = () => {
     setConcept({ topic: '', genre: [], mood: [], tempo: [], language: [], isInstrumental: false, vocals: [], instrumentation: [], excludedStyles: [] });
     setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setCoverUrl('');
-    setActiveStep(WorkflowStep.LYRICS);
+    setActiveStep(WorkflowStep.CONCEPT);
   };
 
   // Helper zum Bereinigen von %20 und anderen Encodings
