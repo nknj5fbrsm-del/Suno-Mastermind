@@ -107,12 +107,17 @@ const SearchableMultiInput: React.FC<SearchableMultiInputProps> = ({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+      <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
         {selected.map(tag => (
           <span key={tag} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-medium bg-suno-primary/10 border border-suno-primary/20 ${accent} group hover:bg-red-500/10 hover:border-red-500/20 transition-all`}>
             {tag}
-            <button type="button" onClick={() => onToggle(tag)} className="hover:text-red-500 transition-colors ml-0.5">
-              <i className="fas fa-times text-[8px]"></i>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(tag); }}
+              className="w-4 h-4 flex items-center justify-center rounded hover:bg-red-500/20 hover:text-red-500 text-zinc-500 dark:text-zinc-400 transition-colors flex-shrink-0"
+              title={tr.concept.removeSelection}
+            >
+              <i className="fas fa-times text-[9px]"></i>
             </button>
           </span>
         ))}

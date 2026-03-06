@@ -188,9 +188,16 @@ const ReferenzMixer: React.FC<{
 
   const handleSunoLoad = async (idx: number) => {
     const slot = slots[idx];
-    let id = extractSunoId(slot.sunoUrl);
+    const rawUrl = slot.sunoUrl.trim();
+
+    if (!rawUrl) {
+      setSlot(idx, { error: tr.concept.refMixerSunoInvalid });
+      return;
+    }
+
+    let id = extractSunoId(rawUrl);
     if (!id) {
-      const shortUrl = getSunoShortUrl(slot.sunoUrl);
+      const shortUrl = getSunoShortUrl(rawUrl);
       if (shortUrl) {
         setSlot(idx, { sunoLoading: true, error: '' });
         try {
@@ -370,6 +377,9 @@ const ReferenzMixer: React.FC<{
                               {slot.sunoLoading ? tr.concept.refMixerSunoLoading : tr.concept.refMixerSunoLoad}
                             </button>
                           </div>
+                          <p className="text-[8px] text-zinc-500 dark:text-zinc-500">
+                            {tr.concept.refMixerLinkHint}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -545,11 +555,22 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const [labHelpModalOpen, setLabHelpModalOpen] = useState(false);
   const [genreFieldPulse, setGenreFieldPulse] = useState(false);
   const genreFieldRef = useRef<HTMLDivElement>(null);
+  // Verhindert Flackern im Song-Idee-Feld: Rücksync vom Parent überspringen, wenn die Änderung von uns kam
+  const lastSentTopicRef = useRef<string | null>(null);
 
-  useEffect(() => { setConcept(initialConcept); }, [initialConcept]);
+  useEffect(() => {
+    if (lastSentTopicRef.current !== null && initialConcept.topic === lastSentTopicRef.current) {
+      lastSentTopicRef.current = null;
+      return;
+    }
+    setConcept(initialConcept);
+  }, [initialConcept]);
 
   // Jede Änderung an die App melden, damit beim Tab-Wechsel (ohne „Weiter“) nichts verloren geht
-  useEffect(() => { onConceptChange?.(concept); }, [concept]);
+  useEffect(() => {
+    onConceptChange?.(concept);
+    lastSentTopicRef.current = concept.topic;
+  }, [concept]);
 
   const focusGenreField = () => {
     setGenreFieldPulse(true);
@@ -564,8 +585,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     try {
       const topic = await generateRandomTopic(randomCategory);
       setConcept(prev => ({ ...prev, topic }));
-    } catch (err) { console.error(err); }
-    finally { setIsRandomizing(false); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally { setIsRandomizing(false); }
   };
 
   const handleAnalyze = async () => {
@@ -582,8 +605,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
         language:        prev.isInstrumental ? [] : (s.language?.length  ? s.language  : prev.language),
         vocals:          prev.isInstrumental ? [] : (s.vocals?.length    ? s.vocals    : prev.vocals),
       }));
-    } catch (err) { console.error(err); }
-    finally { setIsAnalyzing(false); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally { setIsAnalyzing(false); }
   };
 
   const toggle = (key: keyof Pick<SongConcept, 'genre'|'mood'|'excludedStyles'|'language'|'vocals'|'tempo'|'instrumentation'>, val: string) => {
@@ -627,7 +652,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     try {
       const result = await generateGenreFusion(concept.genre, concept);
       setFusionResult(result);
-    } catch (err) { console.error(err); showToast('Fusion fehlgeschlagen', 'error'); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast('Fusion fehlgeschlagen: ' + msg, 'error');
+    }
     finally { setIsFusing(false); }
   };
 
@@ -653,7 +681,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     try {
       const result = await generateCreativeBoost(concept);
       setBoostResult(result);
-    } catch (err) { console.error(err); showToast('Boost fehlgeschlagen', 'error'); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast('Boost fehlgeschlagen: ' + msg, 'error');
+    }
     finally { setIsBoosting(false); }
   };
 

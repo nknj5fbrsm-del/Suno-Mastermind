@@ -412,6 +412,33 @@ WICHTIG: Die erste Zeile der Antwort muss direkt der Inhalt sein (kein „Hier i
   return stripLyricsPreamble(cleaned);
 };
 
+/** Text vereinfachen: Nur gesungene Zeilen (außerhalb von [ ]) ausdünnen/kürzen. Regie [ ] bleibt zeichengetreu unverändert. */
+export const simplifyLyricsText = async (lyrics: string): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `Du erhältst einen Songtext mit Regieanweisungen in eckigen Klammern [ ] und gesungenen Zeilen ohne Klammern.
+
+AUFGABE: Gib den Text zurück mit EINER Änderung: Vereinfache bzw. dünne NUR die gesungenen Zeilen aus (außerhalb der Klammern). Jeden Block in [ ] lasse zeichengetreu unverändert – keine Änderung an Regie.
+
+Vereinfachen der gesungenen Zeilen:
+- Überflüssige Füllwörter oder Wiederholungen weglassen, Zeilen straffen.
+- Sinn und Aussage beibehalten, nur klarer und kürzer formulieren.
+- Reim und Rhythmus können angepasst werden, wenn es der Vereinfachung dient.
+- Leerzeilen und Struktur (wo [ ] steht) exakt beibehalten.
+
+WICHTIG: Die erste Zeile der Antwort muss direkt der Inhalt sein (kein „Hier ist…“, keine Überschrift). Alle [ ]-Blöcke müssen exakt gleich bleiben.`;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Eingabe (nur gesungene Zeilen vereinfachen, [ ] unverändert lassen):\n\n${lyrics}`,
+    config: { systemInstruction: SYSTEM_INSTRUCTION + "\n\nBei dieser Aufgabe: Antworte NUR mit dem vereinfachten Songtext. Keine Einleitung, keine Erklärung. Erste Zeile = erste Zeile des Songs.", temperature: 0.4, ...DEFAULT_THINKING },
+  }));
+  const raw = response.text?.trim() || lyrics;
+  const cleaned = cleanText(raw);
+  return stripLyricsPreamble(cleaned);
+};
+
 /** Kurzfassung der Regie-Tags aus Lyrics (nur [ ]-Blöcke) für Style-Anpassung. */
 function extractRegieSummary(lyrics: string, maxChars = 600): string {
   const matches = lyrics.match(/\[[^\]]*\]/g) || [];

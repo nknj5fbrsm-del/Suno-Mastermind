@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, createContext, useContext, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useMemo, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
-import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, enrichStylePrompt } from './services/geminiService';
+import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, simplifyLyricsText, enrichStylePrompt } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
 import { t, Lang } from './translations';
 
@@ -80,7 +80,15 @@ const App: React.FC = () => {
   const [isKeySaved, setIsKeySaved] = useState<boolean>(() => !!localStorage.getItem('gemini_api_key'));
 
   const [concept, setConcept] = useState<SongConcept>({
-    topic: '', genre: [], mood: [], tempo: [], language: [], isInstrumental: false, vocals: [], instrumentation: [], excludedStyles: []
+    topic: '',
+    genre: [],
+    mood: [],
+    tempo: [],
+    language: [],
+    isInstrumental: false,
+    vocals: [],
+    instrumentation: [],
+    excludedStyles: [],
   });
   const [lyrics, setLyrics] = useState<string>('');
   /** Zwei Lyrics-Varianten zum Vergleichen (Create-Flow); nach Wahl wird eine übernommen. */
@@ -89,6 +97,8 @@ const App: React.FC = () => {
   const [styleData, setStyleData] = useState<GeneratedStyle | null>(null);
   /** Zwei Style-Varianten (passend zu Lyrics 1 und 2); beim Create-Flow beide generiert, auf Style-Seite nebeneinander. */
   const [styleVariants, setStyleVariants] = useState<[GeneratedStyle, GeneratedStyle] | null>(null);
+  /** Varianten, deren Sprache/Gesangsstil im Lyrics-Tab geändert wurde – Style wird beim Wechsel ins Style-Tab nachgezogen. */
+  const [styleRegenPendingForVariants, setStyleRegenPendingForVariants] = useState<(1 | 2)[]>([]);
   const [coverUrl, setCoverUrl] = useState<string>('');
   const [coverError, setCoverError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -142,7 +152,7 @@ const App: React.FC = () => {
     (window as any).GEMINI_API_KEY = manualApiKey;
   };
 
-  const handleError = (error: unknown) => {
+  const handleError = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error ?? 'Unbekannter Fehler');
     if (message.includes("API key not valid") || message.includes("403") || message.includes("401")) {
       setIsKeySaved(false);
@@ -150,7 +160,7 @@ const App: React.FC = () => {
     } else {
       showToast(tr.errors.aiErrorPrefix + message, 'error');
     }
-  };
+  }, [showToast, tr]);
 
   const toggleMode = () => {
     setIsDarkMode(prev => {
@@ -168,11 +178,21 @@ const App: React.FC = () => {
     setIsThemeMenuOpen(false);
   };
 
-  const handleStartNew = () => {
-    setConcept({ topic: '', genre: [], mood: [], tempo: [], language: [], isInstrumental: false, vocals: [], instrumentation: [], excludedStyles: [] });
-    setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setCoverUrl('');
+  const handleStartNew = useCallback(() => {
+    setConcept({
+      topic: '',
+      genre: [],
+      mood: [],
+      tempo: [],
+      language: [],
+      isInstrumental: false,
+      vocals: [],
+      instrumentation: [],
+      excludedStyles: [],
+    });
+    setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setStyleRegenPendingForVariants([]); setCoverUrl('');
     setActiveStep(WorkflowStep.CONCEPT);
-  };
+  }, []);
 
   // Helper zum Bereinigen von %20 und anderen Encodings
   const cleanAiText = (text: string) => {
@@ -184,13 +204,13 @@ const App: React.FC = () => {
   };
 
   /** Nur Konzept übernehmen und zum Lyrics-Tab wechseln („Weiter“ im Konzept). */
-  const handleConceptNext = (inputConcept: SongConcept) => {
+  const handleConceptNext = useCallback((inputConcept: SongConcept) => {
     setConcept(inputConcept);
     setActiveStep(WorkflowStep.LYRICS);
-  };
+  }, []);
 
   /** Create-Flow: Konzept aus State, ggf. analysieren, 2 Lyrics + 2 Styles generieren (von Lyrics-Tab aus). */
-  const handleGenerateLyrics = async () => {
+  const handleGenerateLyrics = useCallback(async () => {
     if (!manualApiKey) {
       showToast(tr.errors.noApiKey, 'error');
       setIsKeySaved(false);
@@ -230,14 +250,6 @@ const App: React.FC = () => {
       const lyricsB = cleanAiText(genLyricsB);
       setLyricsVariants([lyricsA, lyricsB]);
       setLyrics(lyricsA);
-      setLoadingProgress(50);
-      setLoadingText(tr.loading.generatingStyle);
-      const [styleA, styleB] = await Promise.all([
-        generateStylePrompt(finalConcept, lang, [lyricsA]),
-        generateStylePrompt(finalConcept, lang, [lyricsB])
-      ]);
-      setStyleVariants([styleA, styleB]);
-      setStyleData(styleA);
       setLoadingProgress(100);
       setActiveStep(WorkflowStep.LYRICS);
     } catch (error) {
@@ -246,7 +258,57 @@ const App: React.FC = () => {
       setIsLoading(false);
       setLoadingProgress(0);
     }
-  };
+  }, [concept, tr, lang, handleError]);
+
+  const onConceptChange = useCallback((patch: Partial<SongConcept>) => setConcept(prev => ({ ...prev, ...patch })), []);
+  const onUpdateLyrics = useCallback((l: string) => setLyrics(l), []);
+
+  /** Lyrics „Weiter“: Style-Prompt generieren und zum Style-Tab wechseln (keine Auto-Generierung beim Tab-Wechsel). */
+  const handleLyricsNext = useCallback(async () => {
+    const hasTwo = lyricsVariants && lyricsVariants.length >= 2;
+    const hasOne = lyrics?.trim();
+    if (!hasTwo && !hasOne) return;
+    setIsLoading(true);
+    setLoadingText(tr.loading.generatingStyle);
+    setLoadingProgress(30);
+    try {
+      if (hasTwo) {
+        const conceptForB: SongConcept = {
+          ...concept,
+          language: (concept.languageVariant2 && concept.languageVariant2.length > 0) ? concept.languageVariant2 : concept.language,
+          vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
+        };
+        const [styleA, styleB] = await Promise.all([
+          generateStylePrompt(concept, lang, [lyricsVariants![0]]),
+          generateStylePrompt(conceptForB, lang, [lyricsVariants![1]])
+        ]);
+        setStyleVariants([styleA, styleB]);
+        setStyleData(styleA);
+      } else {
+        const styleA = await generateStylePrompt(concept, lang, [lyrics!]);
+        setStyleData(styleA);
+        setStyleVariants(null);
+      }
+      setLoadingProgress(100);
+      setActiveStep(WorkflowStep.STYLE);
+    } catch (e) { handleError(e); }
+    finally { setIsLoading(false); setLoadingProgress(0); }
+  }, [concept, lang, lyrics, lyricsVariants, tr.loading.generatingStyle, handleError]);
+
+  const handleRecall = useCallback((item: SongHistoryItem) => {
+    setConcept(item.concept);
+    setLyrics(item.lyrics);
+    setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null);
+    setStyleData(item.styleData);
+    setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null);
+    setStyleRegenPendingForVariants([]);
+    setCoverUrl(item.coverUrl);
+    setActiveStep(WorkflowStep.LYRICS);
+  }, []);
+  const handleDeleteFromHistory = useCallback(async (id: string) => {
+    await deleteSongFromDB(id);
+    setHistory(prev => prev.filter(h => h.id !== id));
+  }, []);
 
   const themes: { id: ThemeName; label: string; color: string; desc: string; icon: string }[] = [
     { id: 'mastermind', label: 'Mastermind', color: 'bg-purple-600', icon: 'fa-brain', desc: 'Deep Purple & Pink' },
@@ -271,6 +333,38 @@ const App: React.FC = () => {
       setThemeDropdownAnchor(null);
     }
   }, [isThemeMenuOpen]);
+
+  // Beim Wechsel ins Style-Tab: ausstehende Style-Aktualisierungen (wegen geänderter Sprache/Gesangsstil im Lyrics-Tab) nachziehen
+  useEffect(() => {
+    if (activeStep !== WorkflowStep.STYLE || styleRegenPendingForVariants.length === 0 || !styleVariants || !lyricsVariants) return;
+    const toRegen = [...styleRegenPendingForVariants];
+    setStyleRegenPendingForVariants([]);
+    setLoadingText(tr.loading.generatingStyle);
+    setIsLoading(true);
+    (async () => {
+      try {
+        for (const variant of toRegen) {
+          if (variant === 1) {
+            const styleA = await generateStylePrompt(concept, lang, [lyricsVariants[0]]);
+            setStyleVariants(prev => prev ? [styleA, prev[1]] : null);
+            setStyleData(styleA);
+          } else {
+            const conceptForB: SongConcept = {
+              ...concept,
+              language: (concept.languageVariant2 && concept.languageVariant2.length > 0) ? concept.languageVariant2 : concept.language,
+              vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
+            };
+            const styleB = await generateStylePrompt(conceptForB, lang, [lyricsVariants[1]]);
+            setStyleVariants(prev => prev ? [prev[0], styleB] : null);
+          }
+        }
+      } catch (e) {
+        handleError(e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [activeStep, styleRegenPendingForVariants]);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -484,23 +578,6 @@ const App: React.FC = () => {
           <WorkflowNavigation
           activeStep={activeStep}
           setActiveStep={async (step) => {
-            if (step === WorkflowStep.STYLE && lyricsVariants && lyricsVariants.length >= 2 && !styleData) {
-              setIsLoading(true);
-              setLoadingText(tr.loading.generatingStyle);
-              setLoadingProgress(30);
-              try {
-                const [styleA, styleB] = await Promise.all([
-                  generateStylePrompt(concept, lang, [lyricsVariants[0]]),
-                  generateStylePrompt(concept, lang, [lyricsVariants[1]])
-                ]);
-                setStyleVariants([styleA, styleB]);
-                setStyleData(styleA);
-                setLoadingProgress(100);
-                setActiveStep(WorkflowStep.STYLE);
-              } catch (e) { handleError(e); }
-              finally { setIsLoading(false); setLoadingProgress(0); }
-              return;
-            }
             if (step === WorkflowStep.ARTWORK && lyricsVariants && lyricsVariants.length >= 2 && styleData && !coverUrl) {
               setIsLoading(true);
               setLoadingText(tr.loading.generatingCover);
@@ -534,6 +611,7 @@ const App: React.FC = () => {
             }
             setActiveStep(step);
           }}
+          hasConcept={!!concept.topic?.trim()}
           hasLyrics={!!lyrics || !!lyricsVariants}
           hasStyle={!!styleData}
           hasLyricsVariants={!!lyricsVariants}
@@ -570,25 +648,29 @@ const App: React.FC = () => {
           </div>
         )}
         <Suspense fallback={<div className="min-h-[280px] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-suno-primary border-t-transparent animate-spin" /></div>}>
-        {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={(item) => { setConcept(item.concept); setLyrics(item.lyrics); setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null); setStyleData(item.styleData); setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null); setCoverUrl(item.coverUrl); setActiveStep(WorkflowStep.LYRICS); }} onDelete={async (id) => { await deleteSongFromDB(id); setHistory(prev => prev.filter(h => h.id !== id)); }} onStartNew={handleStartNew} />}
-        {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptNext} onConceptChange={setConcept} />}
+        {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={handleRecall} onDelete={handleDeleteFromHistory} onStartNew={handleStartNew} />}
+        {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptNext} onConceptChange={onConceptChange} />}
         {activeStep === WorkflowStep.LYRICS && (
-          lyricsVariants ? (
+          <>
+          {lyricsVariants ? (
             <LyricsCompareView
               variantA={lyricsVariants[0]}
               variantB={lyricsVariants[1]}
               concept={concept}
               isInstrumental={concept.isInstrumental}
-              onConceptChange={(patch) => setConcept(prev => ({ ...prev, ...patch }))}
+              onConceptChange={onConceptChange}
               onUpdateVariantA={(v) => { setLyricsVariants(prev => prev ? [v, prev[1]] : null); setLyrics(v); }}
               onUpdateVariantB={(v) => { setLyricsVariants(prev => prev ? [prev[0], v] : null); }}
               onEnrichRegieA={(lyrics) => enrichRegie(lyrics, concept)}
               onEnrichRegieB={(lyrics) => enrichRegie(lyrics, concept)}
+              onSimplifyA={(lyrics) => simplifyLyricsText(lyrics)}
+              onSimplifyB={(lyrics) => simplifyLyricsText(lyrics)}
               onRegenerateA={async () => {
                 setLoadingText(tr.loading.generatingLyrics);
                 setIsLoading(true);
                 try {
-                  const result = await generateLyrics(concept);
+                  const conceptForA = concept;
+                  const result = await generateLyrics(conceptForA);
                   const cleaned = cleanAiText(result);
                   setLyricsVariants(prev => prev ? [cleaned, prev[1]] : null);
                   setLyrics(cleaned);
@@ -599,22 +681,121 @@ const App: React.FC = () => {
                 setLoadingText(tr.loading.generatingLyrics);
                 setIsLoading(true);
                 try {
-                  const result = await generateLyrics(concept);
+                  const conceptForB: SongConcept = {
+                    ...concept,
+                    language: (concept.languageVariant2 && concept.languageVariant2.length > 0)
+                      ? concept.languageVariant2
+                      : concept.language,
+                    vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0)
+                      ? concept.vocalsVariant2
+                      : concept.vocals,
+                  };
+                  const result = await generateLyrics(conceptForB);
                   const cleaned = cleanAiText(result);
                   setLyricsVariants(prev => prev ? [prev[0], cleaned] : null);
                 } catch (e) { handleError(e); }
                 finally { setIsLoading(false); }
               }}
+              onVariantSettingsChange={(variant) => {
+                if (!styleVariants) return;
+                setStyleRegenPendingForVariants(prev => prev.includes(variant) ? prev : [...prev, variant]);
+              }}
             />
           ) : (
-            <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={(l) => setLyrics(l)} onConceptChange={(patch) => setConcept(prev => ({ ...prev, ...patch }))} onGenerateLyrics={handleGenerateLyrics} isGenerating={isLoading} />
-          )
+            <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={onUpdateLyrics} onConceptChange={onConceptChange} onGenerateLyrics={handleGenerateLyrics} isGenerating={isLoading} />
+          )}
+          {/* Weiter (zu Style) – Style erst hier generieren, gleiches Design wie Konzept */}
+          <div className="relative z-0 mt-20 md:mt-24 group">
+            <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60" />
+            <button
+              type="button"
+              onClick={handleLyricsNext}
+              disabled={isLoading || !(lyricsVariants?.length >= 2 || lyrics?.trim())}
+              className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-arrow-right'} text-lg`} />
+              {tr.concept.nextBtn}
+              <span className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium normal-case tracking-normal hidden md:block">
+                {tr.lyrics.nextToStyle}
+              </span>
+            </button>
+          </div>
+          </>
         )}
-        {activeStep === WorkflowStep.STYLE && styleData && (
+        {activeStep === WorkflowStep.STYLE && (
+          styleData ? (
           styleVariants ? (
-            <StyleDisplay data={styleData} dataVariants={styleVariants} onRegenerate={async () => { setLoadingText(tr.loading.generatingStyle); setIsLoading(true); try { const [a, b] = await Promise.all([generateStylePrompt(concept, lang, lyricsVariants ? [lyricsVariants[0]] : undefined), generateStylePrompt(concept, lang, lyricsVariants ? [lyricsVariants[1]] : undefined)]); setStyleVariants([a, b]); setStyleData(a); } catch(e) { handleError(e); } finally { setIsLoading(false); } }} onUpdatePrompt={(p) => setStyleData(prev => prev ? { ...prev, prompt: p } : null)} onUpdatePromptVariant={(i, p) => { setStyleVariants(prev => prev ? [i === 0 ? { ...prev[0], prompt: p } : prev[0], i === 1 ? { ...prev[1], prompt: p } : prev[1]] : null); if (i === 0) setStyleData(prev => prev ? { ...prev, prompt: p } : null); }} onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)} onEnrichStyleB={(prompt) => enrichStylePrompt(prompt, concept)} onRegenerateA={async () => { const a = await generateStylePrompt(concept, lang, lyricsVariants ? [lyricsVariants[0]] : undefined); setStyleVariants(prev => prev ? [a, prev[1]] : null); setStyleData(a); }} onRegenerateB={async () => { const b = await generateStylePrompt(concept, lang, lyricsVariants ? [lyricsVariants[1]] : undefined); setStyleVariants(prev => prev ? [prev[0], b] : null); }} />
+            <StyleDisplay
+              data={styleData}
+              dataVariants={styleVariants}
+              onRegenerate={async () => {
+                setLoadingText(tr.loading.generatingStyle);
+                setIsLoading(true);
+                try {
+                  const conceptForA = concept;
+                  const conceptForB: SongConcept = {
+                    ...concept,
+                    language: (concept.languageVariant2 && concept.languageVariant2.length > 0)
+                      ? concept.languageVariant2
+                      : concept.language,
+                    vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0)
+                      ? concept.vocalsVariant2
+                      : concept.vocals,
+                  };
+                  const [a, b] = await Promise.all([
+                    generateStylePrompt(conceptForA, lang, lyricsVariants ? [lyricsVariants[0]] : undefined),
+                    generateStylePrompt(conceptForB, lang, lyricsVariants ? [lyricsVariants[1]] : undefined),
+                  ]);
+                  setStyleVariants([a, b]);
+                  setStyleData(a);
+                } catch (e) {
+                  handleError(e);
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              onUpdatePrompt={(p) => setStyleData(prev => prev ? { ...prev, prompt: p } : null)}
+              onUpdatePromptVariant={(i, p) => {
+                setStyleVariants(prev => prev ? [
+                  i === 0 ? { ...prev[0], prompt: p } : prev[0],
+                  i === 1 ? { ...prev[1], prompt: p } : prev[1],
+                ] : null);
+                if (i === 0) setStyleData(prev => prev ? { ...prev, prompt: p } : null);
+              }}
+              onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)}
+              onEnrichStyleB={(prompt) => enrichStylePrompt(prompt, concept)}
+              onRegenerateA={async () => {
+                const conceptForA = concept;
+                const a = await generateStylePrompt(conceptForA, lang, lyricsVariants ? [lyricsVariants[0]] : undefined);
+                setStyleVariants(prev => prev ? [a, prev[1]] : null);
+                setStyleData(a);
+              }}
+              onRegenerateB={async () => {
+                const conceptForB: SongConcept = {
+                  ...concept,
+                  language: (concept.languageVariant2 && concept.languageVariant2.length > 0)
+                    ? concept.languageVariant2
+                    : concept.language,
+                  vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0)
+                    ? concept.vocalsVariant2
+                    : concept.vocals,
+                };
+                const b = await generateStylePrompt(conceptForB, lang, lyricsVariants ? [lyricsVariants[1]] : undefined);
+                setStyleVariants(prev => prev ? [prev[0], b] : null);
+              }}
+            />
           ) : (
             <StyleDisplay data={styleData} onRegenerate={async () => { setLoadingText(tr.loading.generatingStyle); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); setStyleData(await generateStylePrompt(concept, lang, lyricsVariants ?? undefined)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdatePrompt={(prompt) => setStyleData(prev => prev ? { ...prev, prompt } : null)} onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)} />
+          )
+          ) : (
+            <div className="glass-card rounded-2xl p-8 text-center max-w-md mx-auto">
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-6">{tr.style.generateFirst}</p>
+              <button type="button" onClick={handleLyricsNext} disabled={isLoading || !(lyricsVariants?.length >= 2 || lyrics?.trim())}
+                className="btn-create px-6 py-3 rounded-2xl text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed">
+                <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`} />
+                {tr.style.generateNow}
+              </button>
+            </div>
           )
         )}
         {activeStep === WorkflowStep.ARTWORK && styleData && (

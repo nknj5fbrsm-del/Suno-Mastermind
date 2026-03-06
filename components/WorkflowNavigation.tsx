@@ -5,18 +5,20 @@ import { useLang } from '../App';
 interface WorkflowNavigationProps {
   activeStep: WorkflowStep;
   setActiveStep: (step: WorkflowStep) => void;
+  /** Konzept „fertig“ (z. B. Thema ausgefüllt) – Lyrics-Tab erst dann klickbar. */
+  hasConcept: boolean;
   hasLyrics: boolean;
   hasStyle: boolean;
   /** Wenn true, sind zwei Lyrics-Varianten vorhanden; Style ist dann klickbar (generiert Style aus beiden). */
   hasLyricsVariants?: boolean;
 }
 
-const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, setActiveStep, hasLyrics, hasStyle, hasLyricsVariants }) => {
+const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, setActiveStep, hasConcept, hasLyrics, hasStyle, hasLyricsVariants }) => {
   const { tr } = useLang();
   const steps = [
     { id: WorkflowStep.DASHBOARD, icon: 'fa-house',         label: tr.nav.home,    enabled: true },
     { id: WorkflowStep.CONCEPT,   icon: 'fa-wand-sparkles', label: tr.nav.concept, enabled: true },
-    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: true },
+    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: hasConcept },
     { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: hasStyle || !!hasLyricsVariants },
     { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: hasStyle },
   ];

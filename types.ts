@@ -17,6 +17,10 @@ export interface SongConcept {
   language: string[];
   isInstrumental: boolean;
   vocals: string[];
+  /** Optionale, separate Sprache für Lyrics-Variante 2 (Fallback: language). */
+  languageVariant2?: string[];
+  /** Optionaler, separater Gesangsstil für Lyrics-Variante 2 (Fallback: vocals). */
+  vocalsVariant2?: string[];
   instrumentation?: string[];
   excludedStyles: string[];
 }
