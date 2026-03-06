@@ -66,7 +66,7 @@ const HeaderLogo = () => (
 );
 
 const App: React.FC = () => {
-  const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.LYRICS);
+  const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);

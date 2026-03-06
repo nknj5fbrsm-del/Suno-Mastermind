@@ -5,11 +5,11 @@ import { GeneratedStyle } from '../types';
 import { useLang } from '../App';
 import StyleDictionary from './StyleDictionary';
 
-/** Inhalt für das Style-Info-Modal (Referenzen, Wirkung, Warum Empfehlung) – gleiche Darstellung wie zuvor. */
+/** Inhalt für das Style-Info-Modal (Referenzen, Wirkung, Warum Empfehlung) – Hell- und Dunkelmodus. */
 const StyleInfoModalContent: React.FC<{ data: GeneratedStyle }> = ({ data }) => {
   const { tr } = useLang();
   return (
-    <div className="space-y-4 p-1">
+    <div className="space-y-4 p-1 text-zinc-800 dark:text-zinc-200">
       {data.similarArtists && (
         <div>
           <p className="text-[8px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400 mb-1.5 flex items-center gap-1">
@@ -17,7 +17,7 @@ const StyleInfoModalContent: React.FC<{ data: GeneratedStyle }> = ({ data }) => 
           </p>
           <div className="flex flex-wrap gap-1.5">
             {data.similarArtists.split(',').map((a, i) => (
-              <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/10 text-suno-secondary border border-suno-secondary/20">{a.trim()}</span>
+              <span key={i} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/15 dark:bg-suno-secondary/25 text-suno-secondary border border-suno-secondary/25 dark:border-suno-secondary/40">{a.trim()}</span>
             ))}
           </div>
         </div>
@@ -171,20 +171,20 @@ const StyleCard: React.FC<{
                 <i className="fas fa-circle-info text-suno-secondary text-[8px]"></i> {tr.style.styleInfo}
               </button>
               {styleInfoModalOpen && createPortal(
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 dark:bg-black/50 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
                   <div
-                    className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in"
+                    className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in text-zinc-900 dark:text-zinc-100"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/50">
                       <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary flex items-center gap-2">
                         <i className="fas fa-circle-info text-suno-secondary"></i> {tr.style.styleInfo}
                       </span>
-                      <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                      <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                         <i className="fas fa-times text-sm"></i>
                       </button>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar">
+                    <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar bg-white dark:bg-zinc-900">
                       <StyleInfoModalContent data={data} />
                     </div>
                   </div>
@@ -437,22 +437,22 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             <p className="text-[10px] text-center font-black uppercase tracking-[0.15em] text-zinc-500 dark:text-zinc-400 italic leading-snug">{tr.style.aiNote}</p>
           </div>
           {styleInfoModalOpen && createPortal(
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 dark:bg-black/50 backdrop-blur-sm" onClick={() => setStyleInfoModalOpen(false)}>
               <div
-                className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in"
+                className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl overflow-hidden animate-scale-in text-zinc-900 dark:text-zinc-100"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/50">
                   <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary flex items-center gap-2">
                     <i className="fas fa-circle-info text-suno-secondary"></i> {tr.style.styleInfo}
                   </span>
-                  <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                  <button type="button" onClick={() => setStyleInfoModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                     <i className="fas fa-times text-sm"></i>
                   </button>
                 </div>
-                <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar space-y-4">
+                <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar space-y-4 bg-white dark:bg-zinc-900">
                   <StyleInfoModalContent data={data} />
-                  <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
                     <p className="text-[10px] text-center font-black uppercase tracking-[0.15em] text-zinc-500 dark:text-zinc-400 italic leading-snug">{tr.style.aiNote}</p>
                   </div>
                 </div>
