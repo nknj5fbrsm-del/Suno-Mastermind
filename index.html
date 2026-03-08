@@ -137,6 +137,20 @@
             0%,100% { transform: translate(0,0) scale(1); opacity: 0.4; }
             50%  { transform: translate(30px,-40px) scale(1.15); opacity: 0.2; }
         }
+        /* Mobile: Orbs aus – starke CPU/GPU-Entlastung (kein Blur, keine Dauer-Animation) */
+        @media (max-width: 768px) {
+            .orb-container .orb { display: none; }
+            .logo-bg-decor { animation: none !important; filter: none !important; }
+            .logo-glow { animation: none !important; }
+            .decorative-spin-slow { animation: none !important; }
+        }
+        /* Reduced motion: keine dekorativen Dauer-Animationen */
+        @media (prefers-reduced-motion: reduce) {
+            .orb-container .orb { animation: none; filter: blur(0); opacity: 0.5; }
+            .animate-logo-pulse, .logo-glow, .animate-pulse-slow,
+            .loading-note, .suno-badge-shimmer, .live-badge::before,
+            .decorative-spin-slow { animation: none !important; }
+        }
 
         /* ════════════════════════════════════════
            GLASS SYSTEM
@@ -435,7 +449,14 @@
             justify-content: center;
         }
 
-        /* Mobile: Dropdown-Overflow verhindern */
+        /* Mobile: Backdrop-Blur reduzieren – weniger GPU-Last, weniger Wärme */
+        @media (max-width: 768px) {
+            .glass-card { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+            .glass-header { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+            .glass-nav { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+            .glass-btn, .glass-input { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+            .glass-dropdown { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        }
         @media (max-width: 640px) {
             .mobile-dropdown-fix {
                 position: fixed !important;

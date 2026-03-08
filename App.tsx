@@ -47,7 +47,7 @@ const ToastBar: React.FC<{ toast: ToastState; onDismiss: () => void }> = ({ toas
 const HeaderLogo = () => (
   <div className="relative flex-shrink-0">
     {/* Outer ambient glow */}
-    <div className="absolute -inset-2 rounded-2xl suno-gradient opacity-[0.22] blur-xl pointer-events-none animate-logo-pulse"></div>
+    <div className="logo-bg-decor absolute -inset-2 rounded-2xl suno-gradient opacity-[0.22] blur-xl pointer-events-none animate-logo-pulse"></div>
     {/* Logo box */}
     <div
       className="logo-glow relative w-11 h-11 rounded-[14px] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-[1.07] cursor-pointer"

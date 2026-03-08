@@ -336,7 +336,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
               </div>
             ) : (
               <div className="w-full aspect-square rounded-2xl glass-btn flex items-center justify-center">
-                <i className="fas fa-compact-disc text-zinc-300 dark:text-zinc-600 text-5xl" style={{ animation: 'spin 8s linear infinite' }}></i>
+                <i className="fas fa-compact-disc decorative-spin-slow text-zinc-300 dark:text-zinc-600 text-5xl" style={{ animation: 'spin 8s linear infinite' }}></i>
               </div>
             )}
           </div>

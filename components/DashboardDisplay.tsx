@@ -177,7 +177,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
             {history.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-14 h-14 rounded-2xl glass-btn flex items-center justify-center mb-4">
-                  <i className="fas fa-compact-disc text-2xl text-zinc-600 animate-spin" style={{animationDuration:'8s'}}></i>
+                  <i className="fas fa-compact-disc decorative-spin-slow text-2xl text-zinc-600 animate-spin" style={{animationDuration:'8s'}}></i>
                 </div>
                 <p className="text-sm font-bold text-zinc-400 mb-1">{tr.dashboard.noHistory}</p>
                 <p className="text-xs text-zinc-600 mb-5">{tr.dashboard.noHistorySub}</p>
