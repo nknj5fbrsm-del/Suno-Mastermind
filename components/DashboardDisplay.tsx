@@ -170,7 +170,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
             onClick={e => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-3">
                 <p className="section-pill">{tr.dashboard.archive}</p>
                 {history.length > 0 && (
@@ -179,13 +179,13 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-                <button type="button" onClick={handleExport} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                <button type="button" onClick={handleExport} className="glass-btn px-3 py-2 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target">
                   <i className="fas fa-arrow-up-from-bracket text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.export}</span>
                 </button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-1.5 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-2 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target">
                   <i className="fas fa-download text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.import}</span>
                 </button>
@@ -193,7 +193,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                   <button
                     type="button"
                     onClick={handleDeleteAllClick}
-                    className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[10px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
+                    className="glass-btn px-3 py-2 rounded-xl text-red-400 text-[10px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5 touch-target"
                   >
                     <i className="fas fa-trash text-[9px]"></i> {tr.dashboard.deleteAll}
                   </button>
@@ -202,12 +202,12 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                   <button
                     type="button"
                     onClick={handleKeepFavoritesOnlyClick}
-                    className="glass-btn px-3 py-1.5 rounded-xl text-amber-300 text-[10px] font-bold uppercase tracking-wider hover:text-amber-100 hover:bg-amber-500/20 flex items-center gap-1.5"
+                    className="glass-btn px-3 py-2 rounded-xl text-amber-300 text-[10px] font-bold uppercase tracking-wider hover:text-amber-100 hover:bg-amber-500/20 flex items-center gap-1.5 touch-target"
                   >
                     <i className="fas fa-star text-[9px]"></i> {tr.dashboard.keepFavoritesOnly}
                   </button>
                 )}
-                <button onClick={() => setArchiveOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400 ml-1">
+                <button onClick={() => setArchiveOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400 sm:ml-1">
                   <i className="fas fa-times text-sm"></i>
                 </button>
               </div>
@@ -241,7 +241,8 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                       }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-zinc-200 truncate group-hover:text-suno-primary transition-colors">
+                      <p className="text-xs font-bold text-zinc-200 truncate group-hover:text-suno-primary transition-colors flex items-center gap-1.5">
+                        {item.isFavorite && <i className="fas fa-star text-amber-300 text-[10px] flex-shrink-0"></i>}
                         {item.concept.topic || tr.dashboard.untitled}
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
@@ -253,19 +254,19 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                         {new Date(item.timestamp).toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { day: '2-digit', month: 'short', year: '2-digit' })}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col gap-1.5 flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(item.id); }}
-                        className={`w-8 h-8 glass-btn rounded-lg flex items-center justify-center text-[11px] transition-all ${item.isFavorite ? 'text-amber-300 hover:text-amber-200' : 'text-zinc-400 hover:text-amber-300'}`}
+                        className={`w-9 h-9 sm:w-8 sm:h-8 glass-btn rounded-lg flex items-center justify-center text-[11px] transition-all ${item.isFavorite ? 'text-amber-300 hover:text-amber-200' : 'text-zinc-400 hover:text-amber-300'}`}
                         title={item.isFavorite ? tr.dashboard.unfavorite : tr.dashboard.favorite}
                       >
                         <i className={`${item.isFavorite ? 'fas' : 'far'} fa-star`}></i>
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); onRecall(item); setArchiveOpen(false); }}
-                        className="w-8 h-8 glass-btn rounded-lg flex items-center justify-center text-suno-primary text-[11px]" title={tr.dashboard.recall}>
+                        className="w-9 h-9 sm:w-8 sm:h-8 glass-btn rounded-lg flex items-center justify-center text-suno-primary text-[11px]" title={tr.dashboard.recall}>
                         <i className="fas fa-folder-open"></i>
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                        className="w-8 h-8 glass-btn rounded-lg flex items-center justify-center text-zinc-400 hover:bg-red-500 hover:text-white hover:border-red-500 text-[11px] transition-all" title={tr.dashboard.delete}>
+                        className="w-9 h-9 sm:w-8 sm:h-8 glass-btn rounded-lg flex items-center justify-center text-zinc-400 hover:bg-red-500 hover:text-white hover:border-red-500 text-[11px] transition-all" title={tr.dashboard.delete}>
                         <i className="fas fa-trash"></i>
                       </button>
                     </div>
