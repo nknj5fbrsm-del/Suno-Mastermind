@@ -39,6 +39,8 @@ export interface GeneratedStyle {
 export interface SongHistoryItem {
   id: string;
   timestamp: number;
+  /** Favorit-Markierung für schnelle Archivfilter/-bereinigung. */
+  isFavorite?: boolean;
   concept: SongConcept;
   lyrics: string;
   /** Zweite Lyrics-Variante (Create-Flow); wenn gesetzt, werden beide im Lyrics- und Cover-Tab angezeigt. */

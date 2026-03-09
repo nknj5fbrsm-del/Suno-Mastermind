@@ -8,6 +8,7 @@ interface DashboardDisplayProps {
   history: SongHistoryItem[];
   onRecall: (item: SongHistoryItem) => void;
   onDelete: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
   onStartNew: () => void;
 }
 
@@ -15,14 +16,17 @@ const TUTORIAL_ACCENTS = ['text-emerald-500', 'text-suno-secondary', 'text-blue-
 const TUTORIAL_BORDERS = ['border-emerald-500/25', 'border-pink-500/25', 'border-blue-400/25', 'border-yellow-500/25', 'border-purple-500/25'];
 const TUTORIAL_BG = ['from-emerald-500/10 to-emerald-500/3', 'from-pink-500/10 to-pink-500/3', 'from-blue-400/10 to-blue-400/3', 'from-yellow-500/10 to-yellow-500/3', 'from-purple-500/10 to-purple-500/3'];
 
-const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, onDelete, onStartNew }) => {
+const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, onDelete, onToggleFavorite, onStartNew }) => {
   const { tr, lang } = useLang();
   const { showToast } = useToast();
   const [tutorialOpen,  setTutorialOpen]  = useState(false);
   const [archiveOpen,   setArchiveOpen]   = useState(false);
   const [whatsNewOpen,  setWhatsNewOpen]  = useState(false);
   const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
+  const [confirmKeepFavoritesOpen, setConfirmKeepFavoritesOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const favoriteCount = history.filter(item => item.isFavorite).length;
+  const nonFavoriteCount = history.length - favoriteCount;
 
   const handleDeleteAllClick = () => {
     if (!history.length) return;
@@ -33,6 +37,14 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
     history.forEach(item => onDelete(item.id));
     setConfirmDeleteAllOpen(false);
     setArchiveOpen(false);
+  };
+  const handleKeepFavoritesOnlyClick = () => {
+    if (!favoriteCount || !nonFavoriteCount) return;
+    setConfirmKeepFavoritesOpen(true);
+  };
+  const handleKeepFavoritesOnlyConfirm = () => {
+    history.filter(item => !item.isFavorite).forEach(item => onDelete(item.id));
+    setConfirmKeepFavoritesOpen(false);
   };
 
   const handleExport = async () => {
@@ -130,6 +142,26 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
         </div>,
         document.body
       )}
+      {confirmKeepFavoritesOpen && createPortal(
+        <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setConfirmKeepFavoritesOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in" style={{ ...modalStyle }} onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-bold text-zinc-200 text-center leading-relaxed">
+              {tr.dashboard.keepFavoritesConfirm}
+            </p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setConfirmKeepFavoritesOpen(false)}
+                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-300 text-xs font-bold uppercase tracking-wider">
+                {tr.dashboard.deleteAllCancel}
+              </button>
+              <button type="button" onClick={handleKeepFavoritesOnlyConfirm}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-suno-primary text-white hover:opacity-90">
+                {tr.dashboard.keepFavoritesOnly}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ═══ ARCHIV MODAL (Portal → body, damit über Header) ═══ */}
       {archiveOpen && createPortal(
@@ -164,6 +196,15 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                     className="glass-btn px-3 py-1.5 rounded-xl text-red-400 text-[10px] font-bold uppercase tracking-wider hover:text-white hover:bg-red-500 flex items-center gap-1.5"
                   >
                     <i className="fas fa-trash text-[9px]"></i> {tr.dashboard.deleteAll}
+                  </button>
+                )}
+                {favoriteCount > 0 && nonFavoriteCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleKeepFavoritesOnlyClick}
+                    className="glass-btn px-3 py-1.5 rounded-xl text-amber-300 text-[10px] font-bold uppercase tracking-wider hover:text-amber-100 hover:bg-amber-500/20 flex items-center gap-1.5"
+                  >
+                    <i className="fas fa-star text-[9px]"></i> {tr.dashboard.keepFavoritesOnly}
                   </button>
                 )}
                 <button onClick={() => setArchiveOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400 ml-1">
@@ -213,6 +254,12 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                       </p>
                     </div>
                     <div className="flex flex-col gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(item.id); }}
+                        className={`w-8 h-8 glass-btn rounded-lg flex items-center justify-center text-[11px] transition-all ${item.isFavorite ? 'text-amber-300 hover:text-amber-200' : 'text-zinc-400 hover:text-amber-300'}`}
+                        title={item.isFavorite ? tr.dashboard.unfavorite : tr.dashboard.favorite}
+                      >
+                        <i className={`${item.isFavorite ? 'fas' : 'far'} fa-star`}></i>
+                      </button>
                       <button onClick={(e) => { e.stopPropagation(); onRecall(item); setArchiveOpen(false); }}
                         className="w-8 h-8 glass-btn rounded-lg flex items-center justify-center text-suno-primary text-[11px]" title={tr.dashboard.recall}>
                         <i className="fas fa-folder-open"></i>

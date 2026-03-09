@@ -309,6 +309,13 @@ const App: React.FC = () => {
     await deleteSongFromDB(id);
     setHistory(prev => prev.filter(h => h.id !== id));
   }, []);
+  const handleToggleFavorite = useCallback(async (id: string) => {
+    const target = history.find(h => h.id === id);
+    if (!target) return;
+    const updated: SongHistoryItem = { ...target, isFavorite: !target.isFavorite };
+    await saveSongToDB(updated);
+    setHistory(prev => prev.map(h => h.id === id ? updated : h));
+  }, [history]);
 
   const themes: { id: ThemeName; label: string; color: string; desc: string; icon: string }[] = [
     { id: 'mastermind', label: 'Mastermind', color: 'bg-purple-600', icon: 'fa-brain', desc: 'Deep Purple & Pink' },
@@ -648,7 +655,7 @@ const App: React.FC = () => {
           </div>
         )}
         <Suspense fallback={<div className="min-h-[280px] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-suno-primary border-t-transparent animate-spin" /></div>}>
-        {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={handleRecall} onDelete={handleDeleteFromHistory} onStartNew={handleStartNew} />}
+        {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={handleRecall} onDelete={handleDeleteFromHistory} onToggleFavorite={handleToggleFavorite} onStartNew={handleStartNew} />}
         {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptNext} onConceptChange={onConceptChange} />}
         {activeStep === WorkflowStep.LYRICS && (
           <>
