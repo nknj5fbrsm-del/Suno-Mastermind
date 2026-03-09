@@ -47,10 +47,10 @@ const ToastBar: React.FC<{ toast: ToastState; onDismiss: () => void }> = ({ toas
 const HeaderLogo = () => (
   <div className="relative flex-shrink-0">
     {/* Outer ambient glow */}
-    <div className="logo-bg-decor absolute -inset-2 rounded-2xl suno-gradient opacity-[0.22] blur-xl pointer-events-none animate-logo-pulse"></div>
+    <div className="logo-bg-decor absolute -inset-1.5 sm:-inset-2 rounded-2xl suno-gradient opacity-[0.22] blur-xl pointer-events-none animate-logo-pulse"></div>
     {/* Logo box */}
     <div
-      className="logo-glow relative w-11 h-11 rounded-[14px] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-[1.07] cursor-pointer"
+      className="logo-glow relative w-9 h-9 sm:w-11 sm:h-11 rounded-[12px] sm:rounded-[14px] flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-[1.07] cursor-pointer"
       style={{ background: 'linear-gradient(150deg, #1a0830 0%, #0e0d22 55%, #080616 100%)' }}
     >
       {/* Inner gradient layer */}
@@ -60,7 +60,7 @@ const HeaderLogo = () => (
       {/* Bottom-right shadow */}
       <div className="absolute inset-0 bg-gradient-to-tl from-black/30 via-transparent to-transparent pointer-events-none"></div>
       {/* Icon */}
-      <i className="fas fa-compact-disc relative z-10 text-white text-sm" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.7))' }}></i>
+      <i className="fas fa-compact-disc relative z-10 text-white text-xs sm:text-sm" style={{ filter: 'drop-shadow(0 0 6px rgba(168,85,247,0.7))' }}></i>
     </div>
   </div>
 );
