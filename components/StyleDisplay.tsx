@@ -85,6 +85,8 @@ const ValuePills: React.FC<{ weirdness: number; styleInfluence: number }> = ({ w
   );
 };
 
+type StyleCardLoading = 'enrich' | 'regen' | null;
+
 const StyleCard: React.FC<{
   data: GeneratedStyle;
   editablePrompt: string;
@@ -92,10 +94,10 @@ const StyleCard: React.FC<{
   variantLabel?: string;
   variantColor?: string;
   accentClass?: string;
-  busy?: boolean;
+  loading?: StyleCardLoading;
   onEnrich?: () => void;
   onRegenerate?: () => void;
-}> = ({ data, editablePrompt, onPromptChange, variantLabel, variantColor, accentClass, busy, onEnrich, onRegenerate }) => {
+}> = ({ data, editablePrompt, onPromptChange, variantLabel, variantColor, accentClass, loading, onEnrich, onRegenerate }) => {
   const { tr } = useLang();
   const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
   const weirdness = clampSafe(normalize(data.weirdness));
@@ -115,16 +117,16 @@ const StyleCard: React.FC<{
           </span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {onEnrich && (
-              <button type="button" onClick={onEnrich} disabled={busy}
+              <button type="button" onClick={onEnrich} disabled={loading !== null}
                 className={`px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-${accent}/15 border border-${accent}/30 text-${accent} hover:bg-${accent}/25 disabled:opacity-50 flex items-center gap-1.5`}>
-                <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+                <i className={`fas ${loading === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
                 {tr.style.enrichStyle}
               </button>
             )}
             {onRegenerate && (
-              <button type="button" onClick={onRegenerate} disabled={busy} title={tr.style.regenerate}
+              <button type="button" onClick={onRegenerate} disabled={loading !== null} title={tr.style.regenerate}
                 className={`w-8 h-8 rounded-xl flex items-center justify-center glass-btn text-${accent} hover:bg-${accent}/20 disabled:opacity-50`}>
-                <i className={`fas ${busy ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
+                <i className={`fas ${loading === 'regen' ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
               </button>
             )}
           </div>
@@ -143,7 +145,7 @@ const StyleCard: React.FC<{
               }`}
               value={editablePrompt}
               onChange={(e) => onPromptChange(e.target.value)}
-              disabled={busy}
+              disabled={loading !== null}
               spellCheck={false}
             />
           </div>
@@ -209,9 +211,9 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
   const [editableVariant1, setEditableVariant1] = useState(dataVariants?.[1]?.prompt ?? data.prompt);
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const [insertTarget, setInsertTarget] = useState<0 | 1>(0);
-  const [busyA, setBusyA] = useState(false);
-  const [busyB, setBusyB] = useState(false);
-  const [busySingle, setBusySingle] = useState(false);
+  const [loadingA, setLoadingA] = useState<StyleCardLoading>(null);
+  const [loadingB, setLoadingB] = useState<StyleCardLoading>(null);
+  const [loadingSingle, setLoadingSingle] = useState<StyleCardLoading>(null);
   const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
 
   const appendToPrompt = (text: string, target: 'single' | 0 | 1) => {
@@ -255,41 +257,46 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
   };
 
   const handleEnrichA = async () => {
-    if (!onEnrichStyleA || busyA) return;
-    setBusyA(true);
+    if (!onEnrichStyleA || loadingA) return;
+    setLoadingA('enrich');
     try {
       const result = await onEnrichStyleA(editableVariant0);
       setEditableVariant0(result);
       onUpdatePromptVariant?.(0, result);
-    } finally { setBusyA(false); }
+    } finally { setLoadingA(null); }
   };
   const handleEnrichB = async () => {
-    if (!onEnrichStyleB || busyB) return;
-    setBusyB(true);
+    if (!onEnrichStyleB || loadingB) return;
+    setLoadingB('enrich');
     try {
       const result = await onEnrichStyleB(editableVariant1);
       setEditableVariant1(result);
       onUpdatePromptVariant?.(1, result);
-    } finally { setBusyB(false); }
+    } finally { setLoadingB(null); }
   };
   const handleRegenA = async () => {
-    if (!onRegenerateA || busyA) return;
-    setBusyA(true);
-    try { await onRegenerateA(); } finally { setBusyA(false); }
+    if (!onRegenerateA || loadingA) return;
+    setLoadingA('regen');
+    try { await onRegenerateA(); } finally { setLoadingA(null); }
   };
   const handleRegenB = async () => {
-    if (!onRegenerateB || busyB) return;
-    setBusyB(true);
-    try { await onRegenerateB(); } finally { setBusyB(false); }
+    if (!onRegenerateB || loadingB) return;
+    setLoadingB('regen');
+    try { await onRegenerateB(); } finally { setLoadingB(null); }
   };
   const handleEnrichSingle = async () => {
-    if (!onEnrichStyleA || busySingle) return;
-    setBusySingle(true);
+    if (!onEnrichStyleA || loadingSingle) return;
+    setLoadingSingle('enrich');
     try {
       const result = await onEnrichStyleA(editablePrompt);
       setEditablePrompt(result);
       onUpdatePrompt?.(result);
-    } finally { setBusySingle(false); }
+    } finally { setLoadingSingle(null); }
+  };
+  const handleRegenSingle = async () => {
+    if (!onRegenerate || loadingSingle) return;
+    setLoadingSingle('regen');
+    try { await onRegenerate(); } finally { setLoadingSingle(null); }
   };
 
   const charCount = editablePrompt.length;
@@ -317,7 +324,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             variantLabel={tr.lyrics.variant1}
             variantColor="text-suno-primary"
             accentClass="suno-primary"
-            busy={busyA}
+            loading={loadingA}
             onEnrich={onEnrichStyleA ? handleEnrichA : undefined}
             onRegenerate={onRegenerateA ? handleRegenA : undefined}
           />
@@ -328,7 +335,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             variantLabel={tr.lyrics.variant2}
             variantColor="text-suno-secondary"
             accentClass="suno-secondary"
-            busy={busyB}
+            loading={loadingB}
             onEnrich={onEnrichStyleB ? handleEnrichB : undefined}
             onRegenerate={onRegenerateB ? handleRegenB : undefined}
           />
@@ -369,14 +376,14 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
           <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wider hidden sm:block">{tr.style.engine}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={handleEnrichSingle} disabled={busySingle}
+          <button type="button" onClick={handleEnrichSingle} disabled={loadingSingle !== null}
             className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary/25 disabled:opacity-50 flex items-center gap-1.5">
-            <i className={`fas ${busySingle ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+            <i className={`fas ${loadingSingle === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
             {tr.style.enrichStyle}
           </button>
-          <button onClick={onRegenerate} disabled={busySingle} title={tr.style.regenerate}
+          <button onClick={handleRegenSingle} disabled={loadingSingle !== null} title={tr.style.regenerate}
             className="glass-btn w-9 h-9 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-suno-primary text-sm disabled:opacity-50">
-            <i className="fas fa-dice"></i>
+            <i className={`fas ${loadingSingle === 'regen' ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
           </button>
         </div>
       </div>
@@ -405,7 +412,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
               className={`w-full bg-transparent pl-4 pr-2 py-2 font-black text-lg md:text-xl leading-relaxed outline-none resize-none h-28 transition-colors disabled:opacity-70 ${isOverHard ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}
               value={editablePrompt}
               onChange={(e) => handlePromptChange(e.target.value)}
-              disabled={busySingle}
+              disabled={loadingSingle !== null}
               spellCheck={false}
               style={{ fontFamily: 'Inter, sans-serif' }}
             />

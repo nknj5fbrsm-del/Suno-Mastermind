@@ -21,6 +21,8 @@ interface LyricsCompareViewProps {
   onVariantSettingsChange?: (variant: 1 | 2) => void;
 }
 
+type LoadingAction = 'enrich' | 'simplify' | 'regen';
+
 const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
   variantA, variantB,
   concept,
@@ -63,8 +65,8 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
   };
   const [editA, setEditA] = useState(variantA);
   const [editB, setEditB] = useState(variantB);
-  const [busyA, setBusyA] = useState(false);
-  const [busyB, setBusyB] = useState(false);
+  const [loadingA, setLoadingA] = useState<LoadingAction | null>(null);
+  const [loadingB, setLoadingB] = useState<LoadingAction | null>(null);
 
   useEffect(() => { setEditA(variantA); }, [variantA]);
   useEffect(() => { setEditB(variantB); }, [variantB]);
@@ -79,54 +81,54 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
   };
 
   const handleEnrichA = async () => {
-    if (!onEnrichRegieA || busyA) return;
-    setBusyA(true);
+    if (!onEnrichRegieA || loadingA) return;
+    setLoadingA('enrich');
     try {
       const result = await onEnrichRegieA(editA);
       setEditA(result);
       onUpdateVariantA?.(result);
-    } finally { setBusyA(false); }
+    } finally { setLoadingA(null); }
   };
   const handleEnrichB = async () => {
-    if (!onEnrichRegieB || busyB) return;
-    setBusyB(true);
+    if (!onEnrichRegieB || loadingB) return;
+    setLoadingB('enrich');
     try {
       const result = await onEnrichRegieB(editB);
       setEditB(result);
       onUpdateVariantB?.(result);
-    } finally { setBusyB(false); }
+    } finally { setLoadingB(null); }
   };
   const handleSimplifyA = async () => {
-    if (!onSimplifyA || busyA) return;
-    setBusyA(true);
+    if (!onSimplifyA || loadingA) return;
+    setLoadingA('simplify');
     try {
       const result = await onSimplifyA(editA);
       setEditA(result);
       onUpdateVariantA?.(result);
-    } finally { setBusyA(false); }
+    } finally { setLoadingA(null); }
   };
   const handleSimplifyB = async () => {
-    if (!onSimplifyB || busyB) return;
-    setBusyB(true);
+    if (!onSimplifyB || loadingB) return;
+    setLoadingB('simplify');
     try {
       const result = await onSimplifyB(editB);
       setEditB(result);
       onUpdateVariantB?.(result);
-    } finally { setBusyB(false); }
+    } finally { setLoadingB(null); }
   };
   const handleRegenA = async () => {
-    if (!onRegenerateA || busyA) return;
-    setBusyA(true);
+    if (!onRegenerateA || loadingA) return;
+    setLoadingA('regen');
     try {
       await onRegenerateA();
-    } finally { setBusyA(false); }
+    } finally { setLoadingA(null); }
   };
   const handleRegenB = async () => {
-    if (!onRegenerateB || busyB) return;
-    setBusyB(true);
+    if (!onRegenerateB || loadingB) return;
+    setLoadingB('regen');
     try {
       await onRegenerateB();
-    } finally { setBusyB(false); }
+    } finally { setLoadingB(null); }
   };
 
   return (
@@ -185,26 +187,26 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
                 {tr.lyrics.variant1}
               </span>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button type="button" onClick={handleEnrichA} disabled={busyA}
+                <button type="button" onClick={handleEnrichA} disabled={loadingA !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary/25 disabled:opacity-50 flex items-center gap-1.5">
-                  <i className={`fas ${busyA ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+                  <i className={`fas ${loadingA === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
                   {tr.lyrics.enrichRegie}
                 </button>
-                <button type="button" onClick={handleSimplifyA} disabled={busyA}
+                <button type="button" onClick={handleSimplifyA} disabled={loadingA !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary/25 disabled:opacity-50 flex items-center gap-1.5">
-                  <i className={`fas ${busyA ? 'fa-spinner fa-spin' : 'fa-compress'}`}></i>
+                  <i className={`fas ${loadingA === 'simplify' ? 'fa-spinner fa-spin' : 'fa-compress'}`}></i>
                   {tr.lyrics.simplifyText}
                 </button>
-                <button type="button" onClick={handleRegenA} disabled={busyA} title={tr.lyrics.regenerate}
+                <button type="button" onClick={handleRegenA} disabled={loadingA !== null} title={tr.lyrics.regenerate}
                   className="w-8 h-8 rounded-xl flex items-center justify-center glass-btn text-suno-primary hover:bg-suno-primary/20 disabled:opacity-50">
-                  <i className={`fas ${busyA ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
+                  <i className={`fas ${loadingA === 'regen' ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
                 </button>
               </div>
             </div>
             <textarea
               value={editA}
               onChange={(e) => handleChangeA(e.target.value)}
-              disabled={busyA}
+              disabled={loadingA !== null}
               className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none disabled:opacity-70"
               placeholder="…"
               spellCheck={false}
@@ -254,26 +256,26 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
                 {tr.lyrics.variant2}
               </span>
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button type="button" onClick={handleEnrichB} disabled={busyB}
+                <button type="button" onClick={handleEnrichB} disabled={loadingB !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary/25 disabled:opacity-50 flex items-center gap-1.5">
-                  <i className={`fas ${busyB ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
+                  <i className={`fas ${loadingB === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
                   {tr.lyrics.enrichRegie}
                 </button>
-                <button type="button" onClick={handleSimplifyB} disabled={busyB}
+                <button type="button" onClick={handleSimplifyB} disabled={loadingB !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary/25 disabled:opacity-50 flex items-center gap-1.5">
-                  <i className={`fas ${busyB ? 'fa-spinner fa-spin' : 'fa-compress'}`}></i>
+                  <i className={`fas ${loadingB === 'simplify' ? 'fa-spinner fa-spin' : 'fa-compress'}`}></i>
                   {tr.lyrics.simplifyText}
                 </button>
-                <button type="button" onClick={handleRegenB} disabled={busyB} title={tr.lyrics.regenerate}
+                <button type="button" onClick={handleRegenB} disabled={loadingB !== null} title={tr.lyrics.regenerate}
                   className="w-8 h-8 rounded-xl flex items-center justify-center glass-btn text-suno-secondary hover:bg-suno-secondary/20 disabled:opacity-50">
-                  <i className={`fas ${busyB ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
+                  <i className={`fas ${loadingB === 'regen' ? 'fa-spinner fa-spin' : 'fa-dice'}`}></i>
                 </button>
               </div>
             </div>
             <textarea
               value={editB}
               onChange={(e) => handleChangeB(e.target.value)}
-              disabled={busyB}
+              disabled={loadingB !== null}
               className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none disabled:opacity-70"
               placeholder="…"
               spellCheck={false}

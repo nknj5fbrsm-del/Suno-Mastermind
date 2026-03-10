@@ -18,6 +18,33 @@ interface ConceptFormProps {
   onConceptChange?: (concept: SongConcept) => void;
 }
 
+// ─── Deduplizierung inhaltlich (Groß-/Kleinschreibung ignorieren), erste Schreibweise behalten ───
+function dedupeByContent(arr: string[]): string[] {
+  const seen = new Set<string>();
+  return arr.filter((s) => {
+    const key = s.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ─── Tempo: 0/1 Eintrag unverändert; 2+ Einträge → ein Wert oder Bereich "min–max" ───
+function normalizeTempoToSingleOrRange(arr: string[]): string[] {
+  if (arr.length <= 1) return arr;
+  const numbers: number[] = [];
+  for (const s of arr) {
+    const m = s.trim().match(/\d+/);
+    if (m) numbers.push(parseInt(m[0], 10));
+  }
+  if (numbers.length >= 2) {
+    const min = Math.min(...numbers);
+    const max = Math.max(...numbers);
+    return [min === max ? String(min) : `${min}–${max}`];
+  }
+  return [arr[0]];
+}
+
 // ─── AUDIO UPLOAD ZONE ────────────────────────────────────────────────────
 const ACCEPTED_AUDIO = '.mp3,.wav,.ogg,.flac,.aac,.webm,.m4a';
 const MAX_FILE_MB = 18;
@@ -634,13 +661,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
 
   // ─── Referenz-Mixer ───
   const handleMixerApply = (result: ReferenceStyleResult) => {
-    setConcept(prev => ({
-      ...prev,
-      genre:           result.genre.length           ? [...new Set([...prev.genre, ...result.genre])]                       : prev.genre,
-      mood:            result.mood.length            ? [...new Set([...prev.mood, ...result.mood])]                        : prev.mood,
-      tempo:           result.tempo.length           ? [...new Set([...prev.tempo, ...result.tempo])]                      : prev.tempo,
-      instrumentation: result.instrumentation.length ? [...new Set([...(prev.instrumentation ?? []), ...result.instrumentation])] : prev.instrumentation,
-    }));
+    setConcept(prev => {
+      const genre = result.genre.length ? dedupeByContent([...prev.genre, ...result.genre]) : prev.genre;
+      const mood = result.mood.length ? dedupeByContent([...prev.mood, ...result.mood]) : prev.mood;
+      const tempoRaw = result.tempo.length ? dedupeByContent([...prev.tempo, ...result.tempo]) : prev.tempo;
+      const tempo = normalizeTempoToSingleOrRange(tempoRaw);
+      const instrumentation = result.instrumentation.length ? dedupeByContent([...(prev.instrumentation ?? []), ...result.instrumentation]) : prev.instrumentation;
+      return { ...prev, genre, mood, tempo, instrumentation };
+    });
     showToast('Referenz-Stil übernommen ✓', 'success');
   };
 
@@ -668,7 +696,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
       fusionResult.suggestedMood.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
       const newTempo = [...prev.tempo];
       if (fusionResult.suggestedBPM && !newTempo.includes(fusionResult.suggestedBPM)) newTempo.push(fusionResult.suggestedBPM);
-      return { ...prev, instrumentation: newInstr, mood: newMood, tempo: newTempo };
+      const instrumentation = dedupeByContent(newInstr);
+      const mood = dedupeByContent(newMood);
+      const tempo = normalizeTempoToSingleOrRange(dedupeByContent(newTempo));
+      return { ...prev, instrumentation, mood, tempo };
     });
     setFusionResult(null);
   };
@@ -697,7 +728,12 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
       boostResult.addInstruments.forEach(i => { if (!newInstr.includes(i)) newInstr.push(i); });
       const newMood = [...prev.mood];
       boostResult.addMoods.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
-      return { ...prev, genre: newGenre, instrumentation: newInstr, mood: newMood };
+      return {
+        ...prev,
+        genre: dedupeByContent(newGenre),
+        instrumentation: dedupeByContent(newInstr),
+        mood: dedupeByContent(newMood),
+      };
     });
     setBoostResult(null);
   };

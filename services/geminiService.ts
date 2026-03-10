@@ -102,7 +102,7 @@ const SYSTEM_INSTRUCTION = `1. Rollendefinition & Expertise
 Du agierst als hochgradig erfahrener, professioneller Songwriter mit jahrzehntelanger Expertise in der Musikindustrie. Dein Stil ist souverän, präzise und kompromisslos qualitätsorientiert. Du verabscheust Phrasendrescherei, Klischees und Kitsch. Jedes Wort muss Gewicht haben; jeder Reim muss sich natürlich aus dem Metrum ergeben, niemals erzwungen wirken.
 
 ## Core Competencies
-1. **Lyrische Brillanz:** Erstelle Songtexte auf höchstem Niveau in Deutsch, Englisch oder Französisch. Vermeide abgegriffene Metaphern (z.B. Herz/Schmerz). Nutze stattdessen narrative Tiefe und originelle Bilder.
+1. **Lyrische Brillanz:** Erstelle Songtexte auf höchstem Niveau in Deutsch, Englisch oder Französisch. Vermeide abgegriffene Metaphern (z.B. Herz/Schmerz). Nutze narrative Tiefe und originelle Bilder nur dort, wo sie thematisch wirklich passen; ansonsten bevorzuge klare, direkte Sprache. Atmosphärische Stimmungsbilder (z.B. Neon, Nacht, Wetter) setze dezent und nur ein, wenn Thema und Stimmung des Songs es nahelegen – nicht als Standard.
 2. **Genre-Agnostik:** Du beherrscht alle Genres – von tiefgründiger Melancholie bis hin zu humorvollen, pointierten Texten.
 3. **Musikalische Fachsprache:** Integriere dein Wissen über Harmonik, Artikulation und Instrumentierung direkt in die Textgestaltung und die begleitenden Erklärungen.
 
@@ -327,7 +327,7 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
   [Bridge · Wurlitzer pno, pad strings, plate reverb]
 - Nutze exakte Instrumentennamen (Rhodes Piano, Upright Bass, Gitarre, Keys, Drums), Artikulation (staccato, legato, marcato, muted, pizzicato) und Raumklang (close-miking, dry, plate reverb).${noBrassNote}- Kein gesungener Text, NUR Struktur und Regie in [ ].`
     : `[SEED: ${salt}] Erstelle einen absolut neuen, einzigartigen Songtext auf höchstem professionellen Niveau.
-- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.${vocalsBinding}- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Nutze originelle, narrativ starke Metaphern.
+- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.${vocalsBinding}- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Metaphern und Stimmungsbilder (z.B. Licht, Nacht, Wetter) nur einsetzen, wo sie thematisch wirklich passen; sonst klare, direkte Sprache. Vermeide wiederkehrende Klischees wie Neon/Nachtstadt/Regen auf Scheiben, außer das Thema verlangt sie ausdrücklich.
 - Struktur:
   · Nutze ausschließlich eckige Klammern für Regie und Sektionen: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro].
   · In die Klammern kommen detaillierte Spielanweisungen (z. B. [Chorus · 125 BPM, straight feel, syncopated slap bass, minor 9th chords] – OHNE Brass/Trompete außer bei Jazz/Brass-Genre).
@@ -777,8 +777,10 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   const styleInstruction = artStyle && artStyle !== "Default"
     ? (isCustomPrompt ? artStyle : `${artStyle} style`)
     : "professional photography or digital painting";
-  const noTextInstruction = "CRITICAL: The image must contain ZERO text, no letters, no words, no numbers, no logos, no titles. Purely visual artwork only.";
-  const primaryPrompt = `Create a single album cover image. Theme: "${concept.topic}". Genre: ${concept.genre.join(", ")}. Style: ${styleInstruction}. ${noTextInstruction}`;
+  const genreStr = concept.genre?.length ? concept.genre.join(", ") : "music";
+  const moodStr = concept.mood?.length ? concept.mood.join(", ") : "emotional";
+  // Ein kompakter Prompt von Anfang an: Thema, Genre, Mood, Style – Kontext zu Lyrics/Style bleibt erhalten, weniger Tokens
+  const coverPrompt = `Album cover. Theme: "${concept.topic}". Genre: ${genreStr}. Mood: ${moodStr}. Visual style: ${styleInstruction}. No text in image.`;
 
   const extractImageFromResponse = (response: Awaited<ReturnType<typeof ai.models.generateContent>>): string | null => {
     const parts = response.candidates?.[0]?.content?.parts;
@@ -798,10 +800,9 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
   const FALLBACK_IMAGE_MODEL = "gemini-2.0-flash-exp";
   const freeTierHint = " Tipp: Kostenloser Key (aistudio.google.com) hat ein Tageslimit von ca. 500 Bildern und max. 15 pro Minute. Bei 429-Fehlern: 1–2 Minuten warten und erneut versuchen.";
 
-  // Modell-Kaskade: primär → mit imageConfig → Fallback-Modell, jeweils mit Backoff-Retry
+  // Kaskade auf 2 Schritte reduziert: Primär mit imageConfig (1:1), dann Fallback – weniger Anfragen, gleicher Kontext
   const modelAttempts: Array<{ model: string; useImageConfig: boolean; label: string }> = [
-    { model: IMAGE_MODEL, useImageConfig: false, label: "primary" },
-    { model: IMAGE_MODEL, useImageConfig: true, label: "primary+config" },
+    { model: IMAGE_MODEL, useImageConfig: true, label: "primary" },
     { model: FALLBACK_IMAGE_MODEL, useImageConfig: false, label: "fallback" },
   ];
 
@@ -810,13 +811,13 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
       const response = await withRetry(
         () => ai.models.generateContent({
           model: attempt.model,
-          contents: primaryPrompt,
+          contents: coverPrompt,
           config: {
             responseModalities: ["TEXT", "IMAGE"],
             imageConfig: attempt.useImageConfig ? { aspectRatio: "1:1", imageSize: "1K" } : undefined,
           },
         }),
-        { maxRetries: 2, baseDelay: 3000 }
+        { maxRetries: 1, baseDelay: 3000 }
       );
       const dataUrl = extractImageFromResponse(response);
       if (dataUrl) return dataUrl;
@@ -832,23 +833,6 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
       }
       await sleep(2000);
     }
-  }
-
-  // Letzter Versuch: vereinfachter Prompt (weniger Token, höhere Erfolgschance)
-  try {
-    const simplePrompt = `Abstract album artwork, mood: ${(concept.mood || []).join(", ") || "emotional"}, vibrant colors, ${styleInstruction}. No text.`;
-    const response = await withRetry(
-      () => ai.models.generateContent({
-        model: IMAGE_MODEL,
-        contents: simplePrompt,
-        config: { responseModalities: ["TEXT", "IMAGE"] },
-      }),
-      { maxRetries: 1, baseDelay: 5000 }
-    );
-    const dataUrl = extractImageFromResponse(response);
-    if (dataUrl) return dataUrl;
-  } catch {
-    // handled below
   }
 
   throw new Error("Das Bild konnte nicht generiert werden." + freeTierHint);
