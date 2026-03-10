@@ -465,6 +465,20 @@
                 width: auto !important;
                 max-height: 50vh !important;
             }
+            /* Konzeptseite: Ausklappfelder (Genre, Stimmung, Tempo etc.) im Dark Mode lesbar */
+            .dark .glass-dropdown.mobile-dropdown-fix,
+            .dark .glass-dropdown.concept-dropdown-options {
+                background: rgba(24,24,32,0.98) !important;
+                border-color: rgba(255,255,255,0.15);
+            }
+            .dark .glass-dropdown.mobile-dropdown-fix button,
+            .dark .glass-dropdown.concept-dropdown-options button {
+                color: #f4f4f5 !important;
+            }
+            .dark .glass-dropdown.mobile-dropdown-fix .text-zinc-500,
+            .dark .glass-dropdown.concept-dropdown-options .text-zinc-500 {
+                color: rgba(212,212,216,0.9) !important;
+            }
         }
 
         /* Logo border glow – cycles through primary → secondary */
