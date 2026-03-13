@@ -76,7 +76,6 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
 
   /* ─── MODALS ─────────────────────────────────────────────────────────────── */
   const modalStyle: React.CSSProperties = {
-    background: 'rgba(18,10,35,0.97)',
     border: '1px solid rgba(168,85,247,0.25)',
     boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.06) inset',
   };
@@ -87,8 +86,11 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
       {/* ═══ TUTORIAL MODAL (Portal → body, damit über Header) ═══ */}
       {tutorialOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setTutorialOpen(false)}>
-          <div className="w-full max-w-lg rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar" style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
-            onClick={e => e.stopPropagation()}>
+          <div
+            className="w-full max-w-lg glass-card rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+            style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <p className="section-pill">{tr.tutorial.title}</p>
               <button onClick={() => setTutorialOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400">
@@ -107,7 +109,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                       <span className={`text-[8px] font-black uppercase tracking-wider ${TUTORIAL_ACCENTS[i]} opacity-50`}>{step.step}</span>
                       <p className={`text-xs font-black uppercase tracking-wider ${TUTORIAL_ACCENTS[i]}`}>{step.title}</p>
                     </div>
-                    <p className="text-[11px] text-zinc-300 leading-relaxed">{step.desc}</p>
+                    <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">{step.desc}</p>
                   </div>
                 </div>
               ))}
@@ -124,13 +126,17 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
       {/* ═══ BESTÄTIGUNG „Alle löschen“ (Portal → body) ═══ */}
       {confirmDeleteAllOpen && createPortal(
         <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setConfirmDeleteAllOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in" style={{ ...modalStyle }} onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-bold text-zinc-200 text-center leading-relaxed">
+          <div
+            className="w-full max-w-sm glass-card rounded-2xl p-6 space-y-4 animate-scale-in bg-white/95 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+            style={{ ...modalStyle }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200 text-center leading-relaxed">
               {tr.dashboard.deleteAllConfirm}
             </p>
             <div className="flex gap-3">
               <button type="button" onClick={() => setConfirmDeleteAllOpen(false)}
-                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-300 text-xs font-bold uppercase tracking-wider">
+                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-600 dark:text-zinc-300 text-xs font-bold uppercase tracking-wider">
                 {tr.dashboard.deleteAllCancel}
               </button>
               <button type="button" onClick={handleDeleteAllConfirm}
@@ -144,13 +150,17 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
       )}
       {confirmKeepFavoritesOpen && createPortal(
         <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setConfirmKeepFavoritesOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-scale-in" style={{ ...modalStyle }} onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-bold text-zinc-200 text-center leading-relaxed">
+          <div
+            className="w-full max-w-sm glass-card rounded-2xl p-6 space-y-4 animate-scale-in bg-white/95 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+            style={{ ...modalStyle }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200 text-center leading-relaxed">
               {tr.dashboard.keepFavoritesConfirm}
             </p>
             <div className="flex gap-3">
               <button type="button" onClick={() => setConfirmKeepFavoritesOpen(false)}
-                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-300 text-xs font-bold uppercase tracking-wider">
+                className="flex-1 glass-btn py-2.5 rounded-xl text-zinc-600 dark:text-zinc-300 text-xs font-bold uppercase tracking-wider">
                 {tr.dashboard.deleteAllCancel}
               </button>
               <button type="button" onClick={handleKeepFavoritesOnlyConfirm}
@@ -166,8 +176,11 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
       {/* ═══ ARCHIV MODAL (Portal → body, damit über Header) ═══ */}
       {archiveOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setArchiveOpen(false)}>
-          <div className="w-full max-w-2xl rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar" style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
-            onClick={e => e.stopPropagation()}>
+          <div
+            className="w-full max-w-2xl glass-card rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar bg-white/95 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+            style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
+            onClick={e => e.stopPropagation()}
+          >
 
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -181,11 +194,19 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-                <button type="button" onClick={handleExport} className="glass-btn px-3 py-2 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target">
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  className="glass-btn px-3 py-2 rounded-xl text-zinc-700 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target"
+                >
                   <i className="fas fa-arrow-up-from-bracket text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.export}</span>
                 </button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="glass-btn px-3 py-2 rounded-xl text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="glass-btn px-3 py-2 rounded-xl text-zinc-700 dark:text-zinc-200 text-[10px] font-bold uppercase tracking-wider hover:text-suno-primary flex items-center gap-1.5 touch-target"
+                >
                   <i className="fas fa-download text-[9px]" aria-hidden></i>
                   <span>{tr.dashboard.import}</span>
                 </button>
@@ -220,8 +241,8 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                 <div className="w-14 h-14 rounded-2xl glass-btn flex items-center justify-center mb-4">
                   <i className="fas fa-compact-disc decorative-spin-slow text-2xl text-zinc-600 animate-spin" style={{animationDuration:'8s'}}></i>
                 </div>
-                <p className="text-sm font-bold text-zinc-400 mb-1">{tr.dashboard.noHistory}</p>
-                <p className="text-xs text-zinc-600 mb-5">{tr.dashboard.noHistorySub}</p>
+                <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-1">{tr.dashboard.noHistory}</p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5">{tr.dashboard.noHistorySub}</p>
                 <button onClick={() => { setArchiveOpen(false); onStartNew(); }}
                   className="btn-create px-6 py-2.5 rounded-xl text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
                   <i className="fas fa-plus"></i> {tr.dashboard.newProject}
@@ -241,7 +262,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                       }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-zinc-200 truncate group-hover:text-suno-primary transition-colors flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate group-hover:text-suno-primary transition-colors flex items-center gap-1.5">
                         {item.isFavorite && <i className="fas fa-star text-amber-300 text-[10px] flex-shrink-0"></i>}
                         {item.concept.topic || tr.dashboard.untitled}
                       </p>
@@ -288,9 +309,11 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
       {/* ═══ WHAT'S NEW MODAL (Portal → body, damit über Header) ═══ */}
       {whatsNewOpen && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-5" onClick={() => setWhatsNewOpen(false)}>
-          <div className="w-full max-w-lg rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar"
+          <div
+            className="w-full max-w-lg glass-card rounded-3xl p-6 space-y-4 animate-scale-in overflow-y-auto custom-scrollbar bg-white/95 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
             style={{ ...modalStyle, maxHeight: 'calc(100vh - 140px)' }}
-            onClick={e => e.stopPropagation()}>
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <p className="section-pill">{tr.dashboard.whatsNew}</p>
               <button onClick={() => setWhatsNewOpen(false)} className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400">
@@ -305,7 +328,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                   <span className="text-[10px] font-black uppercase tracking-wider text-suno-primary mt-0.5 min-w-[70px]">
                     {item.date}
                   </span>
-                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                  <p className="text-[11px] text-zinc-900 dark:text-zinc-300 leading-relaxed">
                     {item.text}
                   </p>
                 </li>

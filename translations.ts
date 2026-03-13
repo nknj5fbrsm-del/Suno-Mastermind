@@ -10,6 +10,15 @@ export const t = {
       langSwitchToEn: 'Switch to English',
       langSwitchToDe: 'Zu Deutsch wechseln',
     },
+    about: {
+      label: 'Über',
+      name: 'NilsP',
+      p1: 'Ich bin Musiker mit über 40 Jahren Erfahrung, insbesondere an der Trompete. Mein Verständnis von Musik basiert auf präziser Artikulation, komplexer Harmonik und der emotionalen Kraft musikalischer Arrangements.',
+      p2: 'Die Suno Mastermind App ist aus der Notwendigkeit entstanden, die Lücke zwischen vager KI-Generierung und professioneller musikalischer Kontrolle zu schließen. Während gängige KI-Tools oft im Ungefähren bleiben, nutzt diese App spezialisiertes Musik-Vokabular und strukturierte Regieanweisungen, um Ergebnisse auf professionellem Niveau zu erzwingen – ohne Phrasen und ohne Klischees.',
+      p3: 'Mein Ziel ist es, die generative Kraft der KI so zu steuern, dass sie als echtes Werkzeug für anspruchsvolle Musiker dient, die genau wissen, wie ein Horn strahlen oder ein Cello atmen muss.',
+      sunoProfileCta: 'Zu meinem Suno-Profil',
+      close: 'Schließen',
+    },
     dashboard: {
       headline: 'Dein Song beginnt hier.',
       sub: 'KI-gestützte Lyrics, Style-Prompts & Cover-Art – optimiert für Suno V5.',
@@ -233,6 +242,15 @@ export const t = {
       apiKey: 'Change API Key', theme: 'Theme', lightMode: 'Light Mode', darkMode: 'Dark Mode',
       langSwitchToEn: 'Switch to English',
       langSwitchToDe: 'Switch to German',
+    },
+    about: {
+      label: 'About',
+      name: 'NilsP',
+      p1: 'I am a musician with more than 40 years of experience, with a special focus on the trumpet. My understanding of music is rooted in precise articulation, rich harmony and the emotional power of musical arrangements.',
+      p2: 'The Suno Mastermind app was born from the need to close the gap between vague AI output and professional musical control. While many AI tools stay fuzzy, this app uses specialized music vocabulary and structured direction cues to force results to a professional level – without clichés or empty phrases.',
+      p3: 'My goal is to steer the generative power of AI so that it becomes a real tool for demanding musicians who know exactly how a horn should shine or a cello should breathe.',
+      sunoProfileCta: 'To my Suno profile',
+      close: 'Close',
     },
     dashboard: {
       headline: 'Your song starts here.',

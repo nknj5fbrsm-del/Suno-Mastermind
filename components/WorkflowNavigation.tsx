@@ -35,13 +35,13 @@ const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, set
               onClick={() => setActiveStep(step.id)}
               className={`
                 relative flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5
-                px-2 py-2 sm:px-3.5 rounded-xl
+                px-2 py-2 sm:px-3.5 rounded-xl border border-transparent
                 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide whitespace-nowrap
                 transition-all duration-200 min-h-[44px]
                 ${isActive
-                  ? 'btn-create text-white shadow-md'
+                  ? 'btn-create text-white shadow-md border-suno-primary'
                   : step.enabled
-                    ? 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-white/35 dark:hover:bg-white/8'
+                    ? 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70 dark:hover:bg-white/8 hover:border-zinc-300 dark:hover:border-white/20'
                     : 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed opacity-40'
                 }
               `}

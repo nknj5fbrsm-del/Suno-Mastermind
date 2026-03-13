@@ -67,7 +67,6 @@ const HeaderLogo = () => (
 
 const App: React.FC = () => {
   const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -112,12 +111,10 @@ const App: React.FC = () => {
   const langValue = useMemo(() => ({ lang, tr }), [lang, tr]);
 
   useEffect(() => {
-    // Theme Initialisierung
+    // Theme Initialisierung – App läuft ausschließlich im Dark-Mode
     const savedTheme = (localStorage.getItem('suno-theme') as ThemeName) || 'mastermind';
-    const savedMode = localStorage.getItem('suno-mode') || 'dark';
     setActiveTheme(savedTheme);
-    setIsDarkMode(savedMode === 'dark');
-    document.documentElement.className = `${savedMode === 'dark' ? 'dark' : ''} theme-${savedTheme}`;
+    document.documentElement.className = `dark theme-${savedTheme}`;
     
     // History laden
     const fetchHistory = async () => {
@@ -162,18 +159,9 @@ const App: React.FC = () => {
     }
   }, [showToast, tr]);
 
-  const toggleMode = () => {
-    setIsDarkMode(prev => {
-      const next = !prev;
-      document.documentElement.classList.toggle('dark', next);
-      localStorage.setItem('suno-mode', next ? 'dark' : 'light');
-      return next;
-    });
-  };
-
   const changeTheme = (theme: ThemeName) => {
     setActiveTheme(theme);
-    document.documentElement.className = `${isDarkMode ? 'dark' : ''} theme-${theme}`;
+    document.documentElement.className = `dark theme-${theme}`;
     localStorage.setItem('suno-theme', theme);
     setIsThemeMenuOpen(false);
   };
@@ -432,8 +420,8 @@ const App: React.FC = () => {
                   <i className="fas fa-user text-sm"></i>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">Über</p>
-                  <p className="text-sm font-black text-zinc-100 leading-tight">NilsP</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">{tr.about.label}</p>
+                  <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 leading-tight">{tr.about.name}</p>
                 </div>
               </div>
               <button
@@ -445,24 +433,10 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-3 text-[12px] leading-relaxed text-zinc-200">
-              <p>
-                Ich bin Musiker mit über 40 Jahren Erfahrung, insbesondere an der Trompete.
-                Mein Verständnis von Musik basiert auf präziser Artikulation, komplexer Harmonik
-                und der emotionalen Kraft musikalischer Arrangements.
-              </p>
-              <p>
-                Die Suno Mastermind App ist aus der Notwendigkeit entstanden, die Lücke zwischen
-                vager KI-Generierung und professioneller musikalischer Kontrolle zu schließen.
-                Während gängige KI-Tools oft im Ungefähren bleiben, nutzt diese App spezialisiertes
-                Musik-Vokabular und strukturierte Regieanweisungen, um Ergebnisse auf professionellem
-                Niveau zu erzwingen – ohne Phrasen und ohne Klischees.
-              </p>
-              <p>
-                Mein Ziel ist es, die generative Kraft der KI so zu steuern, dass sie als echtes
-                Werkzeug für anspruchsvolle Musiker dient, die genau wissen, wie ein Horn strahlen
-                oder ein Cello atmen muss.
-              </p>
+            <div className="space-y-3 text-[12px] leading-relaxed text-zinc-700 dark:text-zinc-200">
+              <p>{tr.about.p1}</p>
+              <p>{tr.about.p2}</p>
+              <p>{tr.about.p3}</p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -473,14 +447,14 @@ const App: React.FC = () => {
                 className="btn-create flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.18em]"
               >
                 <i className="fas fa-headphones text-sm"></i>
-                Zu meinem Suno-Profil
+                {tr.about.sunoProfileCta}
               </a>
               <button
                 type="button"
                 onClick={() => setAboutOpen(false)}
-                className="glass-btn flex-1 py-2.5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-300 hover:text-suno-primary"
+                className="glass-btn flex-1 py-2.5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-600 dark:text-zinc-300 hover:text-suno-primary"
               >
-                Schließen
+                {tr.about.close}
               </button>
             </div>
           </div>
@@ -569,13 +543,6 @@ const App: React.FC = () => {
                 document.body
               )}
             </div>
-            {/* Dark/Light toggle – sun = warm gold, moon = cool indigo */}
-            <button onClick={toggleMode} className="glass-btn touch-target rounded-xl" title={isDarkMode ? tr.header.lightMode : tr.header.darkMode}>
-              {isDarkMode
-                ? <i className="fas fa-sun text-base" style={{color:'#f59e0b', filter:'drop-shadow(0 0 6px rgba(245,158,11,0.6))'}}></i>
-                : <i className="fas fa-moon text-base" style={{color:'#6366f1', filter:'drop-shadow(0 0 5px rgba(99,102,241,0.5))'}}></i>
-              }
-            </button>
           </div>
           </div>
         </div>
