@@ -1016,7 +1016,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
               <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
                 <i className="fas fa-flask text-suno-secondary text-sm"></i>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">{tr.concept.creativeLab}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">{tr.concept.creativeLab}</p>
+                {isLabOpen && (
+                  <p className="mt-0.5 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 md:hidden">
+                    {tr.concept.refMixer}
+                  </p>
+                )}
+              </div>
             </div>
             <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLabOpen ? 'rotate-180' : ''}`}></i>
           </button>
@@ -1031,31 +1038,38 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
 
         {labHelpModalOpen && createPortal(
           <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setLabHelpModalOpen(false)}>
-            <div className="w-full max-w-md rounded-3xl p-6 space-y-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar" onClick={e => e.stopPropagation()}>
+            <div
+              className="w-full max-w-md glass-card rounded-3xl p-6 space-y-5 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+              onClick={e => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeLabModalTitle}</h3>
-                <button type="button" onClick={() => setLabHelpModalOpen(false)} className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all">
+                <button
+                  type="button"
+                  onClick={() => setLabHelpModalOpen(false)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+                >
                   <i className="fas fa-times text-sm"></i>
                 </button>
               </div>
               <div className="space-y-4">
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-waveform-lines text-suno-primary text-xs"></i>
                   </div>
-                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescRefMixer}</p>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescRefMixer}</p>
                 </div>
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-shuffle text-suno-primary text-xs"></i>
                   </div>
-                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescFusion}</p>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescFusion}</p>
                 </div>
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-bolt text-suno-secondary text-xs"></i>
                   </div>
-                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescBoost}</p>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescBoost}</p>
                 </div>
               </div>
             </div>
