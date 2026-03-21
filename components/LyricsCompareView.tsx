@@ -186,7 +186,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               <span className="text-[10px] font-black uppercase tracking-wider text-suno-primary">
                 {tr.lyrics.variant1}
               </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
                 <button type="button" onClick={handleEnrichA} disabled={loadingA !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary/25 disabled:opacity-50 flex items-center gap-1.5">
                   <i className={`fas ${loadingA === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>
@@ -255,7 +255,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">
                 {tr.lyrics.variant2}
               </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
                 <button type="button" onClick={handleEnrichB} disabled={loadingB !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary/25 disabled:opacity-50 flex items-center gap-1.5">
                   <i className={`fas ${loadingB === 'enrich' ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'}`}></i>

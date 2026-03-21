@@ -65,6 +65,9 @@ const HeaderLogo = () => (
   </div>
 );
 
+const COVER_COOLDOWN_KEY = 'cover_cooldown_until';
+const COVER_COOLDOWN_MS = 90_000;
+
 const App: React.FC = () => {
   const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
@@ -106,6 +109,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<SongHistoryItem[]>([]);
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('suno-lang') as Lang) || 'de');
   const [toast, setToast] = useState<ToastState>(null);
+  const coverRequestInFlightRef = useRef(false);
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
   const tr = useMemo(() => t[lang], [lang]);
   const langValue = useMemo(() => ({ lang, tr }), [lang, tr]);
@@ -250,6 +254,19 @@ const App: React.FC = () => {
 
   const onConceptChange = useCallback((patch: Partial<SongConcept>) => setConcept(prev => ({ ...prev, ...patch })), []);
   const onUpdateLyrics = useCallback((l: string) => setLyrics(l), []);
+
+  const getCoverCooldownRemainingMs = () => {
+    const raw = localStorage.getItem(COVER_COOLDOWN_KEY);
+    const until = raw ? Number(raw) : 0;
+    if (!Number.isFinite(until) || until <= 0) return 0;
+    return Math.max(0, until - Date.now());
+  };
+
+  const setCoverCooldown = (ms: number) => {
+    localStorage.setItem(COVER_COOLDOWN_KEY, String(Date.now() + ms));
+  };
+
+  const isCoverQuotaError = (msg: string) => /429|quota|resource_exhausted|rate-limit/i.test(msg);
 
   /** Lyrics „Weiter“: Style-Prompt generieren und zum Style-Tab wechseln (keine Auto-Generierung beim Tab-Wechsel). */
   const handleLyricsNext = useCallback(async () => {
@@ -553,6 +570,17 @@ const App: React.FC = () => {
           activeStep={activeStep}
           setActiveStep={async (step) => {
             if (step === WorkflowStep.ARTWORK && lyricsVariants && lyricsVariants.length >= 2 && styleData && !coverUrl) {
+              if (coverRequestInFlightRef.current) return;
+              const cooldownLeft = getCoverCooldownRemainingMs();
+              if (cooldownLeft > 0) {
+                const sec = Math.ceil(cooldownLeft / 1000);
+                const msg = `Cover-Generierung pausiert: bitte ${sec}s warten und erneut versuchen.`;
+                setCoverError(msg);
+                showToast(msg, 'info');
+                setActiveStep(WorkflowStep.ARTWORK);
+                return;
+              }
+              coverRequestInFlightRef.current = true;
               setIsLoading(true);
               setLoadingText(tr.loading.generatingCover);
               setLoadingProgress(50);
@@ -575,8 +603,10 @@ const App: React.FC = () => {
               } catch (e) {
                 handleError(e);
                 const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
+                if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
                 setCoverError(msg);
               } finally {
+                coverRequestInFlightRef.current = false;
                 setIsLoading(false);
                 setLoadingProgress(0);
                 setActiveStep(WorkflowStep.ARTWORK);
@@ -783,6 +813,16 @@ const App: React.FC = () => {
             coverError={coverError}
             onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)}
             onRegenerateCover={async (style) => {
+              if (coverRequestInFlightRef.current) return;
+              const cooldownLeft = getCoverCooldownRemainingMs();
+              if (cooldownLeft > 0) {
+                const sec = Math.ceil(cooldownLeft / 1000);
+                const msg = `Cover-Generierung pausiert: bitte ${sec}s warten und erneut versuchen.`;
+                setCoverError(msg);
+                showToast(msg, 'info');
+                return;
+              }
+              coverRequestInFlightRef.current = true;
               setLoadingText(tr.loading.generatingCover);
               setLoadingProgress(10);
               setIsLoading(true);
@@ -795,8 +835,10 @@ const App: React.FC = () => {
               } catch (e) {
                 handleError(e);
                 const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
+                if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
                 setCoverError(msg);
               } finally {
+                coverRequestInFlightRef.current = false;
                 setIsLoading(false);
                 setLoadingProgress(0);
               }

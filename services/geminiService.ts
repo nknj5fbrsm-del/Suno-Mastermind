@@ -22,7 +22,12 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 async function withRetry<T>(
   fn: () => Promise<T>,
-  { maxRetries = 3, baseDelay = 2000, maxDelay = 30000 }: { maxRetries?: number; baseDelay?: number; maxDelay?: number } = {}
+  {
+    maxRetries = 3,
+    baseDelay = 2000,
+    maxDelay = 30000,
+    retryOn429 = true,
+  }: { maxRetries?: number; baseDelay?: number; maxDelay?: number; retryOn429?: boolean } = {}
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -31,7 +36,9 @@ async function withRetry<T>(
     } catch (err: unknown) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
-      const isRetryable = /429|resource_exhausted|quota|overloaded|503|unavailable/i.test(msg);
+      const is429 = /429|resource_exhausted|quota/i.test(msg);
+      const isRetryable = /resource_exhausted|quota|overloaded|503|unavailable/i.test(msg) || (retryOn429 && is429);
+      if (is429 && !retryOn429) throw err;
       if (!isRetryable || attempt === maxRetries) throw err;
       const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 1000, maxDelay);
       console.warn(`[Gemini] Rate limit hit (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms…`);
@@ -817,18 +824,18 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
             imageConfig: attempt.useImageConfig ? { aspectRatio: "1:1", imageSize: "1K" } : undefined,
           },
         }),
-        { maxRetries: 1, baseDelay: 3000 }
+        { maxRetries: 1, baseDelay: 3000, retryOn429: false }
       );
       const dataUrl = extractImageFromResponse(response);
       if (dataUrl) return dataUrl;
     } catch (err) {
       console.warn(`[Cover] ${attempt.label} failed:`, err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const isQuota = /429|quota|resource_exhausted|billing|403|not supported|not available/i.test(msg);
+      if (isQuota) {
+        throw new Error("Bildgenerierung: Rate-Limit erreicht (429)." + freeTierHint);
+      }
       if (attempt.label === "fallback") {
-        const msg = err instanceof Error ? err.message : String(err);
-        const isQuota = /429|quota|resource_exhausted|billing|403|not supported|not available/i.test(msg);
-        if (isQuota) {
-          throw new Error("Bildgenerierung: Rate-Limit erreicht (429)." + freeTierHint);
-        }
         throw new Error("Bildgenerierung fehlgeschlagen: " + (msg.slice(0, 100) || "Unbekannter Fehler") + "." + freeTierHint);
       }
       await sleep(2000);
