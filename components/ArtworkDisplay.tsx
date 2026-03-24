@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLang, useToast } from '../App';
 import type { GeneratedStyle } from '../types';
 
@@ -30,6 +30,8 @@ const CUSTOM_PROMPT_OPTION = 'custom'; // value für "Eigener Prompt"
 const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 
 const SUNO_CREATE_URL = 'https://suno.com/create';
+const SUPPORT_SESSION_KEY = 'support_prompt_shown';
+const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/NilsP';
 
 const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
   const { tr } = useLang();
@@ -46,6 +48,16 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
   const [customPromptText, setCustomPromptText] = useState('');
   const [customPromptModalOpen, setCustomPromptModalOpen] = useState(false);
   const [customPromptInput, setCustomPromptInput] = useState('');
+  const [showSupportPrompt, setShowSupportPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!coverUrl) return;
+    const alreadyShown = sessionStorage.getItem(SUPPORT_SESSION_KEY);
+    if (!alreadyShown) {
+      setShowSupportPrompt(true);
+      sessionStorage.setItem(SUPPORT_SESSION_KEY, '1');
+    }
+  }, [coverUrl]);
 
   const handleDownload = () => {
     if (!coverUrl) return;
@@ -177,6 +189,46 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
         <div className="gradient-line flex-1"></div>
         <span className="text-[9px] font-black text-zinc-400 uppercase tracking-wider hidden sm:block">1024 × 1024 · Suno</span>
       </div>
+
+      {showSupportPrompt && (
+        <div className="glass-card rounded-2xl p-4 border border-suno-primary/25 bg-suno-primary/5 space-y-3 animate-scale-in">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-suno-primary flex items-center gap-1.5">
+                <i className="fas fa-mug-hot text-[10px]"></i> {tr.artwork.supportTitle}
+              </p>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed mt-1">
+                {tr.artwork.supportText}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSupportPrompt(false)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0"
+              aria-label={tr.artwork.supportLater}
+            >
+              <i className="fas fa-times text-[10px]"></i>
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={BUY_ME_A_COFFEE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-create px-4 py-2 rounded-xl text-white font-black text-[10px] uppercase tracking-wider flex items-center gap-2"
+            >
+              <i className="fas fa-heart text-[9px]"></i> {tr.artwork.supportCta}
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowSupportPrompt(false)}
+              className="glass-btn px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 hover:text-suno-primary"
+            >
+              {tr.artwork.supportLater}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ═══ FÜR SUNO (oben: alles kopierbar, bei 2 Varianten als Pills) ═══ */}
       <div className="glass-card rounded-3xl p-5 space-y-4 border-2 border-suno-primary/20">
