@@ -30,7 +30,6 @@ const CUSTOM_PROMPT_OPTION = 'custom'; // value für "Eigener Prompt"
 const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 
 const SUNO_CREATE_URL = 'https://suno.com/create';
-const SUPPORT_SESSION_KEY = 'support_prompt_shown';
 const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/NilsP';
 
 const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
@@ -51,12 +50,7 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
   const [showSupportPrompt, setShowSupportPrompt] = useState(false);
 
   useEffect(() => {
-    if (!coverUrl) return;
-    const alreadyShown = sessionStorage.getItem(SUPPORT_SESSION_KEY);
-    if (!alreadyShown) {
-      setShowSupportPrompt(true);
-      sessionStorage.setItem(SUPPORT_SESSION_KEY, '1');
-    }
+    setShowSupportPrompt(!!coverUrl);
   }, [coverUrl]);
 
   const handleDownload = () => {
