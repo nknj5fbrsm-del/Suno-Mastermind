@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SongConcept } from '../types';
-import { useLang } from '../App';
+import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
 
 interface LyricsCompareViewProps {
@@ -32,6 +32,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
   onEnrichRegieA, onEnrichRegieB, onSimplifyA, onSimplifyB, onRegenerateA, onRegenerateB, onVariantSettingsChange,
 }) => {
   const { tr } = useLang();
+  const { showToast } = useToast();
 
   const toggleLanguage = (val: string) => {
     if (!concept || !onConceptChange) return;
@@ -99,6 +100,10 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
     } finally { setLoadingB(null); }
   };
   const handleSimplifyA = async () => {
+    if (isInstrumental) {
+      showToast(tr.lyrics.simplifyInstrumentalHint, 'info');
+      return;
+    }
     if (!onSimplifyA || loadingA) return;
     setLoadingA('simplify');
     try {
@@ -108,6 +113,10 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
     } finally { setLoadingA(null); }
   };
   const handleSimplifyB = async () => {
+    if (isInstrumental) {
+      showToast(tr.lyrics.simplifyInstrumentalHint, 'info');
+      return;
+    }
     if (!onSimplifyB || loadingB) return;
     setLoadingB('simplify');
     try {
