@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, createContext, useContext, useMemo, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
 import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, simplifyLyricsText, enrichStylePrompt } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
@@ -850,6 +851,7 @@ const App: React.FC = () => {
     </div>
     </LangContext.Provider>
       )}
+      <Analytics />
     </ToastContext.Provider>
   );
 };
