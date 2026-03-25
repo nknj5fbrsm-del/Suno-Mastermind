@@ -318,7 +318,7 @@ const ReferenzMixer: React.FC<{
           </div>
           <div className="text-left min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
+              <span className="text-sm font-black uppercase tracking-wider text-zinc-100">
                 {tr.concept.refMixer}
               </span>
               {analyzedCount > 0 && (
@@ -360,13 +360,13 @@ const ReferenzMixer: React.FC<{
                   {slot.file ? (
                     <div className="flex items-center gap-1.5 min-w-0">
                       <i className={`${slot.sourceMode === 'url' ? 'fas fa-link' : 'fas fa-file-audio'} text-suno-primary text-[9px] flex-shrink-0`}></i>
-                      <span className="text-[9px] font-medium text-zinc-600 dark:text-zinc-300 truncate" title={slot.file.name}>{slot.file.name}</span>
+                      <span className="text-[9px] font-medium text-zinc-200 truncate" title={slot.file.name}>{slot.file.name}</span>
                       <span className="text-[8px] text-zinc-400 flex-shrink-0">{slot.file.sizeMB} MB</span>
                     </div>
                   ) : (
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-500">{tr.concept.refMixerSlot} {idx + 1}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">{tr.concept.refMixerSlot} {idx + 1}</span>
                         <div className="flex rounded-lg overflow-visible border border-zinc-200 dark:border-zinc-600 bg-zinc-100/50 dark:bg-zinc-800/30">
                           <button
                             type="button"
@@ -374,19 +374,19 @@ const ReferenzMixer: React.FC<{
                               setSlot(idx, { ...slot, sourceMode: 'upload', error: '' });
                               setTimeout(() => fileRefs[idx].current?.click(), 0);
                             }}
-                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-l-md ${slot.sourceMode === 'upload' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-500 hover:bg-suno-secondary/25 hover:text-suno-secondary hover:ring-2 hover:ring-suno-secondary/50 hover:ring-inset'}`}
+                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-l-md ${slot.sourceMode === 'upload' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-400 hover:bg-suno-secondary/25 hover:text-suno-secondary hover:ring-2 hover:ring-suno-secondary/50 hover:ring-inset'}`}
                           >
                             {tr.concept.refMixerByFile}
                           </button>
                           <button type="button" onClick={() => setSlot(idx, { ...slot, sourceMode: 'url', error: '' })}
-                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-r-md ${slot.sourceMode === 'url' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-500 hover:bg-suno-primary/15 hover:text-suno-primary'}`}>
+                            className={`relative z-10 min-w-[3.5rem] px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer rounded-r-md ${slot.sourceMode === 'url' ? 'bg-suno-primary/25 text-suno-primary hover:bg-suno-primary/35' : 'text-zinc-400 hover:bg-suno-primary/15 hover:text-suno-primary'}`}>
                             {tr.concept.refMixerByLink}
                           </button>
                         </div>
                       </div>
                       {slot.sourceMode === 'upload' && (
                         <button type="button" onClick={() => fileRefs[idx].current?.click()}
-                          className="flex items-center gap-1.5 text-[9px] font-medium text-zinc-400 hover:text-suno-primary transition-colors">
+                          className="flex items-center gap-1.5 text-[9px] font-medium text-zinc-200 hover:text-suno-primary transition-colors">
                           <i className="fas fa-arrow-up-from-bracket text-[8px]"></i>
                           {tr.concept.fileChoose}
                         </button>
@@ -404,7 +404,7 @@ const ReferenzMixer: React.FC<{
                               {slot.sunoLoading ? tr.concept.refMixerSunoLoading : tr.concept.refMixerSunoLoad}
                             </button>
                           </div>
-                          <p className="text-[8px] text-zinc-500 dark:text-zinc-500">
+                          <p className="text-[8px] text-zinc-400">
                             {tr.concept.refMixerLinkHint}
                           </p>
                         </div>
@@ -1019,7 +1019,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">{tr.concept.creativeLab}</p>
                 {isLabOpen && (
-                  <p className="mt-0.5 text-[9px] font-bold text-zinc-500 dark:text-zinc-400 md:hidden">
+                  <p className="mt-0.5 text-[9px] font-bold text-zinc-300 md:hidden">
                     {tr.concept.refMixer}
                   </p>
                 )}

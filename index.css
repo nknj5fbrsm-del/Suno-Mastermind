@@ -1,6 +1,10 @@
 /* Tailwind Build-Zeit (kein CDN) – bessere Performance */
 @import "tailwindcss";
 
+/* dark: an class="dark" auf <html> koppeln (nicht nur prefers-color-scheme) – sonst z. B. iOS hell:
+   text-zinc-700 auf dunklem UI. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Suno-Farben nutzen bestehende CSS-Variablen aus index.html */
   --color-suno-bg: var(--suno-bg);

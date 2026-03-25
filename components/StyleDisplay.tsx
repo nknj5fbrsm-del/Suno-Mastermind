@@ -314,7 +314,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
         </div>
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-suno-primary/10 dark:bg-suno-primary/15 border border-suno-primary/25">
           <i className="fas fa-info-circle text-suno-primary text-sm flex-shrink-0"></i>
-          <p className="text-[10px] text-zinc-700 dark:text-zinc-300 leading-snug">{tr.style.copyOnLastPage}</p>
+          <p className="text-[10px] text-zinc-100 leading-snug">{tr.style.copyOnLastPage}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <StyleCard
@@ -390,7 +390,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
 
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-suno-primary/10 dark:bg-suno-primary/15 border border-suno-primary/25">
         <i className="fas fa-info-circle text-suno-primary text-sm flex-shrink-0"></i>
-        <p className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">{tr.style.copyOnLastPage}</p>
+        <p className="text-[11px] text-zinc-100 leading-relaxed">{tr.style.copyOnLastPage}</p>
       </div>
 
       <div className="glass-card rounded-3xl p-6 md:p-8 relative overflow-hidden">
