@@ -710,13 +710,18 @@ const App: React.FC = () => {
             <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={onUpdateLyrics} onConceptChange={onConceptChange} onGenerateLyrics={handleGenerateLyrics} isGenerating={isLoading} />
           )}
           {/* Weiter (zu Style) – Style erst hier generieren, gleiches Design wie Konzept */}
-          <div className="relative z-0 mt-20 md:mt-24 group">
-            <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60" />
+          {(() => {
+            const canNext = !!(lyricsVariants?.length >= 2 || lyrics?.trim());
+            return (
+              <div className={`relative z-0 mt-20 md:mt-24 ${canNext ? 'group' : ''}`}>
+                {canNext && (
+                  <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60" />
+                )}
             <button
               type="button"
               onClick={handleLyricsNext}
               disabled={isLoading || !(lyricsVariants?.length >= 2 || lyrics?.trim())}
-              className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-45 disabled:cursor-not-allowed ${canNext ? '' : 'shadow-lg'}`}
             >
               <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-arrow-right'} text-lg`} />
               {tr.concept.nextBtn}
@@ -724,7 +729,9 @@ const App: React.FC = () => {
                 {tr.lyrics.nextToStyle}
               </span>
             </button>
-          </div>
+              </div>
+            );
+          })()}
           </>
         )}
         {activeStep === WorkflowStep.STYLE && (

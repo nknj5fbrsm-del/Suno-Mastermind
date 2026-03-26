@@ -179,7 +179,9 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
       {/* Leer: Lyrics generieren (Create-Flow) */}
       {!initialLyrics && onGenerateLyrics && (
         <div className="glass-card rounded-2xl p-6 space-y-4">
-          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.concept.generateLyricsHint}</p>
+          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            {concept.topic?.trim() ? tr.concept.generateLyricsHintReady : tr.concept.generateLyricsHint}
+          </p>
           <button type="button" onClick={onGenerateLyrics} disabled={isGenerating || !concept.topic?.trim()}
             className="btn-create w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-[0.15em] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
             {isGenerating ? <><i className="fas fa-spinner animate-spin"></i> {tr.loading.generatingLyrics}</> : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.generateLyricsBtn}</>}
@@ -262,9 +264,15 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
       {/* ─── Editor ─── */}
       {initialLyrics && (
       <div className="relative">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+            <i className="fas fa-pen-to-square text-suno-primary text-[11px]" />
+            <span>{tr.lyrics.editableHint}</span>
+          </div>
+        </div>
         <textarea
           ref={textareaRef}
-          className="glass-input w-full rounded-3xl px-6 py-6 font-mono text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed min-h-[420px] h-[62vh] resize-none custom-scrollbar shadow-inner"
+          className="glass-input w-full rounded-3xl px-6 py-6 font-mono text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed min-h-[420px] h-[62vh] resize-none custom-scrollbar shadow-inner cursor-text focus:outline-none focus:ring-2 focus:ring-suno-primary/30"
           value={editableLyrics}
           onChange={(e) => handleChange(e.target.value)}
           onSelect={(e) => {

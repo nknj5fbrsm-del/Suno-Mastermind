@@ -192,9 +192,15 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
           )}
           <div className="glass-card rounded-2xl p-5 flex flex-col min-h-[420px] max-h-[70vh]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-suno-primary">
-                {tr.lyrics.variant1}
-              </span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-suno-primary">
+                  {tr.lyrics.variant1}
+                </span>
+                <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                  <i className="fas fa-pen-to-square mr-1 opacity-70" />
+                  {tr.lyrics.editableHint}
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
                 <button type="button" onClick={handleEnrichA} disabled={loadingA !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-primary/15 border border-suno-primary/30 text-suno-primary hover:bg-suno-primary/25 disabled:opacity-50 flex items-center gap-1.5">
@@ -216,7 +222,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               value={editA}
               onChange={(e) => handleChangeA(e.target.value)}
               disabled={loadingA !== null}
-              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none disabled:opacity-70"
+              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none disabled:opacity-70 cursor-text"
               placeholder="…"
               spellCheck={false}
             />
@@ -261,9 +267,15 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
           )}
           <div className="glass-card rounded-2xl p-5 flex flex-col min-h-[420px] max-h-[70vh]">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">
-                {tr.lyrics.variant2}
-              </span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">
+                  {tr.lyrics.variant2}
+                </span>
+                <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                  <i className="fas fa-pen-to-square mr-1 opacity-70" />
+                  {tr.lyrics.editableHint}
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
                 <button type="button" onClick={handleEnrichB} disabled={loadingB !== null}
                   className="px-2.5 py-1.5 rounded-xl text-[9px] font-bold uppercase tracking-wider bg-suno-secondary/15 border border-suno-secondary/30 text-suno-secondary hover:bg-suno-secondary/25 disabled:opacity-50 flex items-center gap-1.5">
@@ -285,7 +297,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               value={editB}
               onChange={(e) => handleChangeB(e.target.value)}
               disabled={loadingB !== null}
-              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none disabled:opacity-70"
+              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none disabled:opacity-70 cursor-text"
               placeholder="…"
               spellCheck={false}
             />
