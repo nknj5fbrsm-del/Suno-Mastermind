@@ -272,7 +272,7 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
         </div>
         <textarea
           ref={textareaRef}
-          className="glass-input w-full rounded-3xl px-6 py-6 font-mono text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed min-h-[420px] h-[62vh] resize-none custom-scrollbar shadow-inner cursor-text focus:outline-none focus:ring-2 focus:ring-suno-primary/30"
+          className="glass-input lyrics-editor w-full rounded-3xl px-6 py-6 font-mono text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed min-h-[420px] h-[62vh] resize-none custom-scrollbar shadow-none md:shadow-inner cursor-text focus:outline-none focus:ring-2 focus:ring-suno-primary/30"
           value={editableLyrics}
           onChange={(e) => handleChange(e.target.value)}
           onSelect={(e) => {

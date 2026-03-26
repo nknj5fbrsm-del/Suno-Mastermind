@@ -222,7 +222,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               value={editA}
               onChange={(e) => handleChangeA(e.target.value)}
               disabled={loadingA !== null}
-              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none disabled:opacity-70 cursor-text"
+              className="lyrics-editor flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-primary/30 outline-none disabled:opacity-70 cursor-text"
               placeholder="…"
               spellCheck={false}
             />
@@ -297,7 +297,7 @@ const LyricsCompareView: React.FC<LyricsCompareViewProps> = ({
               value={editB}
               onChange={(e) => handleChangeB(e.target.value)}
               disabled={loadingB !== null}
-              className="flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none disabled:opacity-70 cursor-text"
+              className="lyrics-editor flex-1 min-h-0 w-full overflow-auto rounded-xl bg-white/5 dark:bg-black/20 p-4 text-[13px] font-mono text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed custom-scrollbar border-0 resize-none focus:ring-2 focus:ring-suno-secondary/30 outline-none disabled:opacity-70 cursor-text"
               placeholder="…"
               spellCheck={false}
             />
