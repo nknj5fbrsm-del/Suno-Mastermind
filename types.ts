@@ -31,6 +31,14 @@ export interface GeneratedStyle {
   similarArtists: string;
   weirdness: number;
   styleInfluence: number;
+  /** Dynamische Mood-Achse für den Style-Regler (z. B. "Melodisch" ↔ "Experimentell"). */
+  moodLeftLabel?: string;
+  moodRightLabel?: string;
+  /** Kurze EN-Instruktionen für linkes/rechtes Extrem (wird intern zur Prompt-Modulation genutzt). */
+  moodLeftInstruction?: string;
+  moodRightInstruction?: string;
+  /** Neutrale Reglerposition; Default 50. */
+  moodNeutralValue?: number;
   /** Kurze Begründung, warum die KI diese Weirdness- und Influence-Werte empfiehlt. */
   recommendationReason?: string;
   songDescription: string;

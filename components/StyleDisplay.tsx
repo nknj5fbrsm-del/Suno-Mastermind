@@ -66,6 +66,28 @@ const normalize = (val: any) => {
   return Math.min(100, Math.max(0, Math.round(n)));
 };
 const clampSafe = (v: number) => Math.min(SAFE_MAX, Math.max(SAFE_MIN, v));
+const clampMood = (v: number) => Math.min(100, Math.max(0, Math.round(v)));
+const moodNeutral = (d: GeneratedStyle) => clampMood(d.moodNeutralValue ?? 50);
+const normalizePromptBase = (text: string) => text.trim().replace(/[,\s]+$/, '');
+const moodStrengthWord = (distance: number) => {
+  if (distance < 12) return 'slightly';
+  if (distance < 26) return 'moderately';
+  if (distance < 40) return 'strongly';
+  return 'extremely';
+};
+const applyMoodToPrompt = (basePrompt: string, style: GeneratedStyle, sliderValue: number) => {
+  const base = normalizePromptBase(basePrompt);
+  const neutral = moodNeutral(style);
+  if (!base) return '';
+  if (sliderValue === neutral) return base;
+  const direction = sliderValue < neutral ? 'left' : 'right';
+  const instruction = direction === 'left'
+    ? (style.moodLeftInstruction || 'more melodic and harmonic')
+    : (style.moodRightInstruction || 'more experimental and unconventional');
+  const distance = Math.abs(sliderValue - neutral);
+  const strength = moodStrengthWord(distance);
+  return `${base}, ${strength} ${instruction}`;
+};
 
 const ValuePills: React.FC<{ weirdness: number; styleInfluence: number }> = ({ weirdness, styleInfluence }) => {
   const { tr } = useLang();
@@ -91,13 +113,16 @@ const StyleCard: React.FC<{
   data: GeneratedStyle;
   editablePrompt: string;
   onPromptChange: (value: string) => void;
+  moodValue: number;
+  onMoodChange: (value: number) => void;
+  showMoodResetHint?: boolean;
   variantLabel?: string;
   variantColor?: string;
   accentClass?: string;
   loading?: StyleCardLoading;
   onEnrich?: () => void;
   onRegenerate?: () => void;
-}> = ({ data, editablePrompt, onPromptChange, variantLabel, variantColor, accentClass, loading, onEnrich, onRegenerate }) => {
+}> = ({ data, editablePrompt, onPromptChange, moodValue, onMoodChange, showMoodResetHint, variantLabel, variantColor, accentClass, loading, onEnrich, onRegenerate }) => {
   const { tr } = useLang();
   const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
   const weirdness = clampSafe(normalize(data.weirdness));
@@ -160,6 +185,29 @@ const StyleCard: React.FC<{
             </span>
             {isOverHard && <span className="text-[10px] font-black text-red-500">{tr.style.tooLong}</span>}
           </div>
+          <div className="mt-3 rounded-xl border border-suno-primary/20 bg-suno-primary/5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-suno-primary">{tr.style.moodFaderTitle}</p>
+              <span className="text-[10px] font-black text-zinc-400">{moodValue}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold text-zinc-400">
+              <span className="truncate">{data.moodLeftLabel || 'Melodic'}</span>
+              <span className="truncate text-right">{data.moodRightLabel || 'Experimental'}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={moodValue}
+              onChange={(e) => onMoodChange(Number(e.target.value))}
+              className="mt-2 w-full accent-suno-primary cursor-pointer"
+            />
+            <p className="mt-1 text-[9px] font-bold text-zinc-500 dark:text-zinc-400">{tr.style.moodFaderNeutral}</p>
+            {showMoodResetHint && (
+              <p className="mt-1 text-[9px] font-bold text-amber-400">{tr.style.moodFaderResetHint}</p>
+            )}
+          </div>
         </div>
         <div className="flex-shrink-0">
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary flex items-center gap-1.5 mb-2">
@@ -211,9 +259,18 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
   onEnrichStyleA, onEnrichStyleB, onRegenerateA, onRegenerateB,
 }) => {
   const { tr } = useLang();
+  const [basePrompt, setBasePrompt] = useState(data.prompt);
   const [editablePrompt, setEditablePrompt] = useState(data.prompt);
+  const [baseVariant0, setBaseVariant0] = useState(dataVariants?.[0]?.prompt ?? data.prompt);
   const [editableVariant0, setEditableVariant0] = useState(dataVariants?.[0]?.prompt ?? data.prompt);
+  const [baseVariant1, setBaseVariant1] = useState(dataVariants?.[1]?.prompt ?? data.prompt);
   const [editableVariant1, setEditableVariant1] = useState(dataVariants?.[1]?.prompt ?? data.prompt);
+  const [moodSingle, setMoodSingle] = useState(moodNeutral(data));
+  const [moodA, setMoodA] = useState(moodNeutral(dataVariants?.[0] ?? data));
+  const [moodB, setMoodB] = useState(moodNeutral(dataVariants?.[1] ?? data));
+  const [showMoodResetHintSingle, setShowMoodResetHintSingle] = useState(false);
+  const [showMoodResetHintA, setShowMoodResetHintA] = useState(false);
+  const [showMoodResetHintB, setShowMoodResetHintB] = useState(false);
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const [insertTarget, setInsertTarget] = useState<0 | 1>(0);
   const [loadingA, setLoadingA] = useState<StyleCardLoading>(null);
@@ -229,36 +286,124 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     };
     if (target === 'single') {
       const next = prepare(editablePrompt);
+      setBasePrompt(next);
       setEditablePrompt(next);
+      setMoodSingle(moodNeutral(data));
+      setShowMoodResetHintSingle(false);
       onUpdatePrompt?.(next);
     } else {
       const current = target === 0 ? editableVariant0 : editableVariant1;
       const next = prepare(current);
       if (target === 0) {
+        setBaseVariant0(next);
         setEditableVariant0(next);
+        setMoodA(moodNeutral(dataVariants?.[0] ?? data));
+        setShowMoodResetHintA(false);
         onUpdatePromptVariant?.(0, next);
       } else {
+        setBaseVariant1(next);
         setEditableVariant1(next);
+        setMoodB(moodNeutral(dataVariants?.[1] ?? data));
+        setShowMoodResetHintB(false);
         onUpdatePromptVariant?.(1, next);
       }
     }
   };
 
-  useEffect(() => { setEditablePrompt(data.prompt); }, [data.prompt]);
-  useEffect(() => { if (dataVariants?.[0]) setEditableVariant0(dataVariants[0].prompt); }, [dataVariants?.[0]?.prompt]);
-  useEffect(() => { if (dataVariants?.[1]) setEditableVariant1(dataVariants[1].prompt); }, [dataVariants?.[1]?.prompt]);
+  useEffect(() => {
+    const nextBase = data.prompt;
+    setBasePrompt(nextBase);
+    const neutral = moodNeutral(data);
+    setMoodSingle(neutral);
+    setEditablePrompt(applyMoodToPrompt(nextBase, data, neutral));
+    setShowMoodResetHintSingle(false);
+  }, [data.prompt, data.moodLeftInstruction, data.moodRightInstruction, data.moodNeutralValue]);
+  useEffect(() => {
+    if (!dataVariants?.[0]) return;
+    const nextBase = dataVariants[0].prompt;
+    setBaseVariant0(nextBase);
+    const neutral = moodNeutral(dataVariants[0]);
+    setMoodA(neutral);
+    setEditableVariant0(applyMoodToPrompt(nextBase, dataVariants[0], neutral));
+    setShowMoodResetHintA(false);
+  }, [dataVariants?.[0]?.prompt, dataVariants?.[0]?.moodLeftInstruction, dataVariants?.[0]?.moodRightInstruction, dataVariants?.[0]?.moodNeutralValue]);
+  useEffect(() => {
+    if (!dataVariants?.[1]) return;
+    const nextBase = dataVariants[1].prompt;
+    setBaseVariant1(nextBase);
+    const neutral = moodNeutral(dataVariants[1]);
+    setMoodB(neutral);
+    setEditableVariant1(applyMoodToPrompt(nextBase, dataVariants[1], neutral));
+    setShowMoodResetHintB(false);
+  }, [dataVariants?.[1]?.prompt, dataVariants?.[1]?.moodLeftInstruction, dataVariants?.[1]?.moodRightInstruction, dataVariants?.[1]?.moodNeutralValue]);
 
   const handlePromptChange = (value: string) => {
+    const neutral = moodNeutral(data);
+    const hadMood = moodSingle !== neutral;
+    setBasePrompt(value);
     setEditablePrompt(value);
+    if (hadMood) {
+      setMoodSingle(neutral);
+      setShowMoodResetHintSingle(true);
+    } else {
+      setShowMoodResetHintSingle(false);
+    }
     onUpdatePrompt?.(value);
   };
   const handleVariant0Change = (value: string) => {
+    const style0 = dataVariants?.[0] ?? data;
+    const neutral = moodNeutral(style0);
+    const hadMood = moodA !== neutral;
+    setBaseVariant0(value);
     setEditableVariant0(value);
+    if (hadMood) {
+      setMoodA(neutral);
+      setShowMoodResetHintA(true);
+    } else {
+      setShowMoodResetHintA(false);
+    }
     onUpdatePromptVariant?.(0, value);
   };
   const handleVariant1Change = (value: string) => {
+    const style1 = dataVariants?.[1] ?? data;
+    const neutral = moodNeutral(style1);
+    const hadMood = moodB !== neutral;
+    setBaseVariant1(value);
     setEditableVariant1(value);
+    if (hadMood) {
+      setMoodB(neutral);
+      setShowMoodResetHintB(true);
+    } else {
+      setShowMoodResetHintB(false);
+    }
     onUpdatePromptVariant?.(1, value);
+  };
+
+  const handleMoodSingleChange = (value: number) => {
+    const nextMood = clampMood(value);
+    setMoodSingle(nextMood);
+    setShowMoodResetHintSingle(false);
+    const nextPrompt = applyMoodToPrompt(basePrompt, data, nextMood);
+    setEditablePrompt(nextPrompt);
+    onUpdatePrompt?.(nextPrompt);
+  };
+  const handleMoodAChange = (value: number) => {
+    const nextMood = clampMood(value);
+    const style0 = dataVariants?.[0] ?? data;
+    setMoodA(nextMood);
+    setShowMoodResetHintA(false);
+    const nextPrompt = applyMoodToPrompt(baseVariant0, style0, nextMood);
+    setEditableVariant0(nextPrompt);
+    onUpdatePromptVariant?.(0, nextPrompt);
+  };
+  const handleMoodBChange = (value: number) => {
+    const nextMood = clampMood(value);
+    const style1 = dataVariants?.[1] ?? data;
+    setMoodB(nextMood);
+    setShowMoodResetHintB(false);
+    const nextPrompt = applyMoodToPrompt(baseVariant1, style1, nextMood);
+    setEditableVariant1(nextPrompt);
+    onUpdatePromptVariant?.(1, nextPrompt);
   };
 
   const handleEnrichA = async () => {
@@ -266,7 +411,10 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setLoadingA('enrich');
     try {
       const result = await onEnrichStyleA(editableVariant0);
+      setBaseVariant0(result);
       setEditableVariant0(result);
+      setMoodA(moodNeutral(dataVariants?.[0] ?? data));
+      setShowMoodResetHintA(false);
       onUpdatePromptVariant?.(0, result);
     } finally { setLoadingA(null); }
   };
@@ -275,7 +423,10 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setLoadingB('enrich');
     try {
       const result = await onEnrichStyleB(editableVariant1);
+      setBaseVariant1(result);
       setEditableVariant1(result);
+      setMoodB(moodNeutral(dataVariants?.[1] ?? data));
+      setShowMoodResetHintB(false);
       onUpdatePromptVariant?.(1, result);
     } finally { setLoadingB(null); }
   };
@@ -294,7 +445,10 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setLoadingSingle('enrich');
     try {
       const result = await onEnrichStyleA(editablePrompt);
+      setBasePrompt(result);
       setEditablePrompt(result);
+      setMoodSingle(moodNeutral(data));
+      setShowMoodResetHintSingle(false);
       onUpdatePrompt?.(result);
     } finally { setLoadingSingle(null); }
   };
@@ -326,6 +480,9 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             data={dataVariants[0]}
             editablePrompt={editableVariant0}
             onPromptChange={handleVariant0Change}
+            moodValue={moodA}
+            onMoodChange={handleMoodAChange}
+            showMoodResetHint={showMoodResetHintA}
             variantLabel={tr.lyrics.variant1}
             variantColor="text-suno-primary"
             accentClass="suno-primary"
@@ -337,6 +494,9 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             data={dataVariants[1]}
             editablePrompt={editableVariant1}
             onPromptChange={handleVariant1Change}
+            moodValue={moodB}
+            onMoodChange={handleMoodBChange}
+            showMoodResetHint={showMoodResetHintB}
             variantLabel={tr.lyrics.variant2}
             variantColor="text-suno-secondary"
             accentClass="suno-secondary"
@@ -425,6 +585,29 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
               spellCheck={false}
               style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Courier New", monospace' }}
             />
+          </div>
+          <div className="rounded-xl border border-suno-primary/20 bg-suno-primary/5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-suno-primary">{tr.style.moodFaderTitle}</p>
+              <span className="text-[10px] font-black text-zinc-400">{moodSingle}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold text-zinc-400">
+              <span className="truncate">{data.moodLeftLabel || 'Melodic'}</span>
+              <span className="truncate text-right">{data.moodRightLabel || 'Experimental'}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={moodSingle}
+              onChange={(e) => handleMoodSingleChange(Number(e.target.value))}
+              className="mt-2 w-full accent-suno-primary cursor-pointer"
+            />
+            <p className="mt-1 text-[9px] font-bold text-zinc-500 dark:text-zinc-400">{tr.style.moodFaderNeutral}</p>
+            {showMoodResetHintSingle && (
+              <p className="mt-1 text-[9px] font-bold text-amber-400">{tr.style.moodFaderResetHint}</p>
+            )}
           </div>
           {isOverHard && (
             <p className="text-[9px] font-black text-red-500 uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
