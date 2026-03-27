@@ -134,19 +134,24 @@ const StyleCard: React.FC<{
       )}
       <div className="flex-1 flex flex-col min-h-0 space-y-4">
         <div className="relative flex-shrink-0">
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+            <i className={`fas fa-pen-to-square text-${accent} text-[11px]`}></i>
+            <span>{tr.lyrics.editableHint}</span>
+          </div>
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-suno-primary flex items-center gap-1.5 mb-1.5">
             <i className="fas fa-terminal text-[8px]"></i> Suno V5 Input
           </p>
           <div className="relative">
             <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-full transition-colors ${isOverHard ? 'bg-red-500' : isOverSoft ? 'bg-amber-500' : `bg-${accent}`}`}></div>
             <textarea
-              className={`w-full bg-white/5 dark:bg-black/20 rounded-xl pl-4 pr-2 py-2 text-[13px] font-black leading-relaxed outline-none resize-none h-24 transition-colors disabled:opacity-70 ${
+              className={`w-full bg-white/5 dark:bg-black/20 rounded-xl pl-4 pr-2 py-2 text-[13px] font-mono leading-relaxed outline-none resize-none h-24 transition-colors disabled:opacity-70 cursor-text ${
                 isOverHard ? 'text-red-500' : 'text-zinc-900 dark:text-white'
               }`}
               value={editablePrompt}
               onChange={(e) => onPromptChange(e.target.value)}
               disabled={loading !== null}
               spellCheck={false}
+              style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Courier New", monospace' }}
             />
           </div>
           <div className="flex justify-between mt-1.5">
@@ -396,6 +401,10 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
       <div className="glass-card rounded-3xl p-6 md:p-8 relative overflow-hidden">
         <div className="absolute inset-0 suno-gradient-soft rounded-3xl pointer-events-none opacity-40"></div>
         <div className="relative z-10 space-y-4">
+          <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+            <i className="fas fa-pen-to-square text-suno-primary text-[11px]" />
+            <span>{tr.lyrics.editableHint}</span>
+          </div>
           <div className="flex items-center justify-between">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-suno-primary flex items-center gap-1.5">
               <i className="fas fa-terminal text-[8px]"></i> Suno V5 Input
@@ -409,12 +418,12 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
           <div className="relative">
             <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-full transition-colors ${isOverHard ? 'bg-red-500' : isOverSoft ? 'bg-amber-500' : 'bg-suno-primary'}`}></div>
             <textarea
-              className={`w-full bg-transparent pl-4 pr-2 py-2 font-black text-lg md:text-xl leading-relaxed outline-none resize-none h-28 transition-colors disabled:opacity-70 ${isOverHard ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}
+              className={`w-full bg-transparent pl-4 pr-2 py-2 font-mono text-sm leading-relaxed outline-none resize-none h-28 transition-colors disabled:opacity-70 cursor-text ${isOverHard ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}
               value={editablePrompt}
               onChange={(e) => handlePromptChange(e.target.value)}
               disabled={loadingSingle !== null}
               spellCheck={false}
-              style={{ fontFamily: 'Inter, sans-serif' }}
+              style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Courier New", monospace' }}
             />
           </div>
           {isOverHard && (
