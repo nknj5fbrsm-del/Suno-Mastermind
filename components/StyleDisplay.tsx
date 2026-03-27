@@ -316,30 +316,34 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
 
   useEffect(() => {
     const nextBase = data.prompt;
+    // Wenn Parent nur den aktuell angezeigten (Slider-)Text spiegelt, nichts resetten.
+    if (nextBase === editablePrompt) return;
     setBasePrompt(nextBase);
     const neutral = moodNeutral(data);
     setMoodSingle(neutral);
     setEditablePrompt(applyMoodToPrompt(nextBase, data, neutral));
     setShowMoodResetHintSingle(false);
-  }, [data.prompt, data.moodLeftInstruction, data.moodRightInstruction, data.moodNeutralValue]);
+  }, [data.prompt, data.moodLeftInstruction, data.moodRightInstruction, data.moodNeutralValue, editablePrompt]);
   useEffect(() => {
     if (!dataVariants?.[0]) return;
     const nextBase = dataVariants[0].prompt;
+    if (nextBase === editableVariant0) return;
     setBaseVariant0(nextBase);
     const neutral = moodNeutral(dataVariants[0]);
     setMoodA(neutral);
     setEditableVariant0(applyMoodToPrompt(nextBase, dataVariants[0], neutral));
     setShowMoodResetHintA(false);
-  }, [dataVariants?.[0]?.prompt, dataVariants?.[0]?.moodLeftInstruction, dataVariants?.[0]?.moodRightInstruction, dataVariants?.[0]?.moodNeutralValue]);
+  }, [dataVariants?.[0]?.prompt, dataVariants?.[0]?.moodLeftInstruction, dataVariants?.[0]?.moodRightInstruction, dataVariants?.[0]?.moodNeutralValue, editableVariant0]);
   useEffect(() => {
     if (!dataVariants?.[1]) return;
     const nextBase = dataVariants[1].prompt;
+    if (nextBase === editableVariant1) return;
     setBaseVariant1(nextBase);
     const neutral = moodNeutral(dataVariants[1]);
     setMoodB(neutral);
     setEditableVariant1(applyMoodToPrompt(nextBase, dataVariants[1], neutral));
     setShowMoodResetHintB(false);
-  }, [dataVariants?.[1]?.prompt, dataVariants?.[1]?.moodLeftInstruction, dataVariants?.[1]?.moodRightInstruction, dataVariants?.[1]?.moodNeutralValue]);
+  }, [dataVariants?.[1]?.prompt, dataVariants?.[1]?.moodLeftInstruction, dataVariants?.[1]?.moodRightInstruction, dataVariants?.[1]?.moodNeutralValue, editableVariant1]);
 
   const handlePromptChange = (value: string) => {
     const neutral = moodNeutral(data);
