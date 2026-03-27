@@ -115,6 +115,7 @@ const StyleCard: React.FC<{
   onPromptChange: (value: string) => void;
   moodValue: number;
   onMoodChange: (value: number) => void;
+  onMoodCommit?: () => void;
   showMoodResetHint?: boolean;
   variantLabel?: string;
   variantColor?: string;
@@ -122,7 +123,7 @@ const StyleCard: React.FC<{
   loading?: StyleCardLoading;
   onEnrich?: () => void;
   onRegenerate?: () => void;
-}> = ({ data, editablePrompt, onPromptChange, moodValue, onMoodChange, showMoodResetHint, variantLabel, variantColor, accentClass, loading, onEnrich, onRegenerate }) => {
+}> = ({ data, editablePrompt, onPromptChange, moodValue, onMoodChange, onMoodCommit, showMoodResetHint, variantLabel, variantColor, accentClass, loading, onEnrich, onRegenerate }) => {
   const { tr } = useLang();
   const [styleInfoModalOpen, setStyleInfoModalOpen] = useState(false);
   const weirdness = clampSafe(normalize(data.weirdness));
@@ -201,6 +202,9 @@ const StyleCard: React.FC<{
               step={1}
               value={moodValue}
               onChange={(e) => onMoodChange(Number(e.target.value))}
+              onMouseUp={onMoodCommit}
+              onTouchEnd={onMoodCommit}
+              onKeyUp={onMoodCommit}
               className="mt-2 w-full accent-suno-primary cursor-pointer"
             />
             <p className="mt-1 text-[9px] font-bold text-zinc-500 dark:text-zinc-400">{tr.style.moodFaderNeutral}</p>
@@ -385,7 +389,6 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setShowMoodResetHintSingle(false);
     const nextPrompt = applyMoodToPrompt(basePrompt, data, nextMood);
     setEditablePrompt(nextPrompt);
-    onUpdatePrompt?.(nextPrompt);
   };
   const handleMoodAChange = (value: number) => {
     const nextMood = clampMood(value);
@@ -394,7 +397,6 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setShowMoodResetHintA(false);
     const nextPrompt = applyMoodToPrompt(baseVariant0, style0, nextMood);
     setEditableVariant0(nextPrompt);
-    onUpdatePromptVariant?.(0, nextPrompt);
   };
   const handleMoodBChange = (value: number) => {
     const nextMood = clampMood(value);
@@ -403,8 +405,10 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
     setShowMoodResetHintB(false);
     const nextPrompt = applyMoodToPrompt(baseVariant1, style1, nextMood);
     setEditableVariant1(nextPrompt);
-    onUpdatePromptVariant?.(1, nextPrompt);
   };
+  const commitMoodSingle = () => onUpdatePrompt?.(editablePrompt);
+  const commitMoodA = () => onUpdatePromptVariant?.(0, editableVariant0);
+  const commitMoodB = () => onUpdatePromptVariant?.(1, editableVariant1);
 
   const handleEnrichA = async () => {
     if (!onEnrichStyleA || loadingA) return;
@@ -482,6 +486,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             onPromptChange={handleVariant0Change}
             moodValue={moodA}
             onMoodChange={handleMoodAChange}
+            onMoodCommit={commitMoodA}
             showMoodResetHint={showMoodResetHintA}
             variantLabel={tr.lyrics.variant1}
             variantColor="text-suno-primary"
@@ -496,6 +501,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
             onPromptChange={handleVariant1Change}
             moodValue={moodB}
             onMoodChange={handleMoodBChange}
+            onMoodCommit={commitMoodB}
             showMoodResetHint={showMoodResetHintB}
             variantLabel={tr.lyrics.variant2}
             variantColor="text-suno-secondary"
@@ -602,6 +608,9 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
               step={1}
               value={moodSingle}
               onChange={(e) => handleMoodSingleChange(Number(e.target.value))}
+              onMouseUp={commitMoodSingle}
+              onTouchEnd={commitMoodSingle}
+              onKeyUp={commitMoodSingle}
               className="mt-2 w-full accent-suno-primary cursor-pointer"
             />
             <p className="mt-1 text-[9px] font-bold text-zinc-500 dark:text-zinc-400">{tr.style.moodFaderNeutral}</p>
