@@ -455,7 +455,7 @@ function extractRegieSummary(lyrics: string, maxChars = 600): string {
 
 export const generateStylePrompt = async (
   concept: SongConcept,
-  lang: 'de' | 'en' = 'de',
+  _lang: 'de' | 'en' = 'de',
   /** Eine oder zwei Lyrics-Varianten. Bei einer: Style passend zu dieser Regie; bei zwei: ein Prompt für beide. */
   lyricsVariants?: string[] | [string, string] | null
 ): Promise<GeneratedStyle> => {
@@ -490,9 +490,6 @@ export const generateStylePrompt = async (
   · promptEffect: Auf DEUTSCH – wie wirkt dieser Prompt musikalisch (Harmonik, Groove, Artikulation).
   · similarArtists: Passende Künstler-Referenzen, kommagetrennt (Künstlernamen können englisch bleiben).
   · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). styleInfluence: Ganzzahl 15–85 (Prompt-Treue).
-  · moodLeftLabel und moodRightLabel: 1-2 Wörter je Pol (Sprache der UI: ${lang === 'de' ? 'Deutsch' : 'Englisch'}), musikalisch gegensätzlich und passend zum Song.
-  · moodLeftInstruction und moodRightInstruction: je eine kurze ENGLISH Prompt-Instruktion (max. 10 Wörter), die den jeweiligen Pol musikalisch verstärkt.
-  · moodNeutralValue: Ganzzahl 50 (neutraler Startwert).
   · recommendationReason: Auf DEUTSCH – 2–4 Sätze, warum genau diese Werte für diesen Song (Thema, Genre, Stimmung), keine Floskeln.
   · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.
 - Instrumentierung im Style-Prompt: Keine Trompete, kein Brass, keine Bläser (tpt, trumpet, horns) außer Genre oder Lyrics-Regie verlangen es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für die meisten Genres nur Rhythmusgruppe, Keys, Gitarre, Bass, ggf. Strings.`,
@@ -509,15 +506,10 @@ export const generateStylePrompt = async (
           similarArtists: { type: Type.STRING },
           weirdness: { type: Type.INTEGER },
           styleInfluence: { type: Type.INTEGER },
-          moodLeftLabel: { type: Type.STRING },
-          moodRightLabel: { type: Type.STRING },
-          moodLeftInstruction: { type: Type.STRING },
-          moodRightInstruction: { type: Type.STRING },
-          moodNeutralValue: { type: Type.INTEGER },
           recommendationReason: { type: Type.STRING },
           songDescription: { type: Type.STRING },
         },
-        required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "moodLeftLabel", "moodRightLabel", "moodLeftInstruction", "moodRightInstruction", "moodNeutralValue", "recommendationReason", "songDescription"],
+        required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "recommendationReason", "songDescription"],
       },
     },
   }));
@@ -529,7 +521,6 @@ export const generateStylePrompt = async (
   const SAFE_MIN = 15;
   const SAFE_MAX = 85;
   const clampSafe = (v: number) => Math.min(SAFE_MAX, Math.max(SAFE_MIN, Math.round(Number(v))));
-  const clampMoodNeutral = (v: number) => Math.min(100, Math.max(0, Math.round(Number(v))));
 
   const defaultStyle: GeneratedStyle = {
     prompt: concept.genre.join(", ") || "Ambient",
@@ -537,11 +528,6 @@ export const generateStylePrompt = async (
     similarArtists: "Diverse Einflüsse",
     weirdness: 50,
     styleInfluence: 65,
-    moodLeftLabel: lang === 'de' ? 'Melodisch' : 'Melodic',
-    moodRightLabel: lang === 'de' ? 'Experimentell' : 'Experimental',
-    moodLeftInstruction: "more melodic and harmonic",
-    moodRightInstruction: "more experimental and unconventional",
-    moodNeutralValue: 50,
     recommendationReason: "Empfehlung basierend auf Genre und Stimmung; Werte in Suno nach Bedarf anpassbar.",
     songDescription: concept.topic,
   };
@@ -553,18 +539,12 @@ export const generateStylePrompt = async (
     }
     const weirdness = clampSafe(parsed.weirdness ?? defaultStyle.weirdness);
     const styleInfluence = clampSafe(parsed.styleInfluence ?? defaultStyle.styleInfluence);
-    const moodNeutralValue = clampMoodNeutral(parsed.moodNeutralValue ?? defaultStyle.moodNeutralValue ?? 50);
     return {
       ...defaultStyle,
       ...parsed,
       prompt: stylePrompt,
       weirdness,
       styleInfluence,
-      moodLeftLabel: String(parsed.moodLeftLabel || defaultStyle.moodLeftLabel).trim(),
-      moodRightLabel: String(parsed.moodRightLabel || defaultStyle.moodRightLabel).trim(),
-      moodLeftInstruction: String(parsed.moodLeftInstruction || defaultStyle.moodLeftInstruction).trim(),
-      moodRightInstruction: String(parsed.moodRightInstruction || defaultStyle.moodRightInstruction).trim(),
-      moodNeutralValue,
     };
   } catch {
     return {
