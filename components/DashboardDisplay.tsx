@@ -80,8 +80,6 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
     boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.06) inset',
   };
 
-  const recent = [...history].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3);
-
   return (
     <section className="space-y-6 animate-fade-up">
 
@@ -383,63 +381,6 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
               {tr.dashboard.newProject}
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* ═══ RECENT / QUICK CONTINUE ═══ */}
-      <div className="glass-card rounded-3xl p-6 md:p-8">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">{tr.dashboard.recentTitle}</p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">{tr.dashboard.recentSub}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setArchiveOpen(true)}
-            className="glass-btn px-4 py-2 rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase tracking-wider hover:text-suno-secondary touch-target flex items-center gap-2"
-          >
-            <i className="fas fa-folder-open text-suno-secondary" />
-            {tr.dashboard.archive}
-          </button>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          {recent.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 dark:border-white/8 bg-white/5 dark:bg-black/20 p-4">
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">{tr.dashboard.recentEmpty}</p>
-              <button
-                type="button"
-                onClick={onStartNew}
-                className="mt-3 btn-create px-5 py-2.5 rounded-2xl text-white font-black text-[10px] uppercase tracking-[0.18em] shadow-xl touch-target inline-flex items-center gap-2"
-              >
-                <i className="fas fa-plus" />
-                {tr.dashboard.newProject}
-              </button>
-            </div>
-          ) : (
-            recent.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onRecall(item)}
-                className="w-full text-left rounded-2xl border border-white/10 dark:border-white/8 bg-white/5 dark:bg-black/20 hover:bg-white/8 dark:hover:bg-white/6 transition-colors p-4 flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-zinc-800 dark:text-zinc-100 truncate">
-                    {item.concept?.topic?.trim() ? item.concept.topic : tr.dashboard.untitled}
-                  </p>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    {new Date(item.timestamp).toLocaleDateString(lang, { year: 'numeric', month: 'short', day: '2-digit' })}
-                    {item.isFavorite ? ` · ${tr.dashboard.favorite}` : ''}
-                  </p>
-                </div>
-                <span className="flex-shrink-0 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">
-                  <i className="fas fa-arrow-right" />
-                  {tr.dashboard.recall}
-                </span>
-              </button>
-            ))
-          )}
         </div>
       </div>
 

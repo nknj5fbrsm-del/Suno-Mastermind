@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SongConcept } from '../types';
 import {
-  analyzeTopic, generateRandomTopic, analyzeAudio, AudioAnalysisResult,
+  analyzeTopic, generateConceptStoryIdea, analyzeAudio, AudioAnalysisResult,
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
   synthesizeReferenceStyle, ReferenceStyleResult,
@@ -561,7 +561,7 @@ const ReferenzMixer: React.FC<{
 
 // ─── CONCEPT FORM ─────────────────────────────────────────────────────────
 const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onConceptChange }) => {
-  const { tr } = useLang();
+  const { tr, lang } = useLang();
   const { showToast } = useToast();
   const opts = tr.conceptOptions;
   const [concept, setConcept] = useState<SongConcept>(initialConcept);
@@ -610,7 +610,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const handleRandomize = async () => {
     setIsRandomizing(true);
     try {
-      const topic = await generateRandomTopic(randomCategory);
+      const categoryMap: Record<string, 'music' | 'current' | 'wildcard' | 'random'> = {
+        [tr.conceptOptions.randomThemes[0]]: 'random',
+        [tr.conceptOptions.randomThemes[1]]: 'music',
+        [tr.conceptOptions.randomThemes[2]]: 'current',
+        [tr.conceptOptions.randomThemes[3]]: 'wildcard',
+      };
+      const mode = categoryMap[randomCategory] ?? 'random';
+      const topic = await generateConceptStoryIdea(mode, lang);
       setConcept(prev => ({ ...prev, topic }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -1002,6 +1009,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
               : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
           </button>
         </div>
+        <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400 pt-1">
+          {opts.storyDiceHint}
+        </p>
       </div>
 
       {/* ═══ KREATIV-LAB ═══ */}

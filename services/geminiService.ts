@@ -177,6 +177,159 @@ export const generateRandomTopic = async (category: string = "Zufall"): Promise<
   return cleanText(raw);
 };
 
+export interface HomeSongIdeas {
+  musicAnecdote: string;
+  currentAffairs: string;
+  wildcard: string;
+}
+
+const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') => {
+  const categoryInstruction = lang === 'de'
+    ? (
+      mode === 'music' ? 'Schwerpunkt: Musikerleben (Probe, Backstage, Bühne, Studio, Tourbus, Technikpanne, Booker, Club, Festival).' :
+      mode === 'current' ? 'Schwerpunkt: Tagesgeschehen (Politik, Medien, Gesellschaft), aber nur als allgemeine Stimmung/Konflikt.' :
+      mode === 'wildcard' ? 'Schwerpunkt: Freie kreative Szene mit starkem Hook, alltagstauglich.' :
+      'Wähle zufällig einen Schwerpunkt aus: Musikerleben, Tagesgeschehen oder kreative Alltagsszene.'
+    )
+    : (
+      mode === 'music' ? 'Focus: musician life (rehearsal, backstage, stage, studio, tour bus, tech mishap, booking, club, festival).' :
+      mode === 'current' ? 'Focus: current affairs mood (politics, media, society), but only as general tension/conflict.' :
+      mode === 'wildcard' ? 'Focus: free creative scene with a strong hook, still grounded and relatable.' :
+      'Pick a random focus: musician life, current-affairs mood, or a creative grounded scene.'
+    );
+
+  return lang === 'de'
+    ? `Erzeuge genau EINE Song-Story-Idee (für das Feld „Thema“ im Konzept). Stil: Option A — realistisch und von echten Alltagssituationen inspiriert, aber fiktionalisiert.
+${categoryInstruction}
+
+Regeln:
+- 2-4 Sätze, konkrete Szene, klare emotionale Spannung, gut singbar.
+- Keine behaupteten Fakten über reale Ereignisse.
+- Keine Namen echter Personen (weder lebend noch verstorben).
+- Bei Tagesgeschehen: keine konkreten Daten, Orte oder verifizierbaren Claims.
+- Kein „das ist wirklich passiert“-Wording.
+- Keine vulgären/extremen Inhalte, kein Hass, keine Verleumdung.
+- Nur Story, keine Genre-/BPM-/Produktionstipps.
+- Ausgabe als JSON mit Feld "story" in Deutsch.`
+    : `Generate exactly ONE song story idea (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
+${categoryInstruction}
+
+Rules:
+- 2-4 sentences, concrete scene, clear emotional pull, singable.
+- Do not assert real-world facts about actual events.
+- No names of real public figures (living or dead).
+- For current-affairs mode: no specific dates/places/verifiable claims.
+- Do not phrase it as “this really happened”.
+- No vulgar/extreme content, hate, or defamation.
+- Story only, no genre/BPM/production advice.
+- Return JSON with field "story" in English.`;
+};
+
+export const generateConceptStoryIdea = async (
+  mode: 'music' | 'current' | 'wildcard' | 'random',
+  lang: 'de' | 'en' = 'de'
+): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: conceptStoryPromptBody(lang, mode),
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: { story: { type: Type.STRING } },
+        required: ["story"],
+      },
+    },
+  }));
+  const fallback = lang === 'de'
+    ? 'Im Proberaum fällt kurz vor dem Auftritt die Anlage aus und die Band spielt den Refrain unplugged weiter. Das Publikum klatscht den Takt und macht aus der Panne einen Moment, den niemand vergisst. Hinterher bleibt das Gefühl, dass echte Nähe lauter sein kann als jeder Verstärker.'
+    : 'Minutes before a gig, the PA cuts out and the band keeps the chorus alive unplugged. The crowd claps in time and turns a breakdown into a shared high. Afterwards they realize connection can be louder than any amplifier.';
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    return cleanText(String(parsed.story ?? fallback)).trim();
+  } catch {
+    return fallback;
+  }
+};
+
+export const generateHomeSongIdeas = async (lang: 'de' | 'en' = 'de'): Promise<HomeSongIdeas> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const promptBody = lang === 'de'
+    ? `Erzeuge genau 3 kurze Song-Story-Ideen (für das Feld „Thema“ im Konzept). Stil: Option A — realistisch und von echten Alltagssituationen inspiriert, aber fiktionalisiert.
+
+Felder im JSON:
+- musicAnecdote: Szene aus dem Musikerleben (Probe, Backstage, Bühne, Studio, Tourbus, Technikpanne, Booker, Club, Festival etc.). Soll sich anfühlen wie eine typische, glaubwürdige Anekdote — erfinde konkrete Details, behaupte aber nicht, dass ein wirkliches Ereignis oder eine echte Person gemeint ist. Keine Namen echter, lebender oder verstorbener Persönlichkeiten.
+- currentAffairs: Stimmung oder Konflikt, der an das aktuelle Tagesgeschehen erinnert (Politik, Medien, Gesellschaft, Protest, Debattenkultur). Nur allgemein und metaphorisch; keine behaupteten Fakten, keine konkreten Daten, keine namentliche Erwähnung realer Politiker/innen oder Medienstars. Kein „das ist wirklich passiert“-Wording.
+- wildcard: Freie kreative Szene mit starkem Hook, emotionaler Spannung, gut singbar — weiterhin alltagstauglich, keine Sci-Fi/Roboter, kein expliziter Gewalt-Horror.
+
+Für alle drei:
+- Je 2–4 Sätze, konkrete Szene, klare emotionale Spannung.
+- Keine vulgären/extremen Inhalte, kein Hass, keine Verleumdung.
+- Nur die Story — keine Genre-, BPM- oder Produktionstipps.
+- Ausgabesprache strikt Deutsch.`
+    : `Generate exactly 3 short song story ideas (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
+
+JSON fields:
+- musicAnecdote: A scene from musician life (rehearsal, backstage, stage, studio, tour bus, tech mishap, booking, club, festival, etc.). Should feel like a plausible anecdote — invent specific details, but do not claim a real event or real person. No names of real living or dead public figures.
+- currentAffairs: A mood or tension that echoes today’s news climate (politics, media, society, debates). Keep it general and metaphorical; no asserted facts, no specific dates, no naming real politicians or celebrities. Do not phrase it as “this really happened”.
+- wildcard: A free creative scene with a strong hook and emotional bite — still grounded and singable; no sci-fi/robots, no explicit gore.
+
+For all three:
+- 2–4 sentences each, concrete moment, clear emotional pull.
+- No vulgarity, hate, or defamation.
+- Story only — no genre/BPM/production advice.
+- Output language strictly English.`;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: promptBody,
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          musicAnecdote: { type: Type.STRING },
+          currentAffairs: { type: Type.STRING },
+          wildcard: { type: Type.STRING },
+        },
+        required: ["musicAnecdote", "currentAffairs", "wildcard"],
+      },
+    },
+  }));
+
+  const fallback: HomeSongIdeas = {
+    musicAnecdote: lang === 'de'
+      ? 'Eine junge Band bekommt beim Dorffest nur einen 10-Minuten-Slot. Als der Strom kurz ausfällt, singen Publikum und Band den Refrain a cappella weiter. Aus der Panne wird ihr erster gemeinsamer Gänsehautmoment.'
+      : 'A young band gets only a 10-minute slot at a local festival. When the power suddenly drops, the crowd keeps singing the chorus a cappella with them. The glitch becomes their first real goosebumps moment.',
+    currentAffairs: lang === 'de'
+      ? 'In einer Stadt voller Schlagzeilen fühlt sich alles gleichzeitig zu laut und zu schnell an. Zwei Freunde verlieren sich in endlosen News-Feeds und finden erst beim nächtlichen Spaziergang wieder zueinander. Der Song erzählt vom Wunsch, zwischen Krisenmeldungen Menschlichkeit zu behalten.'
+      : 'In a city flooded with headlines, everything feels too loud and too fast at once. Two friends drift apart in endless news feeds and reconnect on a late-night walk. The song captures the need to stay human in the middle of constant crisis updates.',
+    wildcard: lang === 'de'
+      ? 'Eine Frau findet in einer alten Jacke einen Einkaufszettel ihrer verstorbenen Mutter. Jeder Punkt auf der Liste löst eine Erinnerung aus, die plötzlich wieder lebendig wirkt. Am Ende wird aus einem gewöhnlichen Supermarktgang ein stilles Gespräch über Liebe und Abschied.'
+      : 'A woman finds an old grocery list from her late mother inside a jacket pocket. Every item unlocks a memory that feels suddenly alive again. What starts as a routine store visit turns into a quiet conversation about love and letting go.',
+  };
+
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    return {
+      musicAnecdote: cleanText(String(parsed.musicAnecdote ?? fallback.musicAnecdote)).trim(),
+      currentAffairs: cleanText(String(parsed.currentAffairs ?? fallback.currentAffairs)).trim(),
+      wildcard: cleanText(String(parsed.wildcard ?? fallback.wildcard)).trim(),
+    };
+  } catch {
+    return fallback;
+  }
+};
+
 export const analyzeTopic = async (topic: string, isInstrumental: boolean = false): Promise<Partial<SongConcept>> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
