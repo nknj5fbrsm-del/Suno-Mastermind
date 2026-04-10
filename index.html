@@ -465,6 +465,34 @@
             background: rgba(10, 10, 18, 0.78) !important;
             border-color: rgba(255,255,255,0.14) !important;
         }
+        .lyrics-code-wrapper {
+            min-height: 0;
+            height: 100%;
+            font-family: "JetBrains Mono", "Fira Code", "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e4e4e7;
+        }
+        .lyrics-code-wrapper textarea,
+        .lyrics-code-wrapper pre {
+            margin: 0 !important;
+            outline: none !important;
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+        }
+        .lyrics-code-textarea {
+            caret-color: #fff;
+        }
+        .lyrics-code-textarea::selection {
+            background: rgba(168,85,247,0.25);
+        }
+        .lyrics-code-pre {
+            color: #e4e4e7;
+            pointer-events: none;
+        }
+        .cm-suno-tag-primary { color: #a855f7; font-weight: 700; }
+        .cm-suno-tag-secondary { color: #ec4899; font-weight: 700; }
         @media (max-width: 640px) {
             .mobile-dropdown-fix {
                 position: fixed !important;
