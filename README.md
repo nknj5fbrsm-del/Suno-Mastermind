@@ -1,13 +1,13 @@
 # Suno Mastermind
 
-KI-gestützter Workflow für Song-Erstellung: Lyrics, Style-Prompt und Cover-Art – optimiert für **Suno V5**.  
+KI-gestützter Workflow für Song-Erstellung: Lyrics, Style-Prompt und Cover-Art – optimiert für **Suno V 5.5**.  
 React + TypeScript (Vite), Google Gemini API (BYOK).
 
 ## Features
 
 - **Konzept:** Thema eingeben oder per Würfel; optional Referenz-Audio – KI analysiert Genre, Tempo, Stimmung.
 - **Lyrics:** Zwei Varianten beim Erstellen, eine wählen; Strukturvorlagen (Pop, Ballade, Rock, …); Tags & Live-Edit.
-- **Style Prompt:** Kompakter V5-Prompt mit Weirdness/Influence, Begründung, Song-Beschreibung.
+- **Style Prompt:** Kompakter V 5.5-Prompt mit Weirdness/Influence, Begründung, Song-Beschreibung.
 - **Cover & Story:** KI-Cover, eigener Bildprompt möglich; Songstory editierbar.
 - **Für Suno:** Auf der letzten Seite alles kopieren (Lyrics, Clean Text, Style, Story, Cover-Download) und Suno öffnen.
 

@@ -21,7 +21,7 @@ export const t = {
     },
     dashboard: {
       headline: 'Dein Song beginnt hier.',
-      sub: 'KI-gestützte Lyrics, Style-Prompts & Cover-Art – optimiert für Suno V5.',
+      sub: 'KI-gestützte Lyrics, Style-Prompts & Cover-Art – optimiert für Suno V 5.5.',
       newProject: 'Neues Projekt',
       recentTitle: 'Zuletzt geöffnet',
       recentSub: 'Schnell weitermachen, wo du aufgehört hast.',
@@ -59,11 +59,11 @@ export const t = {
         { date: '2026-02-25', text: 'Referenz-Mixer im Konzept: Bis zu 3 Tracks per Datei-Upload oder Suno-Link (auch Share-Link suno.com/s/…). KI synthetisiert gemeinsame Stil-DNA und füllt Genre, Mood, Tempo & Instrumente.' },
         { date: '2026-02-24', text: 'Kreativ-Boost im Konzept: KI schlägt einen unerwarteten, aber musikalisch sinnvollen Twist mit Instrumenten, Genres und Produktionstipps vor.' },
         { date: '2026-02-24', text: 'Genre-Fusion Lab im Konzept: Aus mehreren Genres wird ein Hybrid-Style mit passendem BPM, Mood und Instrumenten generiert.' },
-        { date: '2026-02-24', text: 'Style-Prompt: Anreichern-Pill und Würfel pro Variante, Soft-Limit 200 Zeichen (Hard-Limit 1000) für Suno V5 Style-Feld.' },
+        { date: '2026-02-24', text: 'Style-Prompt: Anreichern-Pill und Würfel pro Variante, Soft-Limit 200 Zeichen (Hard-Limit 1000) für Suno V 5.5 Style-Feld.' },
         { date: '2026-02-24', text: 'Lyrics: Regie anreichern direkt im Varianten-Modal – Regie-Tags in [ ] werden detailreicher, gesungene Zeilen bleiben unverändert.' },
         { date: '2026-02-22', text: 'Cover-Art: Free-Tier-optimierte Gemini-Calls mit Fallback und Verbot von Text im Bild für saubere Cover.' },
         { date: '2026-02-20', text: 'Audio-Analyse im Konzept: Referenz-Track hochladen – KI erkennt Genre, Tempo, Stimmung & Instrumente und befüllt die Felder.' },
-        { date: '2026-02-20', text: 'Create-Flow: Zwei Lyrics-Varianten mit passendem Style-Prompt, alles durchgängig für Suno V5 optimiert.' },
+        { date: '2026-02-20', text: 'Create-Flow: Zwei Lyrics-Varianten mit passendem Style-Prompt, alles durchgängig für Suno V 5.5 optimiert.' },
       ],
     },
     tutorial: {
@@ -177,7 +177,7 @@ export const t = {
       nextToStyle: 'Zum Style-Tab',
     },
     style: {
-      pill: 'Style Prompt', engine: 'V5 Engine', regenerate: 'Neu generieren',
+      pill: 'Style Prompt', engine: 'V 5.5 Engine', regenerate: 'Neu generieren',
       generateFirst: 'Style wird beim Klick auf „Weiter“ im Lyrics-Tab generiert.',
       generateNow: 'Jetzt generieren',
       copy: 'Prompt kopieren', copied: 'Kopiert!',
@@ -298,7 +298,7 @@ export const t = {
     },
     dashboard: {
       headline: 'Your song starts here.',
-      sub: 'AI-powered lyrics, style prompts & cover art – optimized for Suno V5.',
+      sub: 'AI-powered lyrics, style prompts & cover art – optimized for Suno V 5.5.',
       newProject: 'New Project',
       recentTitle: 'Recently opened',
       recentSub: 'Continue where you left off.',
@@ -336,11 +336,11 @@ export const t = {
         { date: '2026-02-25', text: 'Reference Mixer in the Concept step: up to 3 tracks via file upload or Suno link (including Share link suno.com/s/…). AI synthesizes a shared style DNA and fills genre, mood, tempo & instruments.' },
         { date: '2026-02-24', text: 'Creative Boost in the Concept step: AI proposes a surprising but musically solid twist with instruments, genres and production tips.' },
         { date: '2026-02-24', text: 'Genre Fusion Lab in the Concept step: turn multiple genres into a hybrid style with matching BPM, mood and instrumentation.' },
-        { date: '2026-02-24', text: 'Style prompt: Enrich pill and dice per variant, soft limit 200 characters (hard limit 1000) tailored for Suno V5.' },
+        { date: '2026-02-24', text: 'Style prompt: Enrich pill and dice per variant, soft limit 200 characters (hard limit 1000) tailored for Suno V 5.5.' },
         { date: '2026-02-24', text: 'Lyrics: Enrich direction inside the variants modal – [ ] regie tags become more detailed, sung lines stay untouched.' },
         { date: '2026-02-22', text: 'Cover art: Free-tier-optimized Gemini calls with fallback and strict “no text in image” enforcement for clean covers.' },
         { date: '2026-02-20', text: 'Audio analysis in the Concept step: upload a reference track – AI detects genre, tempo, mood & instruments and fills in the fields.' },
-        { date: '2026-02-20', text: 'Create flow: two lyrics variants with a matching style prompt, fully optimized for Suno V5.' },
+        { date: '2026-02-20', text: 'Create flow: two lyrics variants with a matching style prompt, fully optimized for Suno V 5.5.' },
       ],
     },
     tutorial: {
@@ -454,7 +454,7 @@ export const t = {
       nextToStyle: 'To Style tab',
     },
     style: {
-      pill: 'Style Prompt', engine: 'V5 Engine', regenerate: 'Regenerate',
+      pill: 'Style Prompt', engine: 'V 5.5 Engine', regenerate: 'Regenerate',
       generateFirst: 'Style is generated when you click „Next“ on the Lyrics step.',
       generateNow: 'Generate now',
       copy: 'Copy Prompt', copied: 'Copied!',

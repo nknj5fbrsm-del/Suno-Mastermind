@@ -142,7 +142,7 @@ Hier siehst du den **Style-Prompt** für Suno plus Weirdness/Influence und **Son
 | **Zwei Varianten** | Passend zu Lyric A und B; pro Variante bearbeiten, anreichern oder neu würfeln. |
 | **Anreichern** | KI macht den Prompt detaillierter (BPM, Feel, Instrumente), ohne den Kern zu ändern. |
 | **Würfel** | Diese Style-Variante neu generieren (zum Konzept + zugehöriger Lyric-Variante). |
-| **Zeichenlimit** | z. B. „/ 200 empf. · max 1000“ für Suno V5. |
+| **Zeichenlimit** | z. B. „/ 200 empf. · max 1000“ für Suno V 5.5. |
 
 Style-Prompt und Song-Beschreibung fließen in **Cover & Story** ein (Story-Text, Copy-Pills).
 

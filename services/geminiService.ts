@@ -104,7 +104,7 @@ const SYSTEM_INSTRUCTION = `1. Rollendefinition & Expertise
 • Tags in [ ] oft **eine Zeile pro Tag** (Stacking); danach optional eine Leerzeile, dann der reine Lyric-Block mit **bewusstem** Umbruch-Groove.
 
 5. Kompression & Limitierung (App-Logik)
-• Zeichen-Management: Halte den Style-Prompt unter 200 Zeichen (Suno V5 erlaubt max. 1000, empfohlen 80–200 für Fokus).
+• Zeichen-Management: Halte den Style-Prompt unter 200 Zeichen (Suno V 5.5 erlaubt max. 1000, empfohlen 80–200 für Fokus).
 • Abkürzungen: Verwende im Bedarfsfall gängige Musiker-Kürzel (z. B. tpt, sax, pno, dr).
 • BPM & Feel: Jedes Ergebnis muss eine BPM-Zahl und eine Angabe zum Rhythmus-Gefühl (z. B. swing, straight, halftime) enthalten.
 
@@ -345,7 +345,7 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
     : " Gib auch passende language- und vocals-Vorschläge.";
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Analyse für Suno V5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
+    contents: `Analyse für Suno V 5.5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
 - Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (z. B. Jazz, Brass Band, Latin Brass).
 - vocals: Gib für jede Gesangsstimme einen EINDEUTIGEN Vornamen oder Künstlernamen, der in Lyrics und Style EXAKT so übernommen wird (z. B. ["Herrmann (Bariton)"] oder Duett ["Herrmann (Bariton)", "Sonja (Sopran)"]). Dieser Name ist verbindlich – in den folgenden Schritten (Lyrics, Style) darf kein anderer Name verwendet oder erfunden werden.
 - Falls das Thema einen Künstler referenziert (z. B. "wie Michael Jackson"), kann dieser Vorname (Michael) als vocals-Name genutzt werden; ansonsten wähle einen passenden, eindeutigen Namen.`,
@@ -404,7 +404,7 @@ export const analyzeAudio = async (
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `Analysiere dieses Audiofile präzise als erfahrener Musikproduzent für Suno V5.
+  const prompt = `Analysiere dieses Audiofile präzise als erfahrener Musikproduzent für Suno V 5.5.
 
 Erstelle folgende Analyse:
 - genre: Genau passende Genre-Bezeichnungen (max. 3, z. B. "Indie Rock", "Lo-Fi Hip Hop")
@@ -485,7 +485,7 @@ export const generateLyrics = async (
 const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns, brass) in den Regie-Tags, außer das Genre verlangt es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für Pop, Rock, Ballade, Indie, Lo-Fi, Singer-Songwriter etc. nur Rhythmusgruppe, Piano, Gitarre, Strings – kein Brass.\n`;
 
   const prompt = concept.isInstrumental
-    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V5. Thema: ${concept.topic}. Genre: ${genreStr}.
+    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V 5.5. Thema: ${concept.topic}. Genre: ${genreStr}.
 - Erzeuge nur eine Abfolge von Regie-Tags in eckigen Klammern, z. B. [Intro], [Verse], [Chorus], [Bridge], [Solo], [Outro].
 - In jedes Tag gehören präzise Spielanweisungen für die Begleitung, z. B.:
   [Intro · Rhodes pno, upright bass, soft brush dr, close-miked, dry room]
@@ -635,7 +635,7 @@ export const generateStylePrompt = async (
   let accumulated = "";
   const stream = await withRetry(() => ai.models.generateContentStream({
     model: TEXT_MODEL,
-    contents: `Suno V5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}
+    contents: `Suno V 5.5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}
 - Aufgabe: Erzeuge einen extrem kompakten, hochpräzisen Style-Prompt für eine Musik-KI wie Suno.
 
 - SPRACHE – UNBEDINGT BEACHTEN:
@@ -643,7 +643,7 @@ export const generateStylePrompt = async (
   · Die Felder promptEffect, recommendationReason und songDescription MÜSSEN ausschließlich auf DEUTSCH formuliert sein (Wirkung & Technik, Warum diese Empfehlung, Song-Story). Diese Texte können in der App per Sprachumschalter angezeigt werden.
 
 - DER STYLE-PROMPT (Feld \"prompt\" im JSON, nur Englisch):
-  · Ziel: 80–200 Zeichen (kompakt und fokussiert). Suno V5 erlaubt bis zu 1000 Zeichen, aber kürzere Prompts erzeugen bessere Ergebnisse. Halte den Prompt unter ${MAX_STYLE_PROMPT_LENGTH} Zeichen.
+  · Ziel: 80–200 Zeichen (kompakt und fokussiert). Suno V 5.5 erlaubt bis zu 1000 Zeichen, aber kürzere Prompts erzeugen bessere Ergebnisse. Halte den Prompt unter ${MAX_STYLE_PROMPT_LENGTH} Zeichen.
   · Immer eine konkrete BPM-Zahl (z. B. 125 BPM), ein klares Feel (swing, straight, halftime).
   · Wichtige Instrumentierung und Artikulation (z. B. Rhodes pno, upright bass, marcato brass, tight drums). Musiker-Abkürzungen erlaubt (tpt, sax, pno, dr).
   · Exaktes musikalisches Vokabular (minor 9th chords, syncopated slap bass, ghost notes, close-miked, plate reverb).
@@ -723,7 +723,7 @@ export const suggestStyleTags = async (concept: SongConcept, _lyrics: string): P
   const ai = new GoogleGenAI({ apiKey });
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Suggest 5 professional Suno V5 style tags for: Topic "${concept.topic}", Genres "${concept.genre.join(", ")}". Focus on instrumentation and recording techniques.`,
+    contents: `Suggest 5 professional Suno V 5.5 style tags for: Topic "${concept.topic}", Genres "${concept.genre.join(", ")}". Focus on instrumentation and recording techniques.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       responseMimeType: "application/json",
@@ -751,10 +751,10 @@ export const enrichStylePrompt = async (prompt: string, concept: SongConcept): P
     : " No trumpet/brass/horns unless the genre demands it.";
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Current Suno V5 style prompt: "${prompt}"
+    contents: `Current Suno V 5.5 style prompt: "${prompt}"
 Genre context: ${concept.genre.join(", ")}. Topic: "${concept.topic}".
 
-Task: Enrich this style prompt for Suno V5. Make it more specific and professional:
+Task: Enrich this style prompt for Suno V 5.5. Make it more specific and professional:
 - Add precise BPM and feel if missing (e.g. "118 BPM, halftime feel").
 - Add specific instruments (e.g. Rhodes pno, upright bass, tight brush drums) instead of vague terms.
 - Add articulation cues (staccato, legato, muted, fingerpicked).
@@ -788,7 +788,7 @@ Current mood: ${concept.mood.length ? concept.mood.join(', ') : 'not set'}
 
 Create a unique genre fusion from these genres. Think like a visionary producer who blends styles in unexpected ways.`,
     config: {
-      systemInstruction: `You are a genre-fusion specialist for Suno V5 music production. Your task is to take 2+ genres and create a unique, cohesive fusion.
+      systemInstruction: `You are a genre-fusion specialist for Suno V 5.5 music production. Your task is to take 2+ genres and create a unique, cohesive fusion.
 
 Rules:
 - fusionName: A catchy, short hybrid genre name in English (2-4 words, e.g. "Tropical Jazz Trap", "Cinematic Lo-Fi Soul")
@@ -857,7 +857,7 @@ Rules:
 - The twist must COMPLEMENT what exists, not replace it
 - Be surprising but musically plausible – think "I would never have thought of that, but it's genius"
 - Vary wildly between runs (use the seed for variety): sometimes suggest an instrument, sometimes a genre twist, sometimes a production technique, sometimes a vocal idea
-- Keep suggestions Suno V5 compatible`,
+- Keep suggestions Suno V 5.5 compatible`,
       ...DEFAULT_THINKING,
       temperature: 1.2,
       responseMimeType: "application/json",
@@ -916,7 +916,7 @@ Rules:
 - tempo: 1-2 entries combining the tempos, e.g. "88 BPM, slow swing" or "120–128 BPM, driving"
 - instrumentation: 4-8 specific instruments that define the shared sonic identity (e.g. "Rhodes Piano", "Upright Bass", "Brush Kit")
 - regieSeed: One Suno Regie tag in square brackets capturing the shared production feel, e.g. "[Verse · Rhodes pno, upright bass, brush dr, close-miked, dry room]"
-- stylePromptSeed: A 60-150 char Suno V5 style prompt capturing this sonic DNA (English only, comma-separated descriptors, no brackets)
+- stylePromptSeed: A 60-150 char Suno V 5.5 style prompt capturing this sonic DNA (English only, comma-separated descriptors, no brackets)
 - fusionLabel: A 2-4 word catchy label for this synthesized style (English)
 Respond only with valid JSON.`,
       responseMimeType: "application/json",

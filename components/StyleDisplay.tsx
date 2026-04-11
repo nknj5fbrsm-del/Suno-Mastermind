@@ -139,7 +139,7 @@ const StyleCard: React.FC<{
             <span>{tr.lyrics.editableHint}</span>
           </div>
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-suno-primary flex items-center gap-1.5 mb-1.5">
-            <i className="fas fa-terminal text-[8px]"></i> Suno V5 Input
+            <i className="fas fa-terminal text-[8px]"></i> Suno V 5.5 Input
           </p>
           <div className="relative">
             <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-full transition-colors ${isOverHard ? 'bg-red-500' : isOverSoft ? 'bg-amber-500' : `bg-${accent}`}`}></div>
@@ -421,7 +421,7 @@ const StyleDisplay: React.FC<StyleDisplayProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-suno-primary flex items-center gap-1.5">
-              <i className="fas fa-terminal text-[8px]"></i> Suno V5 Input
+              <i className="fas fa-terminal text-[8px]"></i> Suno V 5.5 Input
             </p>
             <div className={`px-2.5 py-1 rounded-xl text-[9px] font-black border transition-all ${
               isOverHard ? 'bg-red-500/12 text-red-500 border-red-500/25 animate-pulse' : isOverSoft ? 'bg-amber-500/12 text-amber-600 border-amber-500/25' : 'glass-btn text-zinc-500 border-white/0'
