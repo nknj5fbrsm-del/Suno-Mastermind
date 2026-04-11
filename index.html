@@ -465,6 +465,7 @@
             background: rgba(10, 10, 18, 0.78) !important;
             border-color: rgba(255,255,255,0.14) !important;
         }
+        /* Lyrics-Overlay: gleiche Typometrie für <pre> und Textarea (react-simple-code-editor). */
         .lyrics-code-wrapper {
             min-height: 0;
             height: 100%;
@@ -472,6 +473,18 @@
             font-size: 13px;
             line-height: 1.6;
             color: #e4e4e7;
+            /* Scrollen auf iOS ohne „Stocken“ */
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Mobile: min. 16px verhindert iOS-Safari-Zoom beim Fokus in der Textarea; Sync-Höhe passt sich an */
+        @media (max-width: 768px) {
+            .lyrics-code-wrapper {
+                font-size: 16px;
+                line-height: 1.55;
+            }
+            .lyrics-code-wrapper textarea.lyrics-code-textarea {
+                touch-action: manipulation;
+            }
         }
         .lyrics-code-wrapper textarea,
         .lyrics-code-wrapper pre {
@@ -483,6 +496,9 @@
         }
         .lyrics-code-textarea {
             caret-color: #fff;
+            /* Explizit: Fokus/Klick zum Platzieren des Cursors (Overlay-Editor, WebKit) */
+            user-select: text !important;
+            -webkit-user-select: text !important;
         }
         .lyrics-code-textarea::selection {
             background: rgba(168,85,247,0.25);
@@ -490,6 +506,11 @@
         .lyrics-code-pre {
             color: #e4e4e7;
             pointer-events: none;
+            z-index: 0;
+        }
+        /* Textarea liegt über dem <pre> (Klicks / Caret) */
+        .lyrics-code-wrapper textarea.lyrics-code-textarea {
+            z-index: 1;
         }
         .cm-suno-tag-primary { color: #a855f7; font-weight: 700; }
         .cm-suno-tag-secondary { color: #ec4899; font-weight: 700; }

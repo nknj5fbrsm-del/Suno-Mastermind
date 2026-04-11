@@ -4,6 +4,7 @@ import { SongConcept } from '../types';
 import { suggestStyleTags } from '../services/geminiService';
 import { useLang } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
+import LyricsTipTutorialBody from './LyricsTipTutorialBody';
 
 interface LyricDisplayProps {
   lyrics: string;
@@ -33,6 +34,7 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isLyricsTutorialOpen, setIsLyricsTutorialOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Saved when textarea is blurred (clicking a tag button blurs it, resetting selectionStart to 0)
   const savedSelectionRef = useRef<{ start: number; end: number; scroll: number }>({ start: 0, end: 0, scroll: 0 });
@@ -125,79 +127,6 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
     handleChange(newVal);
   };
 
-  const insertBlock = (text: string) => {
-    const { start, end, scroll } = savedSelectionRef.current;
-    const block = `${text}\n`;
-    const newVal = editableLyrics.substring(0, start) + block + editableLyrics.substring(end);
-    skipSyncRef.current = true;
-    restoreCursorRef.current = { pos: start + block.length, scroll };
-    handleChange(newVal);
-  };
-
-  const isTagLine = (line: string) => /^\s*\[[^\]]+\]\s*$/.test(line.trim());
-
-  const applyFlowProfile = (mode: 'tight' | 'balanced' | 'breathing') => {
-    const normalized = editableLyrics.replace(/\r\n/g, '\n');
-    if (mode === 'tight') {
-      handleChange(normalized.replace(/\n{2,}/g, '\n'));
-      return;
-    }
-    if (mode === 'balanced') {
-      handleChange(normalized.replace(/\n{3,}/g, '\n\n'));
-      return;
-    }
-    const lines = normalized.split('\n');
-    const next: string[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const current = lines[i];
-      const following = lines[i + 1];
-      next.push(current);
-      if (
-        following !== undefined &&
-        current.trim() &&
-        following.trim() &&
-        !isTagLine(current) &&
-        !isTagLine(following)
-      ) {
-        next.push('');
-      }
-    }
-    handleChange(next.join('\n').replace(/\n{3,}/g, '\n\n'));
-  };
-
-  const sectionStacks = [
-    { id: 'stackVerse', tags: ['Verse · intimate lead vocal', 'Light room reverb', 'Subtle double-track', 'Warm tape saturation'] },
-    { id: 'stackChorus', tags: ['Chorus · wide harmonies', 'Octave doubles', 'Cymbal lift', 'Longer plate reverb'] },
-    { id: 'stackBridge', tags: ['Bridge · dynamic drop', 'Sparse drums', 'Filtered texture', 'Final crescendo'] },
-  ] as const;
-
-  const flowIssues = (() => {
-    const text = editableLyrics.replace(/\r\n/g, '\n');
-    const lines = text.split('\n');
-    let hasInlineRegie = false;
-    let lowTagDensity = false;
-    let sectionTagCount = 0;
-    let inSection = false;
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (!line) continue;
-      if (isTagLine(line)) {
-        const sectionLike = /^\[(intro|verse|pre-chorus|chorus|bridge|solo|outro|end|break)/i.test(line);
-        if (sectionLike) {
-          if (inSection && sectionTagCount > 0 && sectionTagCount < 3) lowTagDensity = true;
-          inSection = true;
-          sectionTagCount = 0;
-        } else if (inSection) {
-          sectionTagCount += 1;
-        }
-      } else if (/\[[^\]]+\]/.test(line)) {
-        hasInlineRegie = true;
-      }
-    }
-    if (inSection && sectionTagCount > 0 && sectionTagCount < 3) lowTagDensity = true;
-    return { hasInlineRegie, lowTagDensity };
-  })();
-
   return (
     <section className="space-y-5 animate-fade-up">
 
@@ -247,6 +176,32 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
             />
           </div>
         </div>
+      )}
+
+      {initialLyrics && (
+      <div className="glass-card rounded-3xl p-6 space-y-4">
+        <button
+          type="button"
+          onClick={() => setIsLyricsTutorialOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 group min-w-0 text-left"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-2xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+              <i className="fas fa-lightbulb text-suno-primary text-sm"></i>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">{tr.lyrics.lyricsTipTutorialTitle}</p>
+          </div>
+          <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLyricsTutorialOpen ? 'rotate-180' : ''}`}></i>
+        </button>
+        {isLyricsTutorialOpen && (
+          <div className="rounded-2xl px-4 py-3 bg-white/40 dark:bg-white/5 border border-white/50 dark:border-white/10">
+            <LyricsTipTutorialBody
+              sections={tr.lyrics.lyricsTipTutorialSections}
+              tagline={tr.lyrics.lyricsTipTutorialTagline}
+            />
+          </div>
+        )}
+      </div>
       )}
 
       {/* Leer: Lyrics generieren (Create-Flow) */}
@@ -329,50 +284,6 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
               className="h-full px-2.5 rounded-l-none rounded-r-xl glass-btn text-zinc-500 hover:bg-suno-primary hover:text-white text-[10px] transition-all border-l-0">
               <i className="fas fa-plus"></i>
             </button>
-          </div>
-        </div>
-
-        {/* Suno-Lyrics Hilfen */}
-        <div className="pt-2 border-t border-white/20 dark:border-white/8 space-y-2">
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-suno-primary">{tr.lyrics.sunoToolsTitle}</p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">{tr.lyrics.flowControl}</span>
-            <button type="button" onClick={() => applyFlowProfile('tight')} className="tag-pill text-zinc-600 dark:text-zinc-300">
-              {tr.lyrics.flowTight}
-            </button>
-            <button type="button" onClick={() => applyFlowProfile('balanced')} className="tag-pill text-zinc-600 dark:text-zinc-300">
-              {tr.lyrics.flowBalanced}
-            </button>
-            <button type="button" onClick={() => applyFlowProfile('breathing')} className="tag-pill text-zinc-600 dark:text-zinc-300">
-              {tr.lyrics.flowBreathing}
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">{tr.lyrics.stackHelper}</span>
-            {sectionStacks.map(({ id, tags }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => insertBlock(tags.map(tag => `[${tag}]`).join('\n'))}
-                className="tag-pill text-zinc-600 dark:text-zinc-300"
-              >
-                {tr.lyrics[id]}
-              </button>
-            ))}
-          </div>
-          <div className="rounded-xl px-3 py-2 bg-white/40 dark:bg-white/5 border border-white/50 dark:border-white/10">
-            <p className="text-[9px] font-black uppercase tracking-[0.12em] text-zinc-600 dark:text-zinc-300">{tr.lyrics.qualityCheckTitle}</p>
-            <div className="mt-1.5 space-y-1">
-              {!flowIssues.lowTagDensity && !flowIssues.hasInlineRegie && (
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-400">{tr.lyrics.qualityOk}</p>
-              )}
-              {flowIssues.lowTagDensity && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">{tr.lyrics.qualityNeedsTagDensity}</p>
-              )}
-              {flowIssues.hasInlineRegie && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">{tr.lyrics.qualityHasInlineRegie}</p>
-              )}
-            </div>
           </div>
         </div>
       </div>
