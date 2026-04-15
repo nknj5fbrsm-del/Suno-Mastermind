@@ -36,6 +36,8 @@ export interface GeneratedStyle {
   /** Kurze Begründung, warum die KI diese Weirdness- und Influence-Werte empfiehlt. */
   recommendationReason?: string;
   songDescription: string;
+  /** Bis zu 3 optionale Songtitel-Vorschläge (separat von der Song-Story). */
+  titleSuggestions?: string[];
 }
 
 export interface SongHistoryItem {

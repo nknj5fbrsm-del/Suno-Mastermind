@@ -56,12 +56,6 @@ const StyleDictionary: React.FC<StyleDictionaryProps> = ({
   return (
     <div className="glass-card rounded-2xl overflow-hidden">
       <div className="p-4 border-b border-white/10 dark:border-white/5 space-y-3">
-        <div className="flex items-center gap-2">
-          <i className="fas fa-book text-suno-primary text-sm"></i>
-          <h3 className="text-xs font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
-            {tr.style.dictionaryTitle}
-          </h3>
-        </div>
         {onInsertTargetChange && variantLabels && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[9px] font-bold uppercase text-zinc-500 dark:text-zinc-400">

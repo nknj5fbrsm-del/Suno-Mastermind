@@ -48,7 +48,7 @@ function normalizeTempoToSingleOrRange(arr: string[]): string[] {
 // ─── AUDIO UPLOAD ZONE ────────────────────────────────────────────────────
 const ACCEPTED_AUDIO = '.mp3,.wav,.ogg,.flac,.aac,.webm,.m4a';
 const MAX_FILE_MB = 18;
-const ACCEPTED_IMAGE = 'image/jpeg,image/png,image/webp';
+const ACCEPTED_IMAGE = 'image/*,.heic,.heif';
 const MAX_IMAGE_MB = 8;
 
 interface AudioFile {
@@ -85,28 +85,65 @@ const readAudioFile = (file: File): Promise<AudioFile> =>
 const readInspirationImageFile = (file: File): Promise<InspirationImageFile> =>
   new Promise((resolve, reject) => {
     const type = (file.type || '').toLowerCase();
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
-      reject(new Error('INVALID_FILE_TYPE'));
-      return;
-    }
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    const isKnownImage = type.startsWith('image/') || ['heic', 'heif'].includes(ext);
+    if (!isKnownImage) { reject(new Error('INVALID_FILE_TYPE')); return; }
     if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
       reject(new Error('FILE_TOO_LARGE'));
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = String(e.target?.result || '');
+    const finalize = (dataUrl: string, mimeType: string) => {
       const base64 = dataUrl.split(',')[1] || '';
       resolve({
         name: file.name,
         sizeMB: Math.round((file.size / 1024 / 1024) * 10) / 10,
         base64,
-        mimeType: file.type || 'image/jpeg',
+        mimeType,
         dataUrl,
       });
     };
-    reader.onerror = () => reject(new Error('READ_ERROR'));
-    reader.readAsDataURL(file);
+    const readAsDataUrl = () => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = String(e.target?.result || '');
+        finalize(dataUrl, file.type || 'image/jpeg');
+      };
+      reader.onerror = () => reject(new Error('READ_ERROR'));
+      reader.readAsDataURL(file);
+    };
+    const normalizeViaCanvas = async () => {
+      try {
+        const blobUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('READ_ERROR');
+            ctx.drawImage(img, 0, 0);
+            const jpegData = canvas.toDataURL('image/jpeg', 0.92);
+            URL.revokeObjectURL(blobUrl);
+            finalize(jpegData, 'image/jpeg');
+          } catch {
+            URL.revokeObjectURL(blobUrl);
+            reject(new Error('READ_ERROR'));
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error('READ_ERROR'));
+        };
+        img.src = blobUrl;
+      } catch {
+        reject(new Error('READ_ERROR'));
+      }
+    };
+
+    const isDirectSupported = ['image/jpeg', 'image/png', 'image/webp'].includes(type);
+    if (isDirectSupported) readAsDataUrl();
+    else normalizeViaCanvas();
   });
 
 // ─── REFERENZ-MIXER ───────────────────────────────────────────────────────
@@ -607,6 +644,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isImageDragOver, setIsImageDragOver] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Genre-Fusion Lab
@@ -729,6 +767,16 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     }));
     showToast(tr.concept.imageApplySuccess, 'success');
     setIsImageModalOpen(false);
+  };
+
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsImageDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await handleImageFile(file);
+    }
   };
 
   const toggle = (key: keyof Pick<SongConcept, 'genre'|'mood'|'excludedStyles'|'language'|'vocals'|'tempo'|'instrumentation'>, val: string) => {
@@ -1157,6 +1205,38 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
                 e.target.value = '';
               }}
             />
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsImageDragOver(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsImageDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsImageDragOver(false);
+              }}
+              onDrop={handleImageDrop}
+              className={`rounded-2xl border border-dashed px-4 py-5 text-center transition-all ${
+                isImageDragOver
+                  ? 'border-suno-secondary bg-suno-secondary/15'
+                  : 'border-zinc-600 bg-white/[0.02]'
+              }`}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
+                <i className="fas fa-cloud-arrow-up mr-2 text-suno-secondary"></i>
+                Bild hierher ziehen & ablegen
+              </p>
+              <p className="mt-1 text-[9px] text-zinc-400">
+                JPG, PNG, WEBP, HEIC oder HEIF (max. 8 MB)
+              </p>
+            </div>
 
             {inspirationImage && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">

@@ -221,8 +221,8 @@ function rememberRandomIdea(idea: string): void {
 }
 
 function buildRandomStoryAxes(lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') {
-  const settingsDe = ['Proberaum', 'Backstage', 'Nachtzug', 'Kleinstadt-Bar', 'U-Bahn', 'Supermarkt um Mitternacht', 'Büroflur', 'Dorfplatz', 'Raststätte', 'Küche bei Regen', 'Parkhausdach', 'Bahnhof'];
-  const settingsEn = ['rehearsal room', 'backstage hallway', 'night train', 'small-town bar', 'subway platform', 'midnight supermarket', 'office corridor', 'village square', 'highway rest stop', 'kitchen in the rain', 'parking garage roof', 'train station'];
+  const settingsDe = ['Nachtzug', 'Kleinstadt-Bar', 'U-Bahn', 'Supermarkt um Mitternacht', 'Büroflur', 'Dorfplatz', 'Raststätte', 'Küche bei Regen', 'Parkhausdach', 'Bahnhof', 'Kiosk kurz vor Feierabend', 'Wohnblock-Innenhof'];
+  const settingsEn = ['night train', 'small-town bar', 'subway platform', 'midnight supermarket', 'office corridor', 'village square', 'highway rest stop', 'kitchen in the rain', 'parking garage roof', 'train station', 'corner shop before closing', 'apartment courtyard'];
 
   const conflictsDe = ['zu spät für den entscheidenden Moment', 'falsche Nachricht zur falschen Zeit', 'eine alte Schuld taucht wieder auf', 'ein Versprechen wird auf die Probe gestellt', 'zwei Ziele passen nicht mehr zusammen', 'ein Missverständnis eskaliert', 'Mut gegen Sicherheit', 'Nähe gegen Stolz'];
   const conflictsEn = ['too late for the decisive moment', 'the wrong message at the worst time', 'an old debt resurfaces', 'a promise gets tested', 'two goals no longer fit together', 'a misunderstanding escalates', 'courage versus safety', 'closeness versus pride'];
@@ -237,19 +237,19 @@ function buildRandomStoryAxes(lang: 'de' | 'en', mode: 'music' | 'current' | 'wi
   const hooksEn = ['a clear hook line that is instantly singable', 'a short, punchy chorus core', 'one central line with high recall value'];
 
   const modeAddOnDe = mode === 'music'
-    ? ['Bandprobe kurz vor Auftritt', 'Technikpanne live', 'Tourbus-Spannung', 'Backstage-Entscheidung']
+    ? ['rhythmischer Sprachfluss', 'prägnanter Refrainimpuls', 'starker Hook-Moment', 'dynamische Kontraste']
     : mode === 'current'
       ? ['gesellschaftliche Anspannung im Alltag', 'digitale Reizüberflutung', 'Streitkultur und Müdigkeit', 'öffentliche Unsicherheit privat gespiegelt']
       : mode === 'wildcard'
         ? ['ungewöhnlicher Perspektivwechsel', 'subtile Ironie im ernsten Thema', 'ein Ort als heimlicher Gegenspieler', 'Kontrast aus Wärme und Kälte']
-        : ['Musikerleben', 'Tagesgeschehen', 'Kreativer Twist', 'Alltagsdrama'];
+        : ['Alltagsdrama', 'zwischenmenschlicher Wendepunkt', 'familiärer Konflikt', 'Reise-/Ortswechsel', 'Arbeitswelt-Reibung', 'Freundschaft auf der Kippe', 'Neustart nach Rückschlag', 'kleiner Moment mit großer Wirkung'];
   const modeAddOnEn = mode === 'music'
-    ? ['band rehearsal before showtime', 'live technical breakdown', 'tour-bus tension', 'a backstage decision']
+    ? ['rhythmic language flow', 'focused chorus impulse', 'strong hook moment', 'dynamic contrast']
     : mode === 'current'
       ? ['social tension in everyday life', 'digital overstimulation', 'debate fatigue', 'public uncertainty mirrored privately']
       : mode === 'wildcard'
         ? ['an unusual perspective shift', 'subtle irony inside a serious theme', 'a location as hidden antagonist', 'contrast of warmth and cold']
-        : ['musician life', 'current-affairs mood', 'creative twist', 'everyday drama'];
+        : ['everyday drama', 'relationship turning point', 'family conflict', 'travel/location change', 'work-life friction', 'friendship on the edge', 'restart after setback', 'small moment with big impact'];
 
   if (lang === 'de') {
     return {
@@ -284,13 +284,13 @@ const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | '
       mode === 'music' ? 'Schwerpunkt: Musikerleben (Probe, Backstage, Bühne, Studio, Tourbus, Technikpanne, Booker, Club, Festival).' :
       mode === 'current' ? 'Schwerpunkt: Tagesgeschehen (Politik, Medien, Gesellschaft), aber nur als allgemeine Stimmung/Konflikt.' :
       mode === 'wildcard' ? 'Schwerpunkt: Freie kreative Szene mit starkem Hook, alltagstauglich.' :
-      'Wähle zufällig einen Schwerpunkt aus: Musikerleben, Tagesgeschehen oder kreative Alltagsszene.'
+      'Wähle zufällig einen Schwerpunkt aus dem breiten Alltagsleben (Beziehungen, Arbeit, Familie, Orte, persönliche Wendepunkte) – NICHT aus Musikerleben/Bandkontext.'
     )
     : (
       mode === 'music' ? 'Focus: musician life (rehearsal, backstage, stage, studio, tour bus, tech mishap, booking, club, festival).' :
       mode === 'current' ? 'Focus: current affairs mood (politics, media, society), but only as general tension/conflict.' :
       mode === 'wildcard' ? 'Focus: free creative scene with a strong hook, still grounded and relatable.' :
-      'Pick a random focus: musician life, current-affairs mood, or a creative grounded scene.'
+      'Pick a random focus from broad everyday life (relationships, work, family, places, personal turning points) — NOT musician/band context.'
     );
 
   return lang === 'de'
@@ -314,6 +314,7 @@ Regeln:
 - Keine vulgären/extremen Inhalte, kein Hass, keine Verleumdung.
 - Nur Story, keine Genre-/BPM-/Produktionstipps.
 - Musikalisch umsetzbar: klarer Refrain-Ansatz, singbare Kernzeile, konkrete Bildsprache statt abstrakter Theorie.
+- Wenn mode = random: KEIN Musikerleben-Kontext (keine Bandprobe, keine Bühne, kein Backstage, kein Studio, kein Tourbus, kein Auftritt).
 ${recentBlock}
 - Ausgabe als JSON mit Feld "story" in Deutsch.`
     : `Generate exactly ONE song story idea (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
@@ -336,6 +337,7 @@ Rules:
 - No vulgar/extreme content, hate, or defamation.
 - Story only, no genre/BPM/production advice.
 - Musically usable: clear chorus angle, singable core line, concrete imagery over abstract theory.
+- If mode = random: NO musician-life context (no rehearsal, stage, backstage, studio, tour bus, or gig framing).
 ${recentBlock}
 - Return JSON with field "story" in English.`;
 };
@@ -885,6 +887,7 @@ export const generateStylePrompt = async (
   · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). styleInfluence: Ganzzahl 15–85 (Prompt-Treue).
   · recommendationReason: Auf DEUTSCH – 2–4 Sätze, warum genau diese Werte für diesen Song (Thema, Genre, Stimmung), keine Floskeln.
   · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.
+  · titleSuggestions: GENAU 3 kurze, prägnante Songtitel auf DEUTSCH (nur Titel, keine Unterzeilen).
 - Instrumentierung im Style-Prompt: Keine Trompete, kein Brass, keine Bläser (tpt, trumpet, horns) außer Genre oder Lyrics-Regie verlangen es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für die meisten Genres nur Rhythmusgruppe, Keys, Gitarre, Bass, ggf. Strings.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -901,8 +904,9 @@ export const generateStylePrompt = async (
           styleInfluence: { type: Type.INTEGER },
           recommendationReason: { type: Type.STRING },
           songDescription: { type: Type.STRING },
+          titleSuggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
-        required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "recommendationReason", "songDescription"],
+        required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "recommendationReason", "songDescription", "titleSuggestions"],
       },
     },
   }));
@@ -923,6 +927,7 @@ export const generateStylePrompt = async (
     styleInfluence: 65,
     recommendationReason: "Empfehlung basierend auf Genre und Stimmung; Werte in Suno nach Bedarf anpassbar.",
     songDescription: concept.topic,
+    titleSuggestions: [],
   };
   try {
     const parsed = JSON.parse(response.text || "{}");
@@ -932,12 +937,16 @@ export const generateStylePrompt = async (
     }
     const weirdness = clampSafe(parsed.weirdness ?? defaultStyle.weirdness);
     const styleInfluence = clampSafe(parsed.styleInfluence ?? defaultStyle.styleInfluence);
+    const titleSuggestions = Array.isArray(parsed.titleSuggestions)
+      ? parsed.titleSuggestions.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean).slice(0, 3)
+      : [];
     return {
       ...defaultStyle,
       ...parsed,
       prompt: stylePrompt,
       weirdness,
       styleInfluence,
+      titleSuggestions,
     };
   } catch {
     return {

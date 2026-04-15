@@ -8,6 +8,7 @@ type CopyPillType = 'lyrics' | 'clean' | 'style' | 'story' | 'cover' | 'suno';
 interface ArtworkDisplayProps {
   coverUrl: string;
   songDescription: string;
+  titleSuggestions?: string[];
   lyrics: string;
   /** Wenn gesetzt: zwei Pills „Variante 1“ / „Variante 2“, jeweils aufklappbar mit Copy-Optionen. */
   lyricsVariants?: [string, string] | null;
@@ -32,7 +33,7 @@ const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 const SUNO_CREATE_URL = 'https://suno.com/create';
 const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/NilsP';
 
-const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
+const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, titleSuggestions = [], lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const [expandedVariant, setExpandedVariant] = useState<1 | 2 | null>(null);
@@ -390,6 +391,20 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
 
         {/* ─── Song Story ─── */}
         <div className="glass-card rounded-3xl p-5 flex flex-col gap-3">
+          {titleSuggestions.length > 0 && (
+            <div className="rounded-2xl border border-suno-primary/20 bg-suno-primary/5 p-3 space-y-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-suno-primary flex items-center gap-1.5">
+                <i className="fas fa-signature text-[8px]"></i> {tr.artwork.titleSuggestionsTitle}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {titleSuggestions.map((title, idx) => (
+                  <span key={`${title}-${idx}`} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/20 dark:bg-black/20 border border-suno-primary/25 text-zinc-700 dark:text-zinc-200">
+                    {title}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary flex items-center gap-1.5">
             <i className="fas fa-quote-left text-[8px]"></i> {tr.artwork.storyTitle}
           </p>

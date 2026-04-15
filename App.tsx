@@ -814,6 +814,7 @@ const App: React.FC = () => {
           <ArtworkDisplay
             coverUrl={coverUrl}
             songDescription={styleData.songDescription}
+            titleSuggestions={styleData.titleSuggestions}
             lyrics={lyrics}
             lyricsVariants={lyricsVariants}
             stylePrompt={styleData.prompt}
