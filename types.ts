@@ -11,6 +11,8 @@ export type ThemeName = 'mastermind' | 'sunset' | 'forest';
 
 export interface SongConcept {
   topic: string;
+  imageInspirationText?: string;
+  inspirationSource?: 'text' | 'image' | 'mixed';
   genre: string[];
   mood: string[];
   tempo: string[];

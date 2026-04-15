@@ -6,7 +6,7 @@ import {
   analyzeTopic, generateConceptStoryIdea, analyzeAudio, AudioAnalysisResult,
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
-  synthesizeReferenceStyle, ReferenceStyleResult,
+  synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
@@ -48,12 +48,22 @@ function normalizeTempoToSingleOrRange(arr: string[]): string[] {
 // ─── AUDIO UPLOAD ZONE ────────────────────────────────────────────────────
 const ACCEPTED_AUDIO = '.mp3,.wav,.ogg,.flac,.aac,.webm,.m4a';
 const MAX_FILE_MB = 18;
+const ACCEPTED_IMAGE = 'image/jpeg,image/png,image/webp';
+const MAX_IMAGE_MB = 8;
 
 interface AudioFile {
   name: string;
   sizeMB: number;
   base64: string;
   mimeType: string;
+}
+
+interface InspirationImageFile {
+  name: string;
+  sizeMB: number;
+  base64: string;
+  mimeType: string;
+  dataUrl: string;
 }
 
 const readAudioFile = (file: File): Promise<AudioFile> =>
@@ -69,6 +79,33 @@ const readAudioFile = (file: File): Promise<AudioFile> =>
       resolve({ name: file.name, sizeMB: Math.round((file.size / 1024 / 1024) * 10) / 10, base64, mimeType: file.type || 'audio/mpeg' });
     };
     reader.onerror = () => reject(new Error('Lesefehler'));
+    reader.readAsDataURL(file);
+  });
+
+const readInspirationImageFile = (file: File): Promise<InspirationImageFile> =>
+  new Promise((resolve, reject) => {
+    const type = (file.type || '').toLowerCase();
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+      reject(new Error('INVALID_FILE_TYPE'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      reject(new Error('FILE_TOO_LARGE'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = String(e.target?.result || '');
+      const base64 = dataUrl.split(',')[1] || '';
+      resolve({
+        name: file.name,
+        sizeMB: Math.round((file.size / 1024 / 1024) * 10) / 10,
+        base64,
+        mimeType: file.type || 'image/jpeg',
+        dataUrl,
+      });
+    };
+    reader.onerror = () => reject(new Error('READ_ERROR'));
     reader.readAsDataURL(file);
   });
 
@@ -567,7 +604,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const [concept, setConcept] = useState<SongConcept>(initialConcept);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isRandomizing, setIsRandomizing] = useState(false);
-  const [randomCategory, setRandomCategory] = useState(() => tr.conceptOptions.randomThemes[0]);
+  const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Genre-Fusion Lab
   const [isFusing, setIsFusing] = useState(false);
@@ -610,14 +650,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const handleRandomize = async () => {
     setIsRandomizing(true);
     try {
-      const categoryMap: Record<string, 'music' | 'current' | 'wildcard' | 'random'> = {
-        [tr.conceptOptions.randomThemes[0]]: 'random',
-        [tr.conceptOptions.randomThemes[1]]: 'music',
-        [tr.conceptOptions.randomThemes[2]]: 'current',
-        [tr.conceptOptions.randomThemes[3]]: 'wildcard',
-      };
-      const mode = categoryMap[randomCategory] ?? 'random';
-      const topic = await generateConceptStoryIdea(mode, lang);
+      const topic = await generateConceptStoryIdea('random', lang);
       setConcept(prev => ({ ...prev, topic }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -643,6 +676,59 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
       const msg = err instanceof Error ? err.message : String(err ?? '');
       showToast(tr.errors.aiErrorPrefix + msg, 'error');
     } finally { setIsAnalyzing(false); }
+  };
+
+  const handleImageFile = async (file: File) => {
+    try {
+      const img = await readInspirationImageFile(file);
+      setInspirationImage(img);
+      setConcept(prev => ({
+        ...prev,
+        imageInspirationText: prev.imageInspirationText ?? '',
+        inspirationSource: prev.inspirationSource ?? 'text',
+      }));
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'INVALID_FILE_TYPE') showToast(tr.concept.imageInvalidType, 'error');
+      else if (code === 'FILE_TOO_LARGE') showToast(tr.concept.imageTooLarge, 'error');
+      else showToast(tr.concept.imageReadError, 'error');
+    }
+  };
+
+  const handleAnalyzeImage = async () => {
+    if (!inspirationImage || isAnalyzingImage) return;
+    setIsAnalyzingImage(true);
+    try {
+      const result = await analyzeInspirationImage(inspirationImage.base64, inspirationImage.mimeType, lang);
+      const idea = result.songIdeaPrompt || '';
+      setConcept(prev => ({
+        ...prev,
+        imageInspirationText: idea,
+        inspirationSource: prev.topic.trim() ? 'mixed' : 'image',
+      }));
+      showToast(tr.concept.imageAnalyzeSuccess, 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      if (/CONTENT_BLOCKED/i.test(msg)) {
+        showToast(tr.concept.imageBlocked, 'error');
+      } else {
+        showToast(tr.concept.imageAnalyzeError, 'error');
+      }
+    } finally {
+      setIsAnalyzingImage(false);
+    }
+  };
+
+  const handleApplyImageIdea = () => {
+    const suggestion = (concept.imageInspirationText || '').trim();
+    if (!suggestion) return;
+    setConcept(prev => ({
+      ...prev,
+      topic: suggestion,
+      inspirationSource: prev.topic.trim() ? 'mixed' : 'image',
+    }));
+    showToast(tr.concept.imageApplySuccess, 'success');
+    setIsImageModalOpen(false);
   };
 
   const toggle = (key: keyof Pick<SongConcept, 'genre'|'mood'|'excludedStyles'|'language'|'vocals'|'tempo'|'instrumentation'>, val: string) => {
@@ -982,37 +1068,153 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
         <div className="flex flex-wrap items-center gap-2">
           {/* Randomize */}
           <div className="flex items-center glass-btn rounded-xl overflow-hidden p-0">
-            <select
-              value={randomCategory}
-              onChange={(e) => setRandomCategory(e.target.value)}
-              className="bg-transparent text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 outline-none px-2.5 py-2 cursor-pointer border-r border-white/20 dark:border-white/8"
-            >
-              {opts.randomThemes.map(theme => <option key={theme} value={theme} className="bg-white dark:bg-zinc-900">{theme}</option>)}
-            </select>
             <button type="button" onClick={handleRandomize} disabled={isRandomizing}
-              className="px-3 py-2 text-suno-primary hover:bg-suno-primary/10 transition-colors text-sm"
+              className="px-4 py-2 text-suno-primary hover:bg-suno-primary/10 transition-colors text-sm font-bold uppercase tracking-wider"
               title={opts.randomizeTitle}>
+              <span className="mr-2 text-[10px]">{opts.randomThemes[0]}</span>
               <i className={`fas fa-dice ${isRandomizing ? 'animate-spin' : ''}`}></i>
             </button>
           </div>
 
-          {/* Inspiration */}
-          <button type="button" onClick={handleAnalyze}
-            disabled={isAnalyzing || !concept.topic}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] transition-all border ${
-              isAnalyzing
-                ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
-                : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
-            }`}>
-            {isAnalyzing
-              ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.inspiring}</>
-              : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
+          <button
+            type="button"
+            onClick={() => setIsImageModalOpen(true)}
+            className="glass-btn flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] text-suno-secondary border border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all"
+          >
+            <i className="fas fa-image"></i>
+            {tr.concept.imageInspirationTitle}
+            {(inspirationImage || concept.imageInspirationText?.trim()) && (
+              <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-suno-secondary/20 text-suno-secondary text-[8px] font-black">
+                1
+              </span>
+            )}
           </button>
+
         </div>
-        <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400 pt-1">
-          {opts.storyDiceHint}
-        </p>
+        <div className="rounded-2xl border border-suno-primary/20 bg-suno-primary/5 dark:bg-suno-primary/10 px-3 py-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-suno-primary">
+              <i className="fas fa-gears mr-2"></i>
+              {tr.concept.inspire}
+            </p>
+            <button type="button" onClick={handleAnalyze}
+              disabled={isAnalyzing || !concept.topic}
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+                isAnalyzing
+                  ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
+                  : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
+              }`}>
+              {isAnalyzing
+                ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.inspiring}</>
+                : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
+            </button>
+          </div>
+          <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+            {tr.concept.inspireHint}
+          </p>
+        </div>
       </div>
+
+      {isImageModalOpen && createPortal(
+        <div className="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsImageModalOpen(false)}>
+          <div
+            className="w-full max-w-2xl glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-suno-secondary">
+                <i className="fas fa-image mr-2"></i>{tr.concept.imageInspirationTitle}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="glass-btn px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider text-suno-secondary hover:bg-suno-secondary/10"
+              >
+                <i className="fas fa-upload mr-1"></i>
+                {tr.concept.imageUpload}
+              </button>
+              <p className="text-[10px] text-zinc-400">{tr.concept.imageHint}</p>
+            </div>
+
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept={ACCEPTED_IMAGE}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImageFile(f);
+                e.target.value = '';
+              }}
+            />
+
+            {inspirationImage && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                <img src={inspirationImage.dataUrl} alt="Inspiration Upload" className="w-full sm:w-24 h-24 object-cover rounded-xl border border-zinc-700" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold text-zinc-200 truncate">{inspirationImage.name}</p>
+                  <p className="text-[9px] text-zinc-400">{inspirationImage.sizeMB} MB</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAnalyzeImage}
+                  disabled={isAnalyzingImage}
+                  className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all ${
+                    isAnalyzingImage ? 'glass-btn text-suno-secondary opacity-70' : 'btn-create text-white'
+                  }`}
+                >
+                  <i className={`fas ${isAnalyzingImage ? 'fa-spinner animate-spin' : 'fa-wand-magic-sparkles'} mr-1`}></i>
+                  {isAnalyzingImage ? tr.concept.imageAnalyzing : tr.concept.imageAnalyze}
+                </button>
+              </div>
+            )}
+
+            <p className="text-[9px] leading-relaxed text-zinc-400">{tr.concept.imageSafetyHint}</p>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
+                {tr.concept.imageResultLabel}
+              </label>
+              <textarea
+                className="glass-input w-full rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 resize-none h-28 custom-scrollbar"
+                placeholder={tr.concept.imageResultPlaceholder}
+                value={concept.imageInspirationText || ''}
+                onChange={(e) => setConcept(prev => ({ ...prev, imageInspirationText: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(false)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
+              >
+                {tr.about.close}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyImageIdea}
+                disabled={!concept.imageInspirationText?.trim()}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-arrow-turn-up mr-1"></i>
+                {tr.concept.imageApply}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ═══ KREATIV-LAB ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-4">

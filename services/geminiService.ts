@@ -189,7 +189,96 @@ export interface HomeSongIdeas {
   wildcard: string;
 }
 
+const RANDOM_IDEA_MEMORY_KEY = "suno_random_idea_memory_v1";
+const RANDOM_IDEA_MEMORY_LIMIT = 30;
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getRecentRandomIdeas(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RANDOM_IDEA_MEMORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map((x) => String(x)).filter(Boolean).slice(0, RANDOM_IDEA_MEMORY_LIMIT) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRandomIdea(idea: string): void {
+  if (typeof window === "undefined") return;
+  const cleaned = cleanText(idea).trim();
+  if (!cleaned) return;
+  const recent = getRecentRandomIdeas();
+  const deduped = [cleaned, ...recent.filter((x) => x.toLowerCase() !== cleaned.toLowerCase())].slice(0, RANDOM_IDEA_MEMORY_LIMIT);
+  try {
+    localStorage.setItem(RANDOM_IDEA_MEMORY_KEY, JSON.stringify(deduped));
+  } catch {
+    // ignore storage errors (private mode / quota)
+  }
+}
+
+function buildRandomStoryAxes(lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') {
+  const settingsDe = ['Proberaum', 'Backstage', 'Nachtzug', 'Kleinstadt-Bar', 'U-Bahn', 'Supermarkt um Mitternacht', 'Büroflur', 'Dorfplatz', 'Raststätte', 'Küche bei Regen', 'Parkhausdach', 'Bahnhof'];
+  const settingsEn = ['rehearsal room', 'backstage hallway', 'night train', 'small-town bar', 'subway platform', 'midnight supermarket', 'office corridor', 'village square', 'highway rest stop', 'kitchen in the rain', 'parking garage roof', 'train station'];
+
+  const conflictsDe = ['zu spät für den entscheidenden Moment', 'falsche Nachricht zur falschen Zeit', 'eine alte Schuld taucht wieder auf', 'ein Versprechen wird auf die Probe gestellt', 'zwei Ziele passen nicht mehr zusammen', 'ein Missverständnis eskaliert', 'Mut gegen Sicherheit', 'Nähe gegen Stolz'];
+  const conflictsEn = ['too late for the decisive moment', 'the wrong message at the worst time', 'an old debt resurfaces', 'a promise gets tested', 'two goals no longer fit together', 'a misunderstanding escalates', 'courage versus safety', 'closeness versus pride'];
+
+  const emotionsDe = ['aufgewühlt aber hoffnungsvoll', 'bitter-süß und nachdenklich', 'drängend und unruhig', 'zärtlich aber verletzlich', 'euphorisch mit Bruchkante', 'melancholisch mit Vorwärtsdrang'];
+  const emotionsEn = ['restless but hopeful', 'bittersweet and reflective', 'urgent and uneasy', 'tender but vulnerable', 'euphoric with a crack in it', 'melancholic with forward motion'];
+
+  const perspectivesDe = ['Ich-Perspektive', 'Du-Perspektive', 'beobachtende Erzählperspektive'];
+  const perspectivesEn = ['first-person perspective', 'second-person perspective', 'observational narrator perspective'];
+
+  const hooksDe = ['eine klare Hook-Zeile, die sich sofort mitsingen lässt', 'ein kurzer, prägnanter Refrain-Kern', 'eine zentrale Zeile mit Wiedererkennungswert'];
+  const hooksEn = ['a clear hook line that is instantly singable', 'a short, punchy chorus core', 'one central line with high recall value'];
+
+  const modeAddOnDe = mode === 'music'
+    ? ['Bandprobe kurz vor Auftritt', 'Technikpanne live', 'Tourbus-Spannung', 'Backstage-Entscheidung']
+    : mode === 'current'
+      ? ['gesellschaftliche Anspannung im Alltag', 'digitale Reizüberflutung', 'Streitkultur und Müdigkeit', 'öffentliche Unsicherheit privat gespiegelt']
+      : mode === 'wildcard'
+        ? ['ungewöhnlicher Perspektivwechsel', 'subtile Ironie im ernsten Thema', 'ein Ort als heimlicher Gegenspieler', 'Kontrast aus Wärme und Kälte']
+        : ['Musikerleben', 'Tagesgeschehen', 'Kreativer Twist', 'Alltagsdrama'];
+  const modeAddOnEn = mode === 'music'
+    ? ['band rehearsal before showtime', 'live technical breakdown', 'tour-bus tension', 'a backstage decision']
+    : mode === 'current'
+      ? ['social tension in everyday life', 'digital overstimulation', 'debate fatigue', 'public uncertainty mirrored privately']
+      : mode === 'wildcard'
+        ? ['an unusual perspective shift', 'subtle irony inside a serious theme', 'a location as hidden antagonist', 'contrast of warmth and cold']
+        : ['musician life', 'current-affairs mood', 'creative twist', 'everyday drama'];
+
+  if (lang === 'de') {
+    return {
+      setting: pickRandom(settingsDe),
+      conflict: pickRandom(conflictsDe),
+      emotion: pickRandom(emotionsDe),
+      perspective: pickRandom(perspectivesDe),
+      hookStyle: pickRandom(hooksDe),
+      modeFlavor: pickRandom(modeAddOnDe),
+    };
+  }
+  return {
+    setting: pickRandom(settingsEn),
+    conflict: pickRandom(conflictsEn),
+    emotion: pickRandom(emotionsEn),
+    perspective: pickRandom(perspectivesEn),
+    hookStyle: pickRandom(hooksEn),
+    modeFlavor: pickRandom(modeAddOnEn),
+  };
+}
+
 const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') => {
+  const axes = buildRandomStoryAxes(lang, mode);
+  const recentIdeas = getRecentRandomIdeas();
+  const recentBlock = recentIdeas.length
+    ? (lang === 'de'
+      ? `\nVermeide starke Ähnlichkeit zu diesen zuletzt verwendeten Ideen:\n- ${recentIdeas.slice(0, 8).join('\n- ')}`
+      : `\nAvoid strong similarity to these recently used ideas:\n- ${recentIdeas.slice(0, 8).join('\n- ')}`)
+    : '';
   const categoryInstruction = lang === 'de'
     ? (
       mode === 'music' ? 'Schwerpunkt: Musikerleben (Probe, Backstage, Bühne, Studio, Tourbus, Technikpanne, Booker, Club, Festival).' :
@@ -208,6 +297,14 @@ const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | '
     ? `Erzeuge genau EINE Song-Story-Idee (für das Feld „Thema“ im Konzept). Stil: Option A — realistisch und von echten Alltagssituationen inspiriert, aber fiktionalisiert.
 ${categoryInstruction}
 
+Kreative Leitplanken (zufällig vorgegeben, MUSS klar erkennbar sein):
+- Setting: ${axes.setting}
+- Konflikt: ${axes.conflict}
+- Emotion: ${axes.emotion}
+- Perspektive: ${axes.perspective}
+- Hook-Fokus: ${axes.hookStyle}
+- Modus-Farbe: ${axes.modeFlavor}
+
 Regeln:
 - 2-4 Sätze, konkrete Szene, klare emotionale Spannung, gut singbar.
 - Keine behaupteten Fakten über reale Ereignisse.
@@ -216,9 +313,19 @@ Regeln:
 - Kein „das ist wirklich passiert“-Wording.
 - Keine vulgären/extremen Inhalte, kein Hass, keine Verleumdung.
 - Nur Story, keine Genre-/BPM-/Produktionstipps.
+- Musikalisch umsetzbar: klarer Refrain-Ansatz, singbare Kernzeile, konkrete Bildsprache statt abstrakter Theorie.
+${recentBlock}
 - Ausgabe als JSON mit Feld "story" in Deutsch.`
     : `Generate exactly ONE song story idea (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
 ${categoryInstruction}
+
+Creative rails (randomized and MUST be clearly reflected):
+- Setting: ${axes.setting}
+- Conflict: ${axes.conflict}
+- Emotion: ${axes.emotion}
+- Perspective: ${axes.perspective}
+- Hook focus: ${axes.hookStyle}
+- Mode flavor: ${axes.modeFlavor}
 
 Rules:
 - 2-4 sentences, concrete scene, clear emotional pull, singable.
@@ -228,6 +335,8 @@ Rules:
 - Do not phrase it as “this really happened”.
 - No vulgar/extreme content, hate, or defamation.
 - Story only, no genre/BPM/production advice.
+- Musically usable: clear chorus angle, singable core line, concrete imagery over abstract theory.
+${recentBlock}
 - Return JSON with field "story" in English.`;
 };
 
@@ -257,8 +366,11 @@ export const generateConceptStoryIdea = async (
     : 'Minutes before a gig, the PA cuts out and the band keeps the chorus alive unplugged. The crowd claps in time and turns a breakdown into a shared high. Afterwards they realize connection can be louder than any amplifier.';
   try {
     const parsed = JSON.parse(response.text || "{}");
-    return cleanText(String(parsed.story ?? fallback)).trim();
+    const story = cleanText(String(parsed.story ?? fallback)).trim();
+    rememberRandomIdea(story);
+    return story;
   } catch {
+    rememberRandomIdea(fallback);
     return fallback;
   }
 };
@@ -396,6 +508,16 @@ export interface AudioAnalysisResult extends Partial<SongConcept> {
   isInstrumental: boolean;
 }
 
+export interface ImageInspirationResult {
+  theme: string;
+  mood: string;
+  genreSuggestions: string[];
+  tempoSuggestion: string;
+  imageryKeywords: string[];
+  songIdeaPrompt: string;
+  titleIdeas: string[];
+}
+
 export const analyzeAudio = async (
   audioBase64: string,
   mimeType: string
@@ -461,6 +583,115 @@ Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
     return { ...defaultResult, ...parsed };
   } catch {
     return defaultResult;
+  }
+};
+
+export const analyzeInspirationImage = async (
+  imageBase64: string,
+  mimeType: string,
+  lang: 'de' | 'en' = 'de'
+): Promise<ImageInspirationResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = lang === 'de'
+    ? `Analysiere dieses Bild ausschließlich für kreative Song-Inspiration.
+
+Regeln:
+- Keine Identifizierung realer Personen.
+- Verarbeite keine explizit sexuellen Inhalte, keine Gewaltverherrlichung, keine volksverhetzenden, diskriminierenden, extremistischen oder sonst rechtswidrigen Inhalte.
+- Falls problematische Inhalte erkannt oder vermutet werden, antworte ausschließlich mit: CONTENT_BLOCKED
+
+Wenn unkritisch, liefere JSON mit:
+- theme (kurz)
+- mood (kurz)
+- genreSuggestions (genau 3 Strings)
+- tempoSuggestion (z. B. "95 BPM, laid-back")
+- imageryKeywords (5-10 Strings)
+- songIdeaPrompt (1-2 Absätze, direkt nutzbar als Song-Idee)
+- titleIdeas (genau 3 Strings)
+
+Ausgabe nur als valides JSON.`
+    : `Analyze this image only for creative song inspiration.
+
+Rules:
+- Do not identify real persons.
+- Do not process sexual explicitness, glorified violence, hate/discrimination, extremist propaganda, or other illegal content.
+- If unsafe content is detected or suspected, respond exactly with: CONTENT_BLOCKED
+
+If safe, return JSON with:
+- theme (short)
+- mood (short)
+- genreSuggestions (exactly 3 strings)
+- tempoSuggestion (e.g. "95 BPM, laid-back")
+- imageryKeywords (5-10 strings)
+- songIdeaPrompt (1-2 paragraphs usable as a song idea)
+- titleIdeas (exactly 3 strings)
+
+Output valid JSON only.`;
+
+  const defaultResult: ImageInspirationResult = {
+    theme: "",
+    mood: "",
+    genreSuggestions: [],
+    tempoSuggestion: "",
+    imageryKeywords: [],
+    songIdeaPrompt: "",
+    titleIdeas: [],
+  };
+
+  try {
+    const response = await withRetry(() => ai.models.generateContent({
+      model: TEXT_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: prompt },
+          ],
+        },
+      ],
+      config: {
+        ...DEFAULT_THINKING,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            theme: { type: Type.STRING },
+            mood: { type: Type.STRING },
+            genreSuggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+            tempoSuggestion: { type: Type.STRING },
+            imageryKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+            songIdeaPrompt: { type: Type.STRING },
+            titleIdeas: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["theme", "mood", "genreSuggestions", "tempoSuggestion", "imageryKeywords", "songIdeaPrompt", "titleIdeas"],
+        },
+      },
+    }));
+
+    const raw = (response.text || "").trim();
+    if (/^CONTENT_BLOCKED$/i.test(raw)) {
+      throw new Error("CONTENT_BLOCKED");
+    }
+    const parsed = JSON.parse(raw || "{}");
+    return {
+      theme: cleanText(String(parsed.theme ?? "")).trim(),
+      mood: cleanText(String(parsed.mood ?? "")).trim(),
+      genreSuggestions: Array.isArray(parsed.genreSuggestions) ? parsed.genreSuggestions.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean) : [],
+      tempoSuggestion: cleanText(String(parsed.tempoSuggestion ?? "")).trim(),
+      imageryKeywords: Array.isArray(parsed.imageryKeywords) ? parsed.imageryKeywords.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean) : [],
+      songIdeaPrompt: cleanText(String(parsed.songIdeaPrompt ?? "")).trim(),
+      titleIdeas: Array.isArray(parsed.titleIdeas) ? parsed.titleIdeas.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean) : [],
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err ?? "");
+    if (/CONTENT_BLOCKED|safety|blocked|policy|harm|prohibited|unsafe/i.test(msg)) {
+      throw new Error("CONTENT_BLOCKED");
+    }
+    throw err instanceof Error ? err : new Error(msg || "Image analysis failed");
   }
 };
 
