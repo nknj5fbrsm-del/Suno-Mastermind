@@ -108,6 +108,7 @@ const App: React.FC = () => {
   const [loadingText, setLoadingText] = useState<string>('Generating Magic...');
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [history, setHistory] = useState<SongHistoryItem[]>([]);
+  const [currentHistoryItemId, setCurrentHistoryItemId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('suno-lang') as Lang) || 'de');
   const [toast, setToast] = useState<ToastState>(null);
   const coverRequestInFlightRef = useRef(false);
@@ -184,6 +185,7 @@ const App: React.FC = () => {
       excludedStyles: [],
     });
     setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setStyleRegenPendingForVariants([]); setCoverUrl('');
+    setCurrentHistoryItemId(null);
     setActiveStep(WorkflowStep.CONCEPT);
   }, []);
 
@@ -309,6 +311,7 @@ const App: React.FC = () => {
     setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null);
     setStyleRegenPendingForVariants([]);
     setCoverUrl(item.coverUrl);
+    setCurrentHistoryItemId(item.id);
     setActiveStep(WorkflowStep.LYRICS);
   }, []);
   const handleDeleteFromHistory = useCallback(async (id: string) => {
@@ -600,6 +603,7 @@ const App: React.FC = () => {
                   coverUrl: genCover,
                 };
                 await saveSongToDB(item);
+                setCurrentHistoryItemId(item.id);
                 setHistory(prev => [item, ...prev]);
               } catch (e) {
                 handleError(e);
@@ -815,12 +819,30 @@ const App: React.FC = () => {
             coverUrl={coverUrl}
             songDescription={styleData.songDescription}
             titleSuggestions={styleData.titleSuggestions}
+            selectedTitleSuggestion={styleData.selectedTitleSuggestion}
             lyrics={lyrics}
             lyricsVariants={lyricsVariants}
             stylePrompt={styleData.prompt}
             styleVariants={styleVariants}
             coverError={coverError}
             onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)}
+            onSelectTitleSuggestion={(selectedTitle) => {
+              setStyleData(prev => prev ? { ...prev, selectedTitleSuggestion: selectedTitle } : null);
+              if (!currentHistoryItemId) return;
+              setHistory(prev => {
+                const target = prev.find(h => h.id === currentHistoryItemId);
+                if (!target) return prev;
+                const updated: SongHistoryItem = {
+                  ...target,
+                  styleData: {
+                    ...target.styleData,
+                    selectedTitleSuggestion: selectedTitle,
+                  },
+                };
+                void saveSongToDB(updated);
+                return prev.map(h => h.id === currentHistoryItemId ? updated : h);
+              });
+            }}
             onRegenerateCover={async (style) => {
               if (coverRequestInFlightRef.current) return;
               const cooldownLeft = getCoverCooldownRemainingMs();

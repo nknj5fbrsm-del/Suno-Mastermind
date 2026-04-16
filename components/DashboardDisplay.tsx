@@ -251,6 +251,12 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {history.map((item, idx) => (
+                  (() => {
+                    const archiveTitle =
+                      item.styleData.selectedTitleSuggestion?.trim()
+                      || item.styleData.titleSuggestions?.[0]?.trim()
+                      || item.concept.topic;
+                    return (
                   <div key={item.id}
                     className="flex items-center p-3.5 gap-3 group cursor-pointer rounded-2xl transition-all duration-200 hover:bg-white/10 dark:hover:bg-white/5 border border-transparent hover:border-white/15"
                     onClick={() => { onRecall(item); setArchiveOpen(false); }}
@@ -264,7 +270,7 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate group-hover:text-suno-primary transition-colors flex items-center gap-1.5">
                         {item.isFavorite && <i className="fas fa-star text-amber-300 text-[10px] flex-shrink-0"></i>}
-                        {item.concept.topic || tr.dashboard.untitled}
+                        {archiveTitle || tr.dashboard.untitled}
                       </p>
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         {item.concept.genre?.slice(0, 2).map(g => (
@@ -292,6 +298,8 @@ const DashboardDisplay: React.FC<DashboardDisplayProps> = ({ history, onRecall, 
                       </button>
                     </div>
                   </div>
+                    );
+                  })()
                 ))}
               </div>
             )}

@@ -9,6 +9,7 @@ interface ArtworkDisplayProps {
   coverUrl: string;
   songDescription: string;
   titleSuggestions?: string[];
+  selectedTitleSuggestion?: string;
   lyrics: string;
   /** Wenn gesetzt: zwei Pills „Variante 1“ / „Variante 2“, jeweils aufklappbar mit Copy-Optionen. */
   lyricsVariants?: [string, string] | null;
@@ -17,6 +18,7 @@ interface ArtworkDisplayProps {
   styleVariants?: [GeneratedStyle, GeneratedStyle] | null;
   coverError?: string | null;
   onUpdateStory: (newStory: string) => void;
+  onSelectTitleSuggestion: (title: string) => void;
   onRegenerateCover: (style: string) => Promise<void>;
 }
 
@@ -32,8 +34,24 @@ const FORMSPREE_URL = 'https://formspree.io/f/xbdajoly';
 
 const SUNO_CREATE_URL = 'https://suno.com/create';
 const BUY_ME_A_COFFEE_URL = 'https://buymeacoffee.com/NilsP';
+const CLEAN_COPY_PREFIX = `Lyrics and Prompt created with the new powerful Suno Mastermind App
+https://suno-mastermind-v2.vercel.app
+------------------------------`;
 
-const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescription, titleSuggestions = [], lyrics, lyricsVariants, stylePrompt, styleVariants, coverError, onUpdateStory, onRegenerateCover }) => {
+const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({
+  coverUrl,
+  songDescription,
+  titleSuggestions = [],
+  selectedTitleSuggestion,
+  lyrics,
+  lyricsVariants,
+  stylePrompt,
+  styleVariants,
+  coverError,
+  onUpdateStory,
+  onSelectTitleSuggestion,
+  onRegenerateCover
+}) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const [expandedVariant, setExpandedVariant] = useState<1 | 2 | null>(null);
@@ -77,7 +95,8 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
   };
 
   const handleCopyLyricsClean = (lyricsText?: string) => {
-    const text = (lyricsText ?? lyrics).replace(/\[.*?\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const cleaned = (lyricsText ?? lyrics).replace(/\[.*?\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const text = `${CLEAN_COPY_PREFIX}\n\n${cleaned}`;
     try {
       navigator.clipboard.writeText(text);
       showToast(tr.artwork.copied, 'success');
@@ -398,9 +417,18 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({ coverUrl, songDescripti
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {titleSuggestions.map((title, idx) => (
-                  <span key={`${title}-${idx}`} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-white/20 dark:bg-black/20 border border-suno-primary/25 text-zinc-700 dark:text-zinc-200">
+                  <button
+                    key={`${title}-${idx}`}
+                    type="button"
+                    onClick={() => onSelectTitleSuggestion(title)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                      selectedTitleSuggestion === title
+                        ? 'bg-suno-primary text-white border-suno-primary shadow-md'
+                        : 'bg-white/20 dark:bg-black/20 border-suno-primary/25 text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary/15'
+                    }`}
+                  >
                     {title}
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>

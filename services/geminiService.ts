@@ -928,6 +928,7 @@ export const generateStylePrompt = async (
     recommendationReason: "Empfehlung basierend auf Genre und Stimmung; Werte in Suno nach Bedarf anpassbar.",
     songDescription: concept.topic,
     titleSuggestions: [],
+    selectedTitleSuggestion: undefined,
   };
   try {
     const parsed = JSON.parse(response.text || "{}");
@@ -940,6 +941,9 @@ export const generateStylePrompt = async (
     const titleSuggestions = Array.isArray(parsed.titleSuggestions)
       ? parsed.titleSuggestions.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean).slice(0, 3)
       : [];
+    const selectedTitleSuggestion = cleanText(String(parsed.selectedTitleSuggestion ?? "")).trim()
+      || titleSuggestions[0]
+      || undefined;
     return {
       ...defaultStyle,
       ...parsed,
@@ -947,6 +951,7 @@ export const generateStylePrompt = async (
       weirdness,
       styleInfluence,
       titleSuggestions,
+      selectedTitleSuggestion,
     };
   } catch {
     return {

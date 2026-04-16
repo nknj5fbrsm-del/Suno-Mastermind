@@ -38,6 +38,8 @@ export interface GeneratedStyle {
   songDescription: string;
   /** Bis zu 3 optionale Songtitel-Vorschläge (separat von der Song-Story). */
   titleSuggestions?: string[];
+  /** Aktiv ausgewählter Songtitel, der z. B. im Archiv als Primärtitel genutzt wird. */
+  selectedTitleSuggestion?: string;
 }
 
 export interface SongHistoryItem {
