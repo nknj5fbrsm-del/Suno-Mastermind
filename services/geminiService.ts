@@ -1,5 +1,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SongConcept, GeneratedStyle } from "../types";
+import { t } from "../translations";
+
+type UiLang = "de" | "en";
+
+/** Nur Werte aus der UI-Whitelist (exakte Strings für SearchableMultiInput). */
+function pickAllowedOptions(raw: unknown, allowed: readonly string[]): string[] {
+  if (!Array.isArray(raw)) return [];
+  const allowedSet = new Set(allowed);
+  const out: string[] = [];
+  for (const item of raw) {
+    const s = String(item ?? "").trim();
+    if (allowedSet.has(s) && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
 
 // Text (Lyrics, Analyse, Style) – Free Tier kompatibel
 const TEXT_MODEL = "gemini-3-flash-preview";
@@ -450,19 +465,34 @@ For all three:
   }
 };
 
-export const analyzeTopic = async (topic: string, isInstrumental: boolean = false): Promise<Partial<SongConcept>> => {
+export const analyzeTopic = async (
+  topic: string,
+  isInstrumental: boolean = false,
+  lang: UiLang = "de"
+): Promise<Partial<SongConcept>> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
+  const opts = t[lang].conceptOptions;
+  const timbreList = opts.timbre.join(", ");
+  const exclList = opts.exclusions.join(", ");
   const instrumentalNote = isInstrumental
     ? " WICHTIG: Es handelt sich um ein INSTRUMENTAL-Stück. Setze 'language' und 'vocals' zwingend auf leere Arrays []. Konzentriere dich auf genre, mood, tempo und vor allem auf präzise 'instrumentation' (konkrete Instrumente wie Rhodes Piano, Upright Bass, Piccolo Trumpet)."
     : " Gib auch passende language- und vocals-Vorschläge.";
+  const timbreExclBlock =
+    lang === "de"
+      ? `
+- timbre: 1–4 Begriffe für Klangfarbe/Timbre (wie soll es klingen: warm, trocken, tape …) – NUR EXAKT aus dieser Liste wählen: ${timbreList}
+- excludedStyles: 0–4 Einträge: Stilelemente, die zum Thema passen könnten, die du hier aber aktiv VERMEIDEN sollst (falsche Assoziation, Genre-Kollision). NUR EXAKT aus dieser Liste: ${exclList}. Leer [], wenn nichts Sinnvolles ablehnbar ist.`
+      : `
+- timbre: 1–4 tone-color targets — pick ONLY exact strings from: ${timbreList}
+- excludedStyles: 0–4 elements to actively avoid (wrong vibe for this topic). ONLY exact strings from: ${exclList}. Use [] if nothing applies.`;
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Analyse für Suno V 5.5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
 - Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (z. B. Jazz, Brass Band, Latin Brass).
 - vocals: Gib für jede Gesangsstimme einen EINDEUTIGEN Vornamen oder Künstlernamen, der in Lyrics und Style EXAKT so übernommen wird (z. B. ["Herrmann (Bariton)"] oder Duett ["Herrmann (Bariton)", "Sonja (Sopran)"]). Dieser Name ist verbindlich – in den folgenden Schritten (Lyrics, Style) darf kein anderer Name verwendet oder erfunden werden.
-- Falls das Thema einen Künstler referenziert (z. B. "wie Michael Jackson"), kann dieser Vorname (Michael) als vocals-Name genutzt werden; ansonsten wähle einen passenden, eindeutigen Namen.`,
+- Falls das Thema einen Künstler referenziert (z. B. "wie Michael Jackson"), kann dieser Vorname (Michael) als vocals-Name genutzt werden; ansonsten wähle einen passenden, eindeutigen Namen.${timbreExclBlock}`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       ...DEFAULT_THINKING,
@@ -476,6 +506,8 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
           mood: { type: Type.ARRAY, items: { type: Type.STRING } },
           tempo: { type: Type.ARRAY, items: { type: Type.STRING } },
           instrumentation: { type: Type.ARRAY, items: { type: Type.STRING } },
+          timbre: { type: Type.ARRAY, items: { type: Type.STRING } },
+          excludedStyles: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
         required: ["genre", "mood", "tempo", "instrumentation", "language", "vocals"],
       },
@@ -488,10 +520,110 @@ export const analyzeTopic = async (topic: string, isInstrumental: boolean = fals
     mood: [],
     tempo: [],
     instrumentation: [],
+    timbre: [],
+    excludedStyles: [],
   };
   try {
     const parsed = JSON.parse(response.text || "{}");
-    const result = { ...defaultSuggestions, ...parsed };
+    const result: Partial<SongConcept> = { ...defaultSuggestions, ...parsed };
+    result.timbre = pickAllowedOptions(parsed.timbre, opts.timbre);
+    result.excludedStyles = pickAllowedOptions(parsed.excludedStyles, opts.exclusions);
+    if (isInstrumental) {
+      result.language = [];
+      result.vocals = [];
+    }
+    return result;
+  } catch {
+    return defaultSuggestions;
+  }
+};
+
+/**
+ * Leitet aus einer Akkordfolge (frei notiert) plausible Konzept-Vorschläge für Suno ab.
+ * Keine garantierte harmonische „Erkennung“ – eher stilistische Einordnung wie bei analyzeTopic.
+ */
+export const analyzeChordProgression = async (
+  progression: string,
+  isInstrumental: boolean = false,
+  lang: 'de' | 'en' = 'de'
+): Promise<Partial<SongConcept>> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const trimmed = cleanText(progression).trim();
+  if (!trimmed) throw new Error(lang === 'de' ? "Bitte eine Akkordfolge eingeben." : "Please enter a chord progression.");
+
+  const opts = t[lang].conceptOptions;
+  const timbreList = opts.timbre.join(", ");
+  const exclList = opts.exclusions.join(", ");
+  const timbreExclChord =
+    lang === "de"
+      ? `
+- timbre: 1–4 Klangfarben – NUR EXAKT aus: ${timbreList}
+- excludedStyles: 0–4 zu vermeidende Stilelemente – NUR EXAKT aus: ${exclList}. Leer [] wenn nichts passt.`
+      : `
+- timbre: 1–4 tone-color targets — ONLY exact strings from: ${timbreList}
+- excludedStyles: 0–4 elements to avoid — ONLY from: ${exclList}. [] if none.`;
+
+  const instrumentalNote = isInstrumental
+    ? (lang === 'de'
+      ? " WICHTIG: Instrumental. Setze language und vocals auf leere Arrays []. Fokus auf genre, mood, tempo, instrumentation."
+      : " IMPORTANT: Instrumental. Set language and vocals to empty []. Focus on genre, mood, tempo, instrumentation.")
+    : (lang === 'de'
+      ? " Gib passende language- und vocals-Vorschläge (wie bei Songthema-Analyse)."
+      : " Also suggest language and vocals (same rules as topic analysis).");
+
+  const body = lang === 'de'
+    ? `Akkordfolge (Nutzer, beliebige Notation): "${trimmed}"
+${instrumentalNote}
+Leite daraus plausible Suno-Konzept-Vorschläge ab: genre, mood, tempo, instrumentation (konkrete Instrumente). Die Akkordfolge kann römisch (I–V–vi–IV), Buchstaben (Am F C G) oder gemischt sein — interpretiere sie musikalisch plausibel, ohne zu behaupten, es sei die einzig mögliche Lesart.
+- vocals: eindeutige Namen wie bei analyzeTopic (z. B. ["Herrmann (Bariton)"]).
+- Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (Jazz, Brass Band, Latin Brass).${timbreExclChord}`
+    : `Chord progression (user input, any notation): "${trimmed}"
+${instrumentalNote}
+Infer plausible Suno concept suggestions: genre, mood, tempo, instrumentation (specific instruments). Roman numerals or letter chords are both OK — pick a musically plausible reading.
+- vocals: unique names as in topic analysis (e.g. ["Alex (Baritone)"]).
+- No trumpet/brass unless the genre clearly needs it (Jazz, Brass Band, Latin Brass).${timbreExclChord}`;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: body,
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          language: { type: Type.ARRAY, items: { type: Type.STRING } },
+          vocals: { type: Type.ARRAY, items: { type: Type.STRING } },
+          genre: { type: Type.ARRAY, items: { type: Type.STRING } },
+          mood: { type: Type.ARRAY, items: { type: Type.STRING } },
+          tempo: { type: Type.ARRAY, items: { type: Type.STRING } },
+          instrumentation: { type: Type.ARRAY, items: { type: Type.STRING } },
+          timbre: { type: Type.ARRAY, items: { type: Type.STRING } },
+          excludedStyles: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["genre", "mood", "tempo", "instrumentation", "language", "vocals"],
+      },
+    },
+  }));
+
+  const defaultSuggestions: Partial<SongConcept> = {
+    language: [],
+    vocals: [],
+    genre: [],
+    mood: [],
+    tempo: [],
+    instrumentation: [],
+    timbre: [],
+    excludedStyles: [],
+  };
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    const result: Partial<SongConcept> = { ...defaultSuggestions, ...parsed };
+    result.timbre = pickAllowedOptions(parsed.timbre, opts.timbre);
+    result.excludedStyles = pickAllowedOptions(parsed.excludedStyles, opts.exclusions);
     if (isInstrumental) {
       result.language = [];
       result.vocals = [];
@@ -522,30 +654,55 @@ export interface ImageInspirationResult {
 
 export const analyzeAudio = async (
   audioBase64: string,
-  mimeType: string
+  mimeType: string,
+  lang: UiLang = "de"
 ): Promise<AudioAnalysisResult> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
+  const opts = t[lang].conceptOptions;
+  const timbreList = opts.timbre.join(", ");
+  const exclList = opts.exclusions.join(", ");
 
-  const prompt = `Analysiere dieses Audiofile präzise als erfahrener Musikproduzent für Suno V 5.5.
+  const prompt =
+    lang === "de"
+      ? `Analysiere dieses Audiofile präzise als erfahrener Musikproduzent für Suno V 5.5.
 
 Erstelle folgende Analyse:
 - genre: Genau passende Genre-Bezeichnungen (max. 3, z. B. "Indie Rock", "Lo-Fi Hip Hop")
 - mood: Stimmungen/Emotionen des Stücks (max. 4, auf Deutsch, z. B. "Melancholisch", "Energetisch")
 - tempo: Tempoangabe als BPM-Schätzung und Feeling (z. B. ["128 BPM", "Driving"])
 - instrumentation: Erkannte Instrumente – so präzise wie möglich (z. B. "Rhodes Piano", "Upright Bass", "Piccolo Trumpet")
+- timbre: 1–4 Begriffe für die Klangfarbe – NUR EXAKT aus dieser Liste: ${timbreList}
+- excludedStyles: 0–4 Einträge – NUR EXAKT aus dieser Liste: ${exclList}. Wähle Stilelemente, die zum erkannten Charakter dieses Tracks passen würden, wenn man sie in einem neuen Song in DIESEM Stil aktiv MEIDEN sollte (Genre-Kollision, falscher Vibe). Leer [] wenn nichts passt.
 - vocals: Gesangsstil wenn vorhanden (z. B. "Männlich (Husky)") – leeres Array wenn instrumental
 - language: Erkannte Sprache(n) wenn Gesang vorhanden – leeres Array wenn instrumental
 - isInstrumental: true wenn kein Gesang erkennbar, sonst false
 - topicSuggestion: Eine kurze (1-2 Sätze) Beschreibung der Stimmung und des Charakters des Stücks auf Deutsch – als Inspiration für ein Songthema
 
-Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
+Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`
+      : `Analyze this audio precisely as an experienced music producer for Suno V 5.5.
+
+Return:
+- genre: up to 3 precise genre labels (e.g. "Indie Rock", "Lo-Fi Hip Hop")
+- mood: up to 4 moods/emotions
+- tempo: BPM estimate + feel (e.g. ["128 BPM", "Driving"])
+- instrumentation: detected instruments as precisely as possible
+- timbre: 1–4 tone-color targets — ONLY exact strings from: ${timbreList}
+- excludedStyles: 0–4 items — ONLY from: ${exclList}. Pick elements a new song in this sonic direction should actively avoid. [] if none fit.
+- vocals: vocal style if present — [] if instrumental
+- language: detected sung language(s) — [] if instrumental
+- isInstrumental: true if no vocals detected
+- topicSuggestion: 1–2 sentences describing vibe/character as song-topic inspiration
+
+Valid JSON only, no extra text.`;
 
   const defaultResult: AudioAnalysisResult = {
     genre: [], mood: [], tempo: [], instrumentation: [],
     vocals: [], language: [], isInstrumental: false,
     topicSuggestion: "",
+    timbre: [],
+    excludedStyles: [],
   };
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -570,6 +727,8 @@ Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
           mood:              { type: Type.ARRAY, items: { type: Type.STRING } },
           tempo:             { type: Type.ARRAY, items: { type: Type.STRING } },
           instrumentation:   { type: Type.ARRAY, items: { type: Type.STRING } },
+          timbre:            { type: Type.ARRAY, items: { type: Type.STRING } },
+          excludedStyles:    { type: Type.ARRAY, items: { type: Type.STRING } },
           vocals:            { type: Type.ARRAY, items: { type: Type.STRING } },
           language:          { type: Type.ARRAY, items: { type: Type.STRING } },
           isInstrumental:    { type: Type.BOOLEAN },
@@ -582,7 +741,10 @@ Antworte ausschließlich mit validem JSON ohne weitere Erklärungen.`;
 
   try {
     const parsed = JSON.parse(response.text || "{}");
-    return { ...defaultResult, ...parsed };
+    const merged: AudioAnalysisResult = { ...defaultResult, ...parsed };
+    merged.timbre = pickAllowedOptions(parsed.timbre, opts.timbre);
+    merged.excludedStyles = pickAllowedOptions(parsed.excludedStyles, opts.exclusions);
+    return merged;
   } catch {
     return defaultResult;
   }
@@ -715,10 +877,18 @@ export const generateLyrics = async (
   const vocalsBinding = (concept.vocals && concept.vocals.length > 0)
     ? `\n- KONSISTENZ VOKALNAMEN (PFLICHT): Im Konzept sind folgende Stimmen festgelegt: ${JSON.stringify(concept.vocals)}. Extrahiere daraus den/die exakten Namen (z. B. Herrmann, Sonja). Verwende in ALLEN Regie-Tags NUR diese Namen: zu Beginn [Name: Male/Female. Bariton/Sopran, ...], dann [Verse 1: Name], [Chorus: Name]. Erfinde KEINE anderen Namen (kein Klaus, Manfred, Sonja etc., außer sie stehen explizit im Konzept).\n`
     : "";
+  const timbreNote =
+    concept.timbre?.length
+      ? `\n- Timbre / Klangfarbe (in Regie-Tags und Spielanweisungen verankern): ${concept.timbre.join(", ")}.`
+      : "";
+  const excludeNote =
+    concept.excludedStyles?.length
+      ? `\n- Vermeide strikt diese Stilelemente/Sounds in Regie, Instrumentenwahl und Stimmung: ${concept.excludedStyles.join(", ")}.`
+      : "";
 const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns, brass) in den Regie-Tags, außer das Genre verlangt es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für Pop, Rock, Ballade, Indie, Lo-Fi, Singer-Songwriter etc. nur Rhythmusgruppe, Piano, Gitarre, Strings – kein Brass.\n`;
 
   const prompt = concept.isInstrumental
-    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V 5.5. Thema: ${concept.topic}. Genre: ${genreStr}.
+    ? `[SEED: ${salt}] Instrumental-Struktur für Suno V 5.5. Thema: ${concept.topic}. Genre: ${genreStr}.${timbreNote}${excludeNote}
 - Erzeuge nur eine Abfolge von Regie-Tags in eckigen Klammern, z. B. [Intro], [Verse], [Chorus], [Bridge], [Solo], [Outro].
 - In jedes Tag gehören präzise Spielanweisungen für die Begleitung, z. B.:
   [Intro · Rhodes pno, upright bass, soft brush dr, close-miked, dry room]
@@ -726,7 +896,7 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
   [Bridge · Wurlitzer pno, pad strings, plate reverb]
 - Nutze exakte Instrumentennamen (Rhodes Piano, Upright Bass, Gitarre, Keys, Drums), Artikulation (staccato, legato, marcato, muted, pizzicato) und Raumklang (close-miking, dry, plate reverb).${noBrassNote}- Kein gesungener Text, NUR Struktur und Regie in [ ].`
     : `[SEED: ${salt}] Erstelle einen absolut neuen, einzigartigen Songtext auf höchstem professionellen Niveau.
-- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.${vocalsBinding}- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Metaphern und Stimmungsbilder (z.B. Licht, Nacht, Wetter) nur einsetzen, wo sie thematisch wirklich passen; sonst klare, direkte Sprache. Vermeide wiederkehrende Klischees wie Neon/Nachtstadt/Regen auf Scheiben, außer das Thema verlangt sie ausdrücklich.
+- Thema: ${concept.topic}. Sprache: ${langStr}. Genre: ${genreStr}. Mood: ${(concept.mood || []).join(", ")}.${vocalsBinding}${timbreNote}${excludeNote}- Vermeide Kitsch, Klischees und banale Bilder (kein einfacher Herz/Schmerz). Metaphern und Stimmungsbilder (z.B. Licht, Nacht, Wetter) nur einsetzen, wo sie thematisch wirklich passen; sonst klare, direkte Sprache. Vermeide wiederkehrende Klischees wie Neon/Nachtstadt/Regen auf Scheiben, außer das Thema verlangt sie ausdrücklich.
 - Struktur:
   · Nutze ausschließlich eckige Klammern für Regie und Sektionen: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro].
   · In die Klammern kommen detaillierte Spielanweisungen (z. B. [Chorus · 125 BPM, straight feel, syncopated slap bass, minor 9th chords] – OHNE Brass/Trompete außer bei Jazz/Brass-Genre).
@@ -801,6 +971,8 @@ Regie-Anreicherung in [ ]:
 - Füge Raumklang hinzu (close-miking, dry, plate reverb) wo passend.${noBrass}
 - Behalte Sektions-Namen (Intro, Verse, Chorus, Bridge, Outro) und Stimmen-Namen aus dem Konzept bei.
 - Genre-Kontext: ${genreStr}.
+${concept.timbre?.length ? `- Timbre/Klangfarbe berücksichtigen: ${concept.timbre.join(", ")}.` : ""}
+${concept.excludedStyles?.length ? `- Diese Sounds/Stile NICHT in [ ] andeuten oder einbauen: ${concept.excludedStyles.join(", ")}.` : ""}
 
 WICHTIG: Die erste Zeile der Antwort muss direkt der Inhalt sein (kein „Hier ist…“, keine Überschrift). Jede Zeile ohne [ ] muss exakt gleich bleiben.`;
 
@@ -894,10 +1066,16 @@ export const generateStylePrompt = async (
     }
   }
   const titleSuggestionsLangLine = titleSuggestionsLanguageInstruction(concept);
+  const timbreCtx = concept.timbre?.length
+    ? `\n- Konzept-Timbre (im englischen \"prompt\" als passende englische Produktionsbegriffe übersetzen): ${concept.timbre.join(", ")}.`
+    : "";
+  const excludeCtx = concept.excludedStyles?.length
+    ? `\n- Im Style-Prompt KEINE Andeutung dieser Stilelemente/Sounds (Nutzer-Konzept „Ausschließen“): ${concept.excludedStyles.join(", ")}.`
+    : "";
   let accumulated = "";
   const stream = await withRetry(() => ai.models.generateContentStream({
     model: TEXT_MODEL,
-    contents: `Suno V 5.5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}
+    contents: `Suno V 5.5 Style Context: ${concept.topic}. Genre: ${concept.genre.join(", ")}.${regieBlock}${timbreCtx}${excludeCtx}
 - Aufgabe: Erzeuge einen extrem kompakten, hochpräzisen Style-Prompt für eine Musik-KI wie Suno.
 
 - SPRACHE – UNBEDINGT BEACHTEN:
@@ -995,9 +1173,11 @@ export const suggestStyleTags = async (concept: SongConcept, _lyrics: string): P
   const apiKey = getApiKey();
   if (!apiKey) return [];
   const ai = new GoogleGenAI({ apiKey });
+  const timbreLine = concept.timbre?.length ? ` Timbre targets: ${concept.timbre.join(", ")}.` : "";
+  const exclLine = concept.excludedStyles?.length ? ` Avoid implying: ${concept.excludedStyles.join(", ")}.` : "";
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Suggest 5 professional Suno V 5.5 style tags for: Topic "${concept.topic}", Genres "${concept.genre.join(", ")}". Focus on instrumentation and recording techniques.`,
+    contents: `Suggest 5 professional Suno V 5.5 style tags for: Topic "${concept.topic}", Genres "${concept.genre.join(", ")}".${timbreLine}${exclLine} Focus on instrumentation and recording techniques.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       responseMimeType: "application/json",
@@ -1023,10 +1203,12 @@ export const enrichStylePrompt = async (prompt: string, concept: SongConcept): P
   const noBrass = concept.genre.some(g => /jazz|brass|latin|barock/i.test(g))
     ? ""
     : " No trumpet/brass/horns unless the genre demands it.";
+  const timbreLine = concept.timbre?.length ? ` Timbre: ${concept.timbre.join(", ")}.` : "";
+  const exclLine = concept.excludedStyles?.length ? ` Do not suggest or imply: ${concept.excludedStyles.join(", ")}.` : "";
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
     contents: `Current Suno V 5.5 style prompt: "${prompt}"
-Genre context: ${concept.genre.join(", ")}. Topic: "${concept.topic}".
+Genre context: ${concept.genre.join(", ")}. Topic: "${concept.topic}".${timbreLine}${exclLine}
 
 Task: Enrich this style prompt for Suno V 5.5. Make it more specific and professional:
 - Add precise BPM and feel if missing (e.g. "118 BPM, halftime feel").
@@ -1113,6 +1295,8 @@ export const generateCreativeBoost = async (concept: SongConcept): Promise<Creat
 - Mood: ${concept.mood.length ? concept.mood.join(', ') : 'none'}
 - Tempo: ${concept.tempo.length ? concept.tempo.join(', ') : 'none'}
 - Instruments: ${concept.instrumentation?.length ? concept.instrumentation.join(', ') : 'none'}
+- Timbre: ${concept.timbre?.length ? concept.timbre.join(', ') : 'none'}
+- Exclude (avoid): ${concept.excludedStyles?.length ? concept.excludedStyles.join(', ') : 'none'}
 - Vocals: ${concept.vocals.length ? concept.vocals.join(', ') : 'none'}
 - Instrumental: ${concept.isInstrumental ? 'yes' : 'no'}
 - Randomness seed: ${salt}
@@ -1222,8 +1406,10 @@ export const generateCoverArt = async (concept: SongConcept, artStyle: string = 
     : "professional photography or digital painting";
   const genreStr = concept.genre?.length ? concept.genre.join(", ") : "music";
   const moodStr = concept.mood?.length ? concept.mood.join(", ") : "emotional";
+  const timbreStr = concept.timbre?.length ? concept.timbre.join(", ") : "";
+  const timbreSeg = timbreStr ? ` Sonic mood / timbre: ${timbreStr}.` : "";
   // Ein kompakter Prompt von Anfang an: Thema, Genre, Mood, Style – Kontext zu Lyrics/Style bleibt erhalten, weniger Tokens
-  const coverPrompt = `Album cover. Theme: "${concept.topic}". Genre: ${genreStr}. Mood: ${moodStr}. Visual style: ${styleInstruction}. No text in image.`;
+  const coverPrompt = `Album cover. Theme: "${concept.topic}". Genre: ${genreStr}. Mood: ${moodStr}.${timbreSeg} Visual style: ${styleInstruction}. No text in image.`;
 
   const extractImageFromResponse = (response: Awaited<ReturnType<typeof ai.models.generateContent>>): string | null => {
     const parts = response.candidates?.[0]?.content?.parts;

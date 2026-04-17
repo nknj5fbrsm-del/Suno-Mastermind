@@ -7,9 +7,11 @@ import {
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
   synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
+  analyzeChordProgression,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
+import ChordInspirationModal from './ChordInspirationModal';
 
 interface ConceptFormProps {
   initialConcept: SongConcept;
@@ -17,6 +19,32 @@ interface ConceptFormProps {
   /** Wird bei jeder Änderung aufgerufen, damit die App den aktuellen Konzept-Stand behält (z. B. beim Tab-Wechsel ohne „Weiter“). */
   onConceptChange?: (concept: SongConcept) => void;
 }
+
+type CreativeLabToolHelpId = 'refMixer' | 'chords' | 'fusion' | 'boost';
+
+const LabHelpIconButton: React.FC<{
+  onClick: () => void;
+  accent: 'primary' | 'secondary';
+}> = ({ onClick, accent }) => {
+  const { tr } = useLang();
+  const tone =
+    accent === 'primary'
+      ? 'text-suno-primary/45 hover:text-suno-primary hover:bg-suno-primary/[0.12] dark:hover:bg-suno-primary/15'
+      : 'text-suno-secondary/45 hover:text-suno-secondary hover:bg-suno-secondary/[0.12] dark:hover:bg-suno-secondary/15';
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`inline-flex flex-shrink-0 items-center justify-center rounded-lg p-1.5 min-h-[1.625rem] min-w-[1.625rem] transition-all duration-200 ${tone}`}
+      aria-label={tr.concept.creativeLabToolHelpAria}
+    >
+      <i className="fas fa-circle-question text-[12px]" aria-hidden />
+    </button>
+  );
+};
 
 // ─── Deduplizierung inhaltlich (Groß-/Kleinschreibung ignorieren), erste Schreibweise behalten ───
 function dedupeByContent(arr: string[]): string[] {
@@ -27,6 +55,88 @@ function dedupeByContent(arr: string[]): string[] {
     seen.add(key);
     return true;
   });
+}
+
+function normalizeConceptToken(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[–—\-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const CONCEPT_SYNONYM_GROUPS: readonly (readonly string[])[] = [
+  ['acoustic guitar', 'akustikgitarre', 'akustik gitarre'],
+  ['electric guitar', 'e-gitarre', 'e gitarre', 'elektrische gitarre'],
+  ['rhodes piano', 'rhodes pno', 'rhodes'],
+  ['upright bass', 'double bass', 'kontrabass', 'contrabass'],
+  ['bass guitar', 'e-bass', 'e bass', 'bassgitarre'],
+  ['drums', 'drum kit', 'schlagzeug', 'drum set'],
+  ['synthesizer', 'synth', 'synthesiser'],
+  ['piano', 'klavier', 'grand piano', 'flügel'],
+  ['violin', 'geige'],
+  ['cello', 'violoncello'],
+  ['saxophone', 'sax', 'saxophon'],
+  ['trumpet', 'trompete'],
+  ['trombone', 'posaune'],
+  ['flute', 'flöte', 'floete'],
+  ['clarinet', 'klarinette'],
+  ['organ', 'orgel', 'hammond'],
+  ['strings', 'string section', 'strings section', 'streicher', 'streichersektion'],
+  ['melancholic', 'melancholisch'],
+  ['energetic', 'energetisch'],
+  ['slow', 'langsam'],
+  ['fast', 'schnell'],
+];
+
+function synonymGroupId(token: string): number | undefined {
+  const n = normalizeConceptToken(token);
+  for (let i = 0; i < CONCEPT_SYNONYM_GROUPS.length; i++) {
+    for (const m of CONCEPT_SYNONYM_GROUPS[i]) {
+      if (normalizeConceptToken(m) === n) return i;
+    }
+  }
+  return undefined;
+}
+
+function mergeDetailLists(existing: string[], incoming: string[]): string[] {
+  const out: string[] = [...existing];
+  const seenNorm = new Set(existing.map((e) => normalizeConceptToken(e)).filter(Boolean));
+  const takenGroups = new Set<number>();
+  for (const e of existing) {
+    const gid = synonymGroupId(e);
+    if (gid !== undefined) takenGroups.add(gid);
+  }
+  for (const inc of incoming) {
+    const t = inc.trim();
+    if (!t) continue;
+    const n = normalizeConceptToken(t);
+    if (seenNorm.has(n)) continue;
+    const gid = synonymGroupId(t);
+    if (gid !== undefined && takenGroups.has(gid)) continue;
+    out.push(t);
+    seenNorm.add(n);
+    if (gid !== undefined) takenGroups.add(gid);
+  }
+  return dedupeByContent(out);
+}
+
+/** Mindestens ein Detail-Feld (Genre, Mood, …) befüllt — erneute Analyse soll nachfragen. */
+function hasConceptDetailSelections(c: SongConcept): boolean {
+  const nonEmpty = (a?: string[]) => Array.isArray(a) && a.length > 0;
+  if (
+    nonEmpty(c.genre) ||
+    nonEmpty(c.mood) ||
+    nonEmpty(c.tempo) ||
+    nonEmpty(c.instrumentation) ||
+    nonEmpty(c.timbre) ||
+    nonEmpty(c.excludedStyles)
+  ) {
+    return true;
+  }
+  if (!c.isInstrumental && (nonEmpty(c.language) || nonEmpty(c.vocals))) return true;
+  return false;
 }
 
 // ─── Tempo: 0/1 Eintrag unverändert; 2+ Einträge → ein Wert oder Bereich "min–max" ───
@@ -261,7 +371,12 @@ const emptySlot = (): MixerSlot => ({
 const ReferenzMixer: React.FC<{
   onApply: (result: ReferenceStyleResult) => void;
   onApplySingle?: (result: AudioAnalysisResult) => void;
-}> = ({ onApply, onApplySingle }) => {
+  /** Kompakteres Layout für 2-Spalten-Grid (z. B. Kreativ-Lab neben Akkorde) */
+  compact?: boolean;
+  /** Akzentfarbe der Lab-Karte (Schachbrett mit Akkord-Karte) */
+  labAccent?: 'primary' | 'secondary';
+  onToolHelp?: () => void;
+}> = ({ onApply, onApplySingle, compact, labAccent = 'primary', onToolHelp }) => {
   const { tr } = useLang();
   const { showToast } = useToast();
   const [isOpen, setIsOpen]           = useState(false);
@@ -340,7 +455,7 @@ const ReferenzMixer: React.FC<{
     if (!slot.file || slot.analyzing) return;
     setSlot(idx, { analyzing: true, error: '', analysis: null });
     try {
-      const result = await analyzeAudio(slot.file.base64, slot.file.mimeType);
+      const result = await analyzeAudio(slot.file.base64, slot.file.mimeType, lang);
       setSlot(idx, { analysis: result, analyzing: false });
     } catch (e: any) {
       setSlot(idx, { error: e.message || 'Analyse fehlgeschlagen.', analyzing: false });
@@ -378,37 +493,112 @@ const ReferenzMixer: React.FC<{
   const pendingAnalysis = slots.filter(s => s.file && !s.analysis && !s.analyzing).length;
   const anyAnalyzing   = slots.some(s => s.analyzing);
 
+  const headerPad = compact ? 'px-4 py-3' : 'px-6 py-4';
+  const bodyPad = compact ? 'px-4 pb-4 pt-3' : 'px-6 pb-6 pt-4';
+  const labSec = Boolean(compact && labAccent === 'secondary');
+  const iconBox = labSec ? 'bg-suno-secondary/15' : 'bg-suno-primary/15';
+  const iconColor = labSec ? 'text-suno-secondary' : 'text-suno-primary';
+  const openBtnClass = labSec
+    ? 'border border-suno-secondary/35 text-suno-secondary hover:bg-suno-secondary/15 hover:border-suno-secondary/50'
+    : 'border border-suno-primary/35 text-suno-primary hover:bg-suno-primary/15 hover:border-suno-primary/50';
+
   return (
-    <div className="glass-card rounded-3xl overflow-hidden">
-      {/* ── Header / Toggle ── */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(p => !p)}
-        className="w-full flex items-center justify-between px-6 py-4 group hover:bg-white/5 transition-colors"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-7 h-7 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
-            <i className="fas fa-layer-group text-suno-primary text-[11px]"></i>
+    <div
+      className={`glass-card overflow-hidden ${
+        compact
+          ? `rounded-2xl h-full min-h-0 flex flex-col border ${
+              labSec
+                ? 'border-suno-secondary/25 bg-suno-secondary/5 dark:bg-suno-secondary/10'
+                : 'border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10'
+            }`
+          : 'rounded-3xl'
+      }`}
+    >
+      {/* ── Header: kompakt = statisch + „Öffnen“ / „Schließen“; sonst Klappliste mit Chevron ── */}
+      {compact ? (
+        <>
+          <div
+            className={`flex items-start justify-between gap-2 ${headerPad} ${
+              isOpen ? 'border-b border-white/10 dark:border-white/8' : ''
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBox}`}>
+                <i className={`fas fa-layer-group text-[11px] ${iconColor}`}></i>
+              </div>
+              <div className="text-left min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black uppercase tracking-wider text-suno-secondary">
+                    {tr.concept.refMixer}
+                  </span>
+                  {onToolHelp && (
+                    <LabHelpIconButton accent="secondary" onClick={onToolHelp} />
+                  )}
+                  {analyzedCount > 0 && (
+                    <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                      {analyzedCount} {tr.concept.refMixerAnalyzed}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {isOpen && (
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-100 transition-colors"
+              >
+                {tr.about.close}
+              </button>
+            )}
           </div>
-          <div className="text-left min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-black uppercase tracking-wider text-zinc-100">
-                {tr.concept.refMixer}
-              </span>
-              {analyzedCount > 0 && (
-                <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
-                  {analyzedCount} {tr.concept.refMixerAnalyzed}
+          {!isOpen && (
+            <div className="px-4 pb-4 flex-1 flex flex-col justify-end mt-auto min-h-0">
+              <button
+                type="button"
+                onClick={() => setIsOpen(true)}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all ${openBtnClass}`}
+              >
+                <i className="fas fa-sliders-h text-[9px]"></i>
+                {tr.concept.chordLabOpenBtn}
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(p => !p)}
+          className={`w-full flex items-center justify-between group hover:bg-white/5 transition-colors ${headerPad}`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+              <i className="fas fa-layer-group text-suno-primary text-[11px]"></i>
+            </div>
+            <div className="text-left min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black uppercase tracking-wider text-zinc-100">
+                  {tr.concept.refMixer}
                 </span>
-              )}
+                {analyzedCount > 0 && (
+                  <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                    {analyzedCount} {tr.concept.refMixerAnalyzed}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ml-3 ${isOpen ? 'rotate-180' : ''}`}></i>
-      </button>
+          <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ml-3 ${isOpen ? 'rotate-180' : ''}`}></i>
+        </button>
+      )}
 
       {/* ── Body ── */}
       {isOpen && (
-        <div className="px-6 pb-6 space-y-4 border-t border-white/10 dark:border-white/8 pt-4">
+        <div
+          className={`space-y-4 ${compact ? '' : 'border-t border-white/10 dark:border-white/8'} ${bodyPad} ${
+            compact ? 'flex-1 min-h-0 overflow-y-auto' : ''
+          }`}
+        >
 
           {/* Slots */}
           <div className="space-y-2">
@@ -606,9 +796,9 @@ const ReferenzMixer: React.FC<{
                 )}
                 {synthResult.regieSeed && (
                   <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
-                    <i className="fas fa-clapperboard text-amber-500 text-[9px] mt-0.5 flex-shrink-0"></i>
+                    <i className="fas fa-clapperboard text-suno-secondary text-[9px] mt-0.5 flex-shrink-0"></i>
                     <div className="min-w-0">
-                      <p className="text-[8px] font-black uppercase tracking-wider text-amber-500 mb-0.5">{tr.concept.refMixerRegieSeed}</p>
+                      <p className="text-[8px] font-black uppercase tracking-wider text-suno-secondary mb-0.5">{tr.concept.refMixerRegieSeed}</p>
                       <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed font-mono">{synthResult.regieSeed}</p>
                     </div>
                   </div>
@@ -644,6 +834,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isChordModalOpen, setIsChordModalOpen] = useState(false);
+  const [chordDraft, setChordDraft] = useState('');
+  const [isChordAnalyzing, setIsChordAnalyzing] = useState(false);
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -658,6 +851,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   // Kreativ-Lab (gesamt ein-/ausklappbar)
   const [isLabOpen, setIsLabOpen] = useState(false);
   const [labHelpModalOpen, setLabHelpModalOpen] = useState(false);
+  const [creativeToolHelp, setCreativeToolHelp] = useState<CreativeLabToolHelpId | null>(null);
+  const [inspireHelpOpen, setInspireHelpOpen] = useState(false);
+  const [analyzeAgainModalOpen, setAnalyzeAgainModalOpen] = useState(false);
+  const [songIdeaFieldHelpOpen, setSongIdeaFieldHelpOpen] = useState(false);
   const [genreFieldPulse, setGenreFieldPulse] = useState(false);
   const genreFieldRef = useRef<HTMLDivElement>(null);
   // Verhindert Flackern im Song-Idee-Feld: Rücksync vom Parent überspringen, wenn die Änderung von uns kam
@@ -696,24 +893,40 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     } finally { setIsRandomizing(false); }
   };
 
-  const handleAnalyze = async () => {
+  const runSongIdeaAnalysis = async (mode: 'merge' | 'replace') => {
     if (!concept.topic || concept.topic.length < 3) { showToast(tr.concept.enterTopicFirst, 'error'); return; }
+    setAnalyzeAgainModalOpen(false);
     setIsAnalyzing(true);
     try {
-      const s = await analyzeTopic(concept.topic, concept.isInstrumental);
-      setConcept(prev => ({
-        ...prev,
-        genre:           s.genre?.length              ? s.genre           : prev.genre,
-        mood:            s.mood?.length               ? s.mood            : prev.mood,
-        tempo:           s.tempo?.length              ? s.tempo           : prev.tempo,
-        instrumentation: s.instrumentation?.length    ? s.instrumentation : (prev.instrumentation ?? []),
-        language:        prev.isInstrumental ? [] : (s.language?.length  ? s.language  : prev.language),
-        vocals:          prev.isInstrumental ? [] : (s.vocals?.length    ? s.vocals    : prev.vocals),
-      }));
+      const s = await analyzeTopic(concept.topic, concept.isInstrumental, lang);
+      setConcept(prev => {
+        const mergeOrReplace = (existing: string[], incoming: string[]) =>
+          mode === 'replace' ? mergeDetailLists([], incoming) : mergeDetailLists(existing, incoming);
+        return {
+          ...prev,
+          genre: mergeOrReplace(prev.genre, s.genre ?? []),
+          mood: mergeOrReplace(prev.mood, s.mood ?? []),
+          tempo: normalizeTempoToSingleOrRange(mergeOrReplace(prev.tempo, s.tempo ?? [])),
+          instrumentation: mergeOrReplace(prev.instrumentation ?? [], s.instrumentation ?? []),
+          timbre: mergeOrReplace(prev.timbre ?? [], s.timbre ?? []),
+          excludedStyles: mergeOrReplace(prev.excludedStyles ?? [], s.excludedStyles ?? []),
+          language: prev.isInstrumental ? [] : mergeOrReplace(prev.language, s.language ?? []),
+          vocals: prev.isInstrumental ? [] : mergeOrReplace(prev.vocals, s.vocals ?? []),
+        };
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
       showToast(tr.errors.aiErrorPrefix + msg, 'error');
     } finally { setIsAnalyzing(false); }
+  };
+
+  const handleAnalyzeClick = () => {
+    if (!concept.topic || concept.topic.length < 3) { showToast(tr.concept.enterTopicFirst, 'error'); return; }
+    if (hasConceptDetailSelections(concept)) {
+      setAnalyzeAgainModalOpen(true);
+      return;
+    }
+    void runSongIdeaAnalysis('merge');
   };
 
   const handleImageFile = async (file: File) => {
@@ -779,7 +992,56 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     }
   };
 
-  const toggle = (key: keyof Pick<SongConcept, 'genre'|'mood'|'excludedStyles'|'language'|'vocals'|'tempo'|'instrumentation'>, val: string) => {
+  const openChordModal = () => {
+    setChordDraft(concept.chordProgression ?? '');
+    setIsChordModalOpen(true);
+  };
+
+  const closeChordModal = () => {
+    setConcept((prev) => ({
+      ...prev,
+      chordProgression: chordDraft.trim() || undefined,
+    }));
+    setIsChordModalOpen(false);
+  };
+
+  const appendChordSnippet = (snippet: string) => {
+    const s = snippet.trim();
+    if (!s) return;
+    setChordDraft((prev) => (prev.trim() ? `${prev.trim()} | ${s}` : s));
+  };
+
+  const handleChordAnalyze = async () => {
+    const raw = chordDraft.trim();
+    if (!raw) {
+      showToast(tr.concept.chordEmptyError, 'error');
+      return;
+    }
+    setIsChordAnalyzing(true);
+    try {
+      const s = await analyzeChordProgression(raw, concept.isInstrumental, lang);
+      setConcept((prev) => ({
+        ...prev,
+        chordProgression: raw,
+        genre: mergeDetailLists(prev.genre, s.genre ?? []),
+        mood: mergeDetailLists(prev.mood, s.mood ?? []),
+        tempo: normalizeTempoToSingleOrRange(mergeDetailLists(prev.tempo, s.tempo ?? [])),
+        instrumentation: mergeDetailLists(prev.instrumentation ?? [], s.instrumentation ?? []),
+        timbre: mergeDetailLists(prev.timbre ?? [], s.timbre ?? []),
+        excludedStyles: mergeDetailLists(prev.excludedStyles ?? [], s.excludedStyles ?? []),
+        language: prev.isInstrumental ? [] : mergeDetailLists(prev.language, s.language ?? []),
+        vocals: prev.isInstrumental ? [] : mergeDetailLists(prev.vocals, s.vocals ?? []),
+      }));
+      showToast(tr.concept.chordAnalyzeSuccess, 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally {
+      setIsChordAnalyzing(false);
+    }
+  };
+
+  const toggle = (key: keyof Pick<SongConcept, 'genre'|'mood'|'excludedStyles'|'language'|'vocals'|'tempo'|'instrumentation'|'timbre'>, val: string) => {
     setConcept(prev => {
       const cur = (prev[key] as string[] | undefined) ?? [];
       return { ...prev, [key]: cur.includes(val) ? cur.filter(i => i !== val) : [...cur, val] };
@@ -789,25 +1051,26 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const handleAudioAnalysis = (result: AudioAnalysisResult) => {
     setConcept(prev => ({
       ...prev,
-      topic:           prev.topic.trim() ? prev.topic : (result.topicSuggestion || prev.topic),
-      isInstrumental:  result.isInstrumental ?? prev.isInstrumental,
-      genre:           prev.genre.length           ? prev.genre           : (result.genre          ?? []),
-      mood:            prev.mood.length            ? prev.mood            : (result.mood           ?? []),
-      tempo:           prev.tempo.length           ? prev.tempo           : (result.tempo          ?? []),
-      instrumentation: (prev.instrumentation?.length ?? 0) > 0 ? prev.instrumentation! : (result.instrumentation ?? []),
-      vocals:          result.isInstrumental ? [] : (prev.vocals.length   ? prev.vocals            : (result.vocals    ?? [])),
-      language:        result.isInstrumental ? [] : (prev.language.length ? prev.language          : (result.language  ?? [])),
+      topic: prev.topic.trim() ? prev.topic : (result.topicSuggestion || prev.topic),
+      isInstrumental: result.isInstrumental ?? prev.isInstrumental,
+      genre: mergeDetailLists(prev.genre, result.genre ?? []),
+      mood: mergeDetailLists(prev.mood, result.mood ?? []),
+      tempo: normalizeTempoToSingleOrRange(mergeDetailLists(prev.tempo, result.tempo ?? [])),
+      instrumentation: mergeDetailLists(prev.instrumentation ?? [], result.instrumentation ?? []),
+      timbre: mergeDetailLists(prev.timbre ?? [], result.timbre ?? []),
+      excludedStyles: mergeDetailLists(prev.excludedStyles ?? [], result.excludedStyles ?? []),
+      vocals: result.isInstrumental ? [] : mergeDetailLists(prev.vocals, result.vocals ?? []),
+      language: result.isInstrumental ? [] : mergeDetailLists(prev.language, result.language ?? []),
     }));
   };
 
   // ─── Referenz-Mixer ───
   const handleMixerApply = (result: ReferenceStyleResult) => {
     setConcept(prev => {
-      const genre = result.genre.length ? dedupeByContent([...prev.genre, ...result.genre]) : prev.genre;
-      const mood = result.mood.length ? dedupeByContent([...prev.mood, ...result.mood]) : prev.mood;
-      const tempoRaw = result.tempo.length ? dedupeByContent([...prev.tempo, ...result.tempo]) : prev.tempo;
-      const tempo = normalizeTempoToSingleOrRange(tempoRaw);
-      const instrumentation = result.instrumentation.length ? dedupeByContent([...(prev.instrumentation ?? []), ...result.instrumentation]) : prev.instrumentation;
+      const genre = mergeDetailLists(prev.genre, result.genre ?? []);
+      const mood = mergeDetailLists(prev.mood, result.mood ?? []);
+      const tempo = normalizeTempoToSingleOrRange(mergeDetailLists(prev.tempo, result.tempo ?? []));
+      const instrumentation = mergeDetailLists(prev.instrumentation ?? [], result.instrumentation ?? []);
       return { ...prev, genre, mood, tempo, instrumentation };
     });
     showToast('Referenz-Stil übernommen ✓', 'success');
@@ -831,15 +1094,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   const applyFusion = () => {
     if (!fusionResult) return;
     setConcept(prev => {
-      const newInstr = [...(prev.instrumentation ?? [])];
-      fusionResult.suggestedInstruments.forEach(i => { if (!newInstr.includes(i)) newInstr.push(i); });
-      const newMood = [...prev.mood];
-      fusionResult.suggestedMood.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
-      const newTempo = [...prev.tempo];
-      if (fusionResult.suggestedBPM && !newTempo.includes(fusionResult.suggestedBPM)) newTempo.push(fusionResult.suggestedBPM);
-      const instrumentation = dedupeByContent(newInstr);
-      const mood = dedupeByContent(newMood);
-      const tempo = normalizeTempoToSingleOrRange(dedupeByContent(newTempo));
+      const extraTempo = fusionResult.suggestedBPM ? [fusionResult.suggestedBPM] : [];
+      const instrumentation = mergeDetailLists(prev.instrumentation ?? [], fusionResult.suggestedInstruments ?? []);
+      const mood = mergeDetailLists(prev.mood, fusionResult.suggestedMood ?? []);
+      const tempo = normalizeTempoToSingleOrRange(mergeDetailLists(prev.tempo, extraTempo));
       return { ...prev, instrumentation, mood, tempo };
     });
     setFusionResult(null);
@@ -862,49 +1120,68 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
 
   const applyBoost = () => {
     if (!boostResult) return;
-    setConcept(prev => {
-      const newGenre = [...prev.genre];
-      boostResult.addGenres.forEach(g => { if (!newGenre.includes(g)) newGenre.push(g); });
-      const newInstr = [...(prev.instrumentation ?? [])];
-      boostResult.addInstruments.forEach(i => { if (!newInstr.includes(i)) newInstr.push(i); });
-      const newMood = [...prev.mood];
-      boostResult.addMoods.forEach(m => { if (!newMood.includes(m)) newMood.push(m); });
-      return {
-        ...prev,
-        genre: dedupeByContent(newGenre),
-        instrumentation: dedupeByContent(newInstr),
-        mood: dedupeByContent(newMood),
-      };
-    });
+    setConcept(prev => ({
+      ...prev,
+      genre: mergeDetailLists(prev.genre, boostResult.addGenres ?? []),
+      instrumentation: mergeDetailLists(prev.instrumentation ?? [], boostResult.addInstruments ?? []),
+      mood: mergeDetailLists(prev.mood, boostResult.addMoods ?? []),
+    }));
     setBoostResult(null);
   };
 
   const kreativLabContent = isLabOpen ? (
     <div className="space-y-4 pt-2 border-t border-white/10 dark:border-white/5">
-      {/* Referenz-Mixer */}
-      <ReferenzMixer onApply={handleMixerApply} onApplySingle={handleAudioAnalysis} />
+      {/* Obere Reihe: Referenz-Mixer + Akkorde (gleiches Breakpoint wie Fusion & Boost) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        <ReferenzMixer
+          compact
+          labAccent="secondary"
+          onApply={handleMixerApply}
+          onApplySingle={handleAudioAnalysis}
+          onToolHelp={() => setCreativeToolHelp('refMixer')}
+        />
+        <div className="rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 h-full min-h-0 flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-guitar text-suno-primary text-[11px]"></i>
+              </div>
+              <p className="text-xs font-black uppercase tracking-wider text-suno-primary truncate">{tr.concept.chordInspirationBtn}</p>
+              <LabHelpIconButton accent="primary" onClick={() => setCreativeToolHelp('chords')} />
+            </div>
+            {concept.chordProgression?.trim() && (
+              <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-suno-primary/20 text-suno-primary text-[8px] font-black flex-shrink-0">
+                1
+              </span>
+            )}
+          </div>
+          {concept.chordProgression?.trim() && (
+            <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 truncate" title={concept.chordProgression}>
+              {concept.chordProgression}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={openChordModal}
+            className="mt-auto w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] border border-suno-primary/35 text-suno-primary hover:bg-suno-primary/15 hover:border-suno-primary/50 transition-all"
+          >
+            <i className="fas fa-sliders-h text-[9px]"></i>
+            {tr.concept.chordLabOpenBtn}
+          </button>
+        </div>
+      </div>
 
-      {/* Fusion & Boost nebeneinander */}
+      {/* Untere Reihe: Fusion & Boost */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Genre-Fusion Block */}
-        <div
-          className={`rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3 ${concept.genre.length < 2 ? 'cursor-pointer hover:bg-suno-primary/10 dark:hover:bg-suno-primary/15 transition-colors' : ''}`}
-          onClick={concept.genre.length < 2 ? focusGenreField : undefined}
-          role={concept.genre.length < 2 ? 'button' : undefined}
-          tabIndex={concept.genre.length < 2 ? 0 : undefined}
-          onKeyDown={concept.genre.length < 2 ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusGenreField(); } } : undefined}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
-                <i className="fas fa-shuffle text-suno-primary text-[10px]"></i>
+        <div className="rounded-2xl border border-suno-primary/25 bg-suno-primary/5 dark:bg-suno-primary/10 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-shuffle text-suno-primary text-[11px]"></i>
               </div>
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary">{tr.concept.fusionLab}</p>
-                <p className="text-[11px] text-zinc-200 dark:text-zinc-100">
-                  {concept.genre.length >= 2 ? concept.genre.join(' + ') : tr.concept.genre}
-                </p>
-              </div>
+              <p className="text-xs font-black uppercase tracking-wider text-suno-primary truncate">{tr.concept.fusionLab}</p>
+              <LabHelpIconButton accent="primary" onClick={() => setCreativeToolHelp('fusion')} />
             </div>
           </div>
 
@@ -913,7 +1190,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
               type="button"
               onClick={handleFusion}
               disabled={isFusing}
-              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.12em] transition-all border ${
+              className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
                 isFusing
                   ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
                   : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
@@ -930,9 +1207,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
               )}
             </button>
           ) : (
-            <p className="text-[9px] text-zinc-500 dark:text-zinc-500">
-              {tr.concept.fusionHintMinTwo}
-            </p>
+            <button
+              type="button"
+              onClick={focusGenreField}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] border border-suno-primary/35 text-suno-primary hover:bg-suno-primary/15 hover:border-suno-primary/50 transition-all"
+            >
+              <i className="fas fa-arrow-down text-[9px]"></i>
+              {tr.concept.fusionPickGenresBtn}
+            </button>
           )}
 
           {fusionResult && (
@@ -987,14 +1269,13 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
 
         {/* Kreativ-Boost Block */}
         <div className="rounded-2xl border border-suno-secondary/25 bg-suno-secondary/5 dark:bg-suno-secondary/10 p-4 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
-                <i className="fas fa-bolt text-suno-secondary text-sm"></i>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-xl bg-suno-secondary/20 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-bolt text-suno-secondary text-[11px]"></i>
               </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-suno-secondary">{tr.concept.creativeBoost}</p>
-              </div>
+              <p className="text-xs font-black uppercase tracking-wider text-suno-secondary truncate">{tr.concept.creativeBoost}</p>
+              <LabHelpIconButton accent="secondary" onClick={() => setCreativeToolHelp('boost')} />
             </div>
           </div>
 
@@ -1049,9 +1330,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
 
               {boostResult.productionTip && (
                 <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-white/40 dark:bg-black/20">
-                  <i className="fas fa-lightbulb text-amber-500 text-[10px] mt-0.5 flex-shrink-0"></i>
+                  <i className="fas fa-lightbulb text-suno-secondary text-[10px] mt-0.5 flex-shrink-0"></i>
                   <p className="text-[10px] text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    <span className="font-black uppercase tracking-wider text-amber-500 mr-1">{tr.concept.boostTip}:</span>
+                    <span className="font-black uppercase tracking-wider text-suno-secondary mr-1">{tr.concept.boostTip}:</span>
                     {boostResult.productionTip}
                   </p>
                 </div>
@@ -1087,9 +1368,13 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
       {/* ═══ TOPIC CARD ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
-            <i className="fas fa-lightbulb text-suno-primary mr-2"></i>{tr.concept.songIdea}
-          </h3>
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
+              <i className="fas fa-lightbulb text-suno-primary flex-shrink-0"></i>
+              <span>{tr.concept.songIdea}</span>
+            </h3>
+            <LabHelpIconButton accent="primary" onClick={() => setSongIdeaFieldHelpOpen(true)} />
+          </div>
 
           <div
             className="flex items-center gap-2 cursor-pointer select-none group"
@@ -1103,63 +1388,72 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
           </div>
         </div>
 
-        <div className="relative">
+        <div className="glass-input flex flex-col overflow-hidden rounded-2xl p-0 min-h-[9rem] transition-[box-shadow,border-color] focus-within:border-suno-primary focus-within:shadow-[0_0_0_3px_rgba(168,85,247,0.15)] dark:focus-within:shadow-[0_0_0_3px_rgba(168,85,247,0.2)]">
           <textarea
-            className="glass-input w-full rounded-2xl px-4 py-4 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-300 dark:placeholder:text-zinc-500 resize-none h-32 custom-scrollbar"
+            className="w-full min-h-[6.5rem] flex-1 cursor-text resize-none border-0 bg-transparent px-4 py-3 text-sm text-zinc-900 caret-suno-primary outline-none ring-0 dark:text-zinc-100 dark:caret-suno-secondary custom-scrollbar placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             placeholder={concept.isInstrumental ? tr.concept.placeholderInstrumental : tr.concept.placeholder}
+            aria-label={tr.concept.songIdea}
             value={concept.topic}
             onChange={(e) => setConcept(prev => ({ ...prev, topic: e.target.value }))}
           />
-        </div>
-
-        {/* Controls row */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Randomize */}
-          <div className="flex items-center glass-btn rounded-xl overflow-hidden p-0">
-            <button type="button" onClick={handleRandomize} disabled={isRandomizing}
-              className="px-4 py-2 text-suno-primary hover:bg-suno-primary/10 transition-colors text-sm font-bold uppercase tracking-wider"
-              title={opts.randomizeTitle}>
-              <span className="mr-2 text-[10px]">{opts.randomThemes[0]}</span>
-              <i className={`fas fa-dice ${isRandomizing ? 'animate-spin' : ''}`}></i>
-            </button>
+          <div className="flex shrink-0 justify-center border-t border-zinc-200/70 bg-zinc-50/50 px-2 py-1.5 dark:border-white/10 dark:bg-black/15">
+            <div className="flex w-full max-w-lg justify-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleRandomize}
+                disabled={isRandomizing}
+                title={opts.randomizeTitle}
+                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
+              >
+                <span className="truncate">{opts.randomThemes[0]}</span>
+                <i className={`fas fa-dice flex-shrink-0 text-[9px] ${isRandomizing ? 'animate-spin' : ''}`}></i>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsImageModalOpen(true)}
+                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg border border-suno-secondary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-secondary transition-colors hover:border-suno-secondary hover:bg-suno-secondary hover:text-white"
+              >
+                <i className="fas fa-image flex-shrink-0 text-[9px]"></i>
+                <span className="min-w-0 truncate">{tr.concept.imageInspirationTitle}</span>
+                {(inspirationImage || concept.imageInspirationText?.trim()) && (
+                  <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-secondary/25 px-1 text-[8px] font-black">
+                    1
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsImageModalOpen(true)}
-            className="glass-btn flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] text-suno-secondary border border-suno-secondary/20 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary transition-all"
-          >
-            <i className="fas fa-image"></i>
-            {tr.concept.imageInspirationTitle}
-            {(inspirationImage || concept.imageInspirationText?.trim()) && (
-              <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-suno-secondary/20 text-suno-secondary text-[8px] font-black">
-                1
-              </span>
-            )}
-          </button>
-
         </div>
-        <div className="rounded-2xl border border-suno-primary/20 bg-suno-primary/5 dark:bg-suno-primary/10 px-3 py-3 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-suno-primary">
-              <i className="fas fa-gears mr-2"></i>
-              {tr.concept.inspire}
-            </p>
-            <button type="button" onClick={handleAnalyze}
-              disabled={isAnalyzing || !concept.topic}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+        <div className="relative rounded-2xl border border-suno-primary/20 bg-suno-primary/5 dark:bg-suno-primary/10 px-4 py-3">
+          <div className="absolute top-2.5 right-2.5 z-10">
+            <LabHelpIconButton accent="primary" onClick={() => setInspireHelpOpen(true)} />
+          </div>
+          <div className="flex flex-col items-center text-center">
+            <button
+              type="button"
+              onClick={handleAnalyzeClick}
+              disabled={isAnalyzing || !concept.topic?.trim()}
+              className={`w-full max-w-[16rem] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-[0.12em] transition-colors border ${
                 isAnalyzing
-                  ? 'glass-btn text-suno-primary border-suno-primary/30 animate-pulse'
-                  : 'glass-btn text-suno-primary border-suno-primary/20 hover:bg-suno-primary hover:text-white hover:border-suno-primary'
-              }`}>
-              {isAnalyzing
-                ? <><i className="fas fa-spinner animate-spin"></i> {tr.concept.inspiring}</>
-                : <><i className="fas fa-wand-magic-sparkles"></i> {tr.concept.inspire}</>}
+                  ? 'glass-btn text-suno-primary border-suno-primary/35 animate-pulse cursor-wait'
+                  : concept.topic?.trim()
+                  ? 'relative text-white border-suno-primary bg-suno-primary shadow-sm animate-inspire-next-cta hover:brightness-105 active:scale-[0.99]'
+                  : 'glass-btn text-suno-primary/70 border-suno-primary/20 opacity-70 cursor-not-allowed'
+              }`}
+            >
+              {isAnalyzing ? (
+                <>
+                  <i className="fas fa-spinner animate-spin text-[11px]"></i>
+                  <span>{tr.concept.inspiring}</span>
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-wand-magic-sparkles text-[11px]"></i>
+                  <span>{tr.concept.inspire}</span>
+                </>
+              )}
             </button>
           </div>
-          <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-            {tr.concept.inspireHint}
-          </p>
         </div>
       </div>
 
@@ -1296,35 +1590,165 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
         document.body
       )}
 
+      {analyzeAgainModalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[218] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setAnalyzeAgainModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black uppercase tracking-wider text-suno-primary pr-2">
+                {tr.concept.analyzeAgainTitle}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAnalyzeAgainModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all flex-shrink-0"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-300 leading-relaxed">{tr.concept.analyzeAgainBody}</p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => void runSongIdeaAnalysis('replace')}
+                disabled={isAnalyzing}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-sync-alt text-[10px]"></i>
+                {tr.concept.analyzeAgainClear}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runSongIdeaAnalysis('merge')}
+                disabled={isAnalyzing}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] glass-btn border border-suno-secondary/40 text-suno-secondary hover:bg-suno-secondary/15 disabled:opacity-50"
+              >
+                <i className="fas fa-layer-group text-[10px]"></i>
+                {tr.concept.analyzeAgainMerge}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAnalyzeAgainModalOpen(false)}
+              className="w-full py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              {tr.concept.analyzeAgainCancel}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {inspireHelpOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[212] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setInspireHelpOpen(false)}
+        >
+          <div
+            className="w-full max-w-md glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black uppercase tracking-wider text-suno-primary">
+                {tr.concept.inspire}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setInspireHelpOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-300 leading-relaxed">{tr.concept.inspireHint}</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {songIdeaFieldHelpOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[212] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setSongIdeaFieldHelpOpen(false)}
+        >
+          <div
+            className="w-full max-w-md glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black uppercase tracking-wider text-suno-primary">
+                {tr.concept.songIdea}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSongIdeaFieldHelpOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+            <div className="space-y-4 text-[11px] text-zinc-300 leading-relaxed">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary mb-1.5">{tr.concept.lyrics}</p>
+                <p className="whitespace-pre-line">{tr.concept.songIdeaFieldHelpLyrics}</p>
+              </div>
+              <div className="border-t border-zinc-700/80 pt-4">
+                <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary mb-1.5">{tr.concept.instrumental}</p>
+                <p className="whitespace-pre-line">{tr.concept.songIdeaFieldHelpInstrumental}</p>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      <ChordInspirationModal
+        isOpen={isChordModalOpen}
+        onClose={closeChordModal}
+        chordText={chordDraft}
+        onChordTextChange={setChordDraft}
+        onAppendChord={appendChordSnippet}
+        onAnalyze={handleChordAnalyze}
+        isAnalyzing={isChordAnalyzing}
+      />
+
       {/* ═══ KREATIV-LAB ═══ */}
       <div className="glass-card rounded-3xl p-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
+              <i className="fas fa-flask text-suno-secondary text-sm"></i>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary truncate">
+              {tr.concept.creativeLab}
+            </p>
+            <LabHelpIconButton accent="secondary" onClick={() => setLabHelpModalOpen(true)} />
+          </div>
           <button
             type="button"
             onClick={() => setIsLabOpen(v => !v)}
-            className="flex-1 flex items-center justify-between gap-3 group min-w-0"
+            className={`flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+              isLabOpen
+                ? 'glass-btn text-zinc-500 border-zinc-500/25 hover:bg-zinc-500/10 hover:text-zinc-200'
+                : 'glass-btn text-suno-secondary border-suno-secondary/30 hover:bg-suno-secondary hover:text-white hover:border-suno-secondary'
+            }`}
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-2xl bg-suno-secondary/15 flex items-center justify-center flex-shrink-0">
-                <i className="fas fa-flask text-suno-secondary text-sm"></i>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-secondary">{tr.concept.creativeLab}</p>
-                {isLabOpen && (
-                  <p className="mt-0.5 text-[9px] font-bold text-zinc-300 md:hidden">
-                    {tr.concept.refMixer}
-                  </p>
-                )}
-              </div>
-            </div>
-            <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLabOpen ? 'rotate-180' : ''}`}></i>
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setLabHelpModalOpen(true); }}
-            className="flex-shrink-0 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:text-suno-secondary transition-colors px-2 py-1 rounded-lg hover:bg-suno-secondary/10"
-          >
-            {tr.concept.creativeLabShortDescBtn}
+            {isLabOpen ? (
+              <>
+                <i className="fas fa-times text-[9px]"></i>
+                {tr.about.close}
+              </>
+            ) : (
+              <>
+                <i className="fas fa-sliders-h text-[9px]"></i>
+                {tr.concept.chordLabOpenBtn}
+              </>
+            )}
           </button>
         </div>
 
@@ -1353,6 +1777,12 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
                 </div>
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-guitar text-suno-primary text-xs"></i>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescChord}</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-suno-primary/20 flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-shuffle text-suno-primary text-xs"></i>
                   </div>
                   <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescFusion}</p>
@@ -1369,11 +1799,46 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
           document.body
         )}
 
+        {creativeToolHelp && createPortal(
+          <div
+            className="fixed inset-0 z-[210] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setCreativeToolHelp(null)}
+          >
+            <div
+              className="w-full max-w-md glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-black uppercase tracking-wider text-suno-secondary">
+                  {creativeToolHelp === 'refMixer' && tr.concept.refMixer}
+                  {creativeToolHelp === 'chords' && tr.concept.chordInspirationBtn}
+                  {creativeToolHelp === 'fusion' && tr.concept.fusionLab}
+                  {creativeToolHelp === 'boost' && tr.concept.creativeBoost}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setCreativeToolHelp(null)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+                >
+                  <i className="fas fa-times text-sm"></i>
+                </button>
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-relaxed">
+                {creativeToolHelp === 'refMixer' && tr.concept.creativeLabDescRefMixer}
+                {creativeToolHelp === 'chords' && tr.concept.creativeLabDescChord}
+                {creativeToolHelp === 'fusion' && tr.concept.creativeLabDescFusion}
+                {creativeToolHelp === 'boost' && tr.concept.creativeLabDescBoost}
+              </p>
+            </div>
+          </div>,
+          document.body
+        )}
+
         {kreativLabContent}
       </div>
 
-      {/* ═══ FIELDS GRID ═══ */}
-      <div className="glass-card rounded-3xl p-6 space-y-6">
+      {/* ═══ FIELDS GRID ═══ (z-20: Dropdowns über dem Weiter-Button) ═══ */}
+      <div className="glass-card relative z-20 rounded-3xl p-6 space-y-6">
         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
           <span className="section-pill">{tr.concept.details}</span>
           <span className="gradient-line flex-1 block"></span>
@@ -1405,11 +1870,14 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
             <SearchableMultiInput label={tr.concept.instruments} icon="fa-guitar" options={opts.instruments} selected={concept.instrumentation ?? []}
               onToggle={(v) => toggle('instrumentation', v)} placeholder={opts.instruments.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-orange-500" />
           </div>
-        </div>
-
-        <div className="pt-2 border-t border-white/20 dark:border-white/8">
-          <SearchableMultiInput label={tr.concept.exclude} icon="fa-ban" options={opts.exclusions} selected={concept.excludedStyles}
-            onToggle={(v) => toggle('excludedStyles', v)} placeholder={opts.exclusions.slice(0, 2).join(', ') + '…'} accent="text-red-400" />
+          <div className="relative">
+            <SearchableMultiInput label={tr.concept.timbre} icon="fa-wave-square" options={opts.timbre} selected={concept.timbre ?? []}
+              onToggle={(v) => toggle('timbre', v)} placeholder={opts.timbre.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-cyan-400" />
+          </div>
+          <div className="relative">
+            <SearchableMultiInput label={tr.concept.exclude} icon="fa-ban" options={opts.exclusions} selected={concept.excludedStyles}
+              onToggle={(v) => toggle('excludedStyles', v)} placeholder={opts.exclusions.slice(0, 2).join(', ') + '…'} isLoading={isAnalyzing} accent="text-red-400" />
+          </div>
         </div>
       </div>
 

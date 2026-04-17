@@ -11,6 +11,8 @@ export type ThemeName = 'mastermind' | 'sunset' | 'forest';
 
 export interface SongConcept {
   topic: string;
+  /** Optional: eingegebene Akkordfolge (Konzept-Hilfe; Suno folgt ihr nicht exakt). */
+  chordProgression?: string;
   imageInspirationText?: string;
   inspirationSource?: 'text' | 'image' | 'mixed';
   genre: string[];
@@ -24,6 +26,8 @@ export interface SongConcept {
   /** Optionaler, separater Gesangsstil für Lyrics-Variante 2 (Fallback: vocals). */
   vocalsVariant2?: string[];
   instrumentation?: string[];
+  /** Klangfarbe / Timbre-Ziele (z. B. warm, tape-saturated) – getrennt von Instrumentenliste. */
+  timbre: string[];
   excludedStyles: string[];
 }
 

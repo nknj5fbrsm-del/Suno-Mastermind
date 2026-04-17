@@ -91,6 +91,7 @@ const App: React.FC = () => {
     isInstrumental: false,
     vocals: [],
     instrumentation: [],
+    timbre: [],
     excludedStyles: [],
   });
   const [lyrics, setLyrics] = useState<string>('');
@@ -175,6 +176,7 @@ const App: React.FC = () => {
   const handleStartNew = useCallback(() => {
     setConcept({
       topic: '',
+      chordProgression: undefined,
       genre: [],
       mood: [],
       tempo: [],
@@ -182,6 +184,7 @@ const App: React.FC = () => {
       isInstrumental: false,
       vocals: [],
       instrumentation: [],
+      timbre: [],
       excludedStyles: [],
     });
     setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setStyleRegenPendingForVariants([]); setCoverUrl('');
@@ -223,13 +226,15 @@ const App: React.FC = () => {
       let finalConcept = { ...concept };
       if (!finalConcept.topic.trim()) finalConcept = { ...finalConcept, topic: await generateRandomTopic() };
       setLoadingProgress(15);
-      const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental);
+      const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental, lang);
       finalConcept = {
         ...finalConcept,
         genre: finalConcept.genre.length ? finalConcept.genre : (suggestions.genre || []),
         mood: finalConcept.mood.length ? finalConcept.mood : (suggestions.mood || []),
         instrumentation: (finalConcept.instrumentation?.length ? finalConcept.instrumentation : (suggestions.instrumentation || [])) as string[],
         tempo: finalConcept.tempo.length ? finalConcept.tempo : (suggestions.tempo || []),
+        timbre: finalConcept.timbre?.length ? finalConcept.timbre : (suggestions.timbre || []),
+        excludedStyles: finalConcept.excludedStyles?.length ? finalConcept.excludedStyles : (suggestions.excludedStyles || []),
         vocals: finalConcept.isInstrumental ? [] : (finalConcept.vocals.length ? finalConcept.vocals : (suggestions.vocals || [])),
         language: finalConcept.isInstrumental ? [] : (finalConcept.language.length ? finalConcept.language : (suggestions.language || []))
       };
@@ -304,7 +309,10 @@ const App: React.FC = () => {
   }, [concept, lang, lyrics, lyricsVariants, tr.loading.generatingStyle, handleError]);
 
   const handleRecall = useCallback((item: SongHistoryItem) => {
-    setConcept(item.concept);
+    setConcept({
+      ...item.concept,
+      timbre: item.concept.timbre ?? [],
+    });
     setLyrics(item.lyrics);
     setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null);
     setStyleData(item.styleData);

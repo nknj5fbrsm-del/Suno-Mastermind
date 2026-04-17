@@ -74,7 +74,7 @@ const SearchableMultiInput: React.FC<SearchableMultiInputProps> = ({
         </label>
         {isLoading && <span className={`text-[8px] font-black uppercase tracking-wider ${accent} animate-pulse`}><i className="fas fa-wand-magic-sparkles mr-1"></i>{tr.concept.inspiring}</span>}
       </div>
-      <div className="relative">
+      <div className={`relative ${isOpen ? 'z-[100]' : ''}`}>
         <input
           type="text"
           disabled={disabled}
@@ -91,21 +91,20 @@ const SearchableMultiInput: React.FC<SearchableMultiInputProps> = ({
           className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] transition-all ${searchTerm.trim() ? 'bg-suno-primary text-white' : 'text-zinc-400 opacity-40'}`}>
           <i className="fas fa-plus"></i>
         </button>
+        {isOpen && !disabled && (
+          <div className="absolute left-0 right-0 top-full z-[100] mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix concept-dropdown-options shadow-xl">
+            {filtered.length > 0 ? filtered.map(opt => (
+              <button key={opt} type="button"
+                className="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-800 dark:text-zinc-200 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
+                onClick={() => { onToggle(opt); setSearchTerm(''); setIsOpen(false); }}>
+                {opt}
+              </button>
+            )) : (
+              <p className="px-4 py-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.concept.optional}</p>
+            )}
+          </div>
+        )}
       </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 glass-dropdown rounded-2xl max-h-64 overflow-y-auto custom-scrollbar animate-scale-in mobile-dropdown-fix concept-dropdown-options">
-          {filtered.length > 0 ? filtered.map(opt => (
-            <button key={opt} type="button"
-              className="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-suno-primary/10 dark:hover:bg-suno-primary/20 text-zinc-800 dark:text-zinc-200 hover:text-suno-primary transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-none"
-              onClick={() => { onToggle(opt); setSearchTerm(''); setIsOpen(false); }}>
-              {opt}
-            </button>
-          )) : (
-            <p className="px-4 py-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.concept.optional}</p>
-          )}
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
         {selected.map(tag => (

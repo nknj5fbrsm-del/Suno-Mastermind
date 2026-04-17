@@ -17,3 +17,27 @@
 .orb {
   will-change: transform;
 }
+
+/* Konzept: „Song-Idee analysieren“ — Puls-Tempo gleich, nur noch Hauch von Rand/Helligkeit (kein Neon) */
+@keyframes inspire-next-cta {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 10%, transparent);
+    transform: scale(1.015);
+    filter: brightness(1.025);
+  }
+}
+
+.animate-inspire-next-cta {
+  animation: inspire-next-cta 1.25s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+
+.animate-inspire-next-cta:hover {
+  animation-play-state: paused;
+}
