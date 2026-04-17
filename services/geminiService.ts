@@ -848,6 +848,34 @@ function extractRegieSummary(lyrics: string, maxChars = 600): string {
   return regie.length > maxChars ? regie.slice(0, maxChars) + '…' : regie;
 }
 
+/** UI-Bezeichnungen (ConceptForm) → englischer Sprachname für klare Modellanweisungen. */
+const PRIMARY_LYRICS_LANG_TO_EN: Record<string, string> = {
+  Deutsch: "German",
+  Englisch: "English",
+  Französisch: "French",
+  Spanisch: "Spanish",
+  Italienisch: "Italian",
+  Japanisch: "Japanese",
+  Koreanisch: "Korean",
+};
+
+function getPrimaryLyricsLanguageForTitles(concept: SongConcept): { labelDe: string; labelEn: string } {
+  const raw = concept.language?.map((s) => s.trim()).find((s) => s.length > 0);
+  const labelDe = raw ?? "Deutsch";
+  const labelEn = PRIMARY_LYRICS_LANG_TO_EN[labelDe] ?? labelDe;
+  return { labelDe, labelEn };
+}
+
+/** Songtitel-Vorschläge in derselben Sprache wie die Lyrics (Konzeptfeld language). */
+function titleSuggestionsLanguageInstruction(concept: SongConcept): string {
+  const { labelDe, labelEn } = getPrimaryLyricsLanguageForTitles(concept);
+  return (
+    `· titleSuggestions: GENAU 3 kurze, prägnante Songtitel (nur Titel, keine Unterzeilen). ` +
+    `Sprache: dieselbe wie der zu singende Songtext — laut Konzept „${labelDe}“ (English for the model: ${labelEn}). ` +
+    `Keine Titel in einer anderen Sprache als dem Songtext; keine erklärenden Zusätze.`
+  );
+}
+
 export const generateStylePrompt = async (
   concept: SongConcept,
   _lang: 'de' | 'en' = 'de',
@@ -865,6 +893,7 @@ export const generateStylePrompt = async (
       regieBlock = `\n- WICHTIG – Anpassung an die Lyrics-Regie: Passe den Style-Prompt exakt an die Regieanweisungen dieser Lyrics an (Inhalte in [ ]: Stimmen, Instrumentierung, Dynamik, BPM/Feel). Regie: ${extractRegieSummary(lyricsVariants[0])}.\n`;
     }
   }
+  const titleSuggestionsLangLine = titleSuggestionsLanguageInstruction(concept);
   let accumulated = "";
   const stream = await withRetry(() => ai.models.generateContentStream({
     model: TEXT_MODEL,
@@ -887,7 +916,7 @@ export const generateStylePrompt = async (
   · weirdness: Ganzzahl 15–85 (Originalität/Kreativität). styleInfluence: Ganzzahl 15–85 (Prompt-Treue).
   · recommendationReason: Auf DEUTSCH – 2–4 Sätze, warum genau diese Werte für diesen Song (Thema, Genre, Stimmung), keine Floskeln.
   · songDescription: Auf DEUTSCH – kurze Beschreibung des Songs/Vibes für Cover-Art und Story.
-  · titleSuggestions: GENAU 3 kurze, prägnante Songtitel auf DEUTSCH (nur Titel, keine Unterzeilen).
+  ${titleSuggestionsLangLine}
 - Instrumentierung im Style-Prompt: Keine Trompete, kein Brass, keine Bläser (tpt, trumpet, horns) außer Genre oder Lyrics-Regie verlangen es ausdrücklich (z. B. Jazz, Brass Band, Latin Brass). Für die meisten Genres nur Rhythmusgruppe, Keys, Gitarre, Bass, ggf. Strings.`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
