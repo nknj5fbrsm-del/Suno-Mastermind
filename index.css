@@ -41,3 +41,54 @@
 .animate-inspire-next-cta:hover {
   animation-play-state: paused;
 }
+
+/* Cover-Tab: „Copy Variante 1/2“ — Text-Glow wechselweise (gegenphasig), stärker sichtbar */
+@keyframes suno-variant-label-chase-1 {
+  0%,
+  100% {
+    text-shadow:
+      0 0 28px color-mix(in srgb, var(--theme-primary) 65%, transparent),
+      0 0 12px color-mix(in srgb, var(--theme-primary) 45%, transparent),
+      0 0 4px color-mix(in srgb, var(--theme-primary) 35%, transparent);
+  }
+  50% {
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--theme-primary) 22%, transparent),
+      0 0 3px color-mix(in srgb, var(--theme-primary) 12%, transparent);
+  }
+}
+
+@keyframes suno-variant-label-chase-2 {
+  0%,
+  100% {
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--theme-secondary) 22%, transparent),
+      0 0 3px color-mix(in srgb, var(--theme-secondary) 12%, transparent);
+  }
+  50% {
+    text-shadow:
+      0 0 28px color-mix(in srgb, var(--theme-secondary) 65%, transparent),
+      0 0 12px color-mix(in srgb, var(--theme-secondary) 45%, transparent),
+      0 0 4px color-mix(in srgb, var(--theme-secondary) 35%, transparent);
+  }
+}
+
+.animate-suno-variant-label-chase-1 {
+  animation: suno-variant-label-chase-1 2.8s ease-in-out infinite;
+}
+
+.animate-suno-variant-label-chase-2 {
+  animation: suno-variant-label-chase-2 2.8s ease-in-out infinite;
+}
+
+.suno-variant-pills-row:hover .animate-suno-variant-label-chase-1,
+.suno-variant-pills-row:hover .animate-suno-variant-label-chase-2 {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-suno-variant-label-chase-1,
+  .animate-suno-variant-label-chase-2 {
+    animation: none;
+  }
+}
