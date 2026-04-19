@@ -1048,6 +1048,123 @@ function titleSuggestionsLanguageInstruction(concept: SongConcept): string {
   );
 }
 
+/** Drei Songtitel-Vorschläge passend zu den Lyrics (gemeinsam für beide Varianten). Instrumental: nur Konzeptdaten, Titel immer Englisch. */
+export async function generateLyricsTitleSuggestions(
+  concept: SongConcept,
+  lyricsPrimary: string,
+  lyricsSecondary: string | null,
+  _uiLang: UiLang
+): Promise<string[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+
+  if (concept.isInstrumental) {
+    const topic = (concept.topic || "").trim();
+    if (!topic) return [];
+    const mood = (concept.mood ?? []).join(", ");
+    const inst = (concept.instrumentation ?? []).join(", ");
+    const genre = (concept.genre ?? []).join(", ");
+    const tempo = (concept.tempo ?? []).join(", ");
+    const timbre = (concept.timbre ?? []).join(", ");
+    const regieExtra = (lyricsPrimary || "").trim().slice(0, 6000);
+    const regieExtra2 = lyricsSecondary?.trim()
+      ? `\n--- Second variant (same piece, different regie phrasing) ---\n${lyricsSecondary.trim().slice(0, 6000)}`
+      : "";
+    const prompt = `Instrumental track (no vocals). Propose track titles from the concept only.
+
+Song idea / topic: ${topic}
+Mood: ${mood || "(not specified)"}
+Instrumentation: ${inst || "(not specified)"}
+Genre: ${genre || "(not specified)"}
+Tempo: ${tempo || "(not specified)"}
+Timbre / sound: ${timbre || "(not specified)"}
+${regieExtra ? `\nOptional regie / structure excerpt (bracket tags):\n${regieExtra}${regieExtra2}\n` : ""}
+
+TASK: Return EXACTLY 3 different short track titles in ENGLISH only.
+Titles must fit the idea, mood and instrumentation. Same three titles apply to both variants if two regie variants exist.
+Rules: concise; no subtitles; no quotation marks around titles; do not use the word "Instrumental" in every title.`;
+
+    const response = await withRetry(() => ai.models.generateContent({
+      model: TEXT_MODEL,
+      contents: prompt,
+      config: {
+        systemInstruction:
+          SYSTEM_INSTRUCTION +
+          "\n\nRespond ONLY with JSON per schema. Title strings must be English. No markdown outside JSON.",
+        temperature: 0.8,
+        ...DEFAULT_THINKING,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            titles: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["titles"],
+        },
+      },
+    }));
+    try {
+      const parsed = JSON.parse(response.text || "{}");
+      const arr = Array.isArray(parsed.titles) ? parsed.titles : [];
+      return arr
+        .map((s: unknown) => cleanText(String(s)).trim())
+        .filter(Boolean)
+        .slice(0, 3);
+    } catch {
+      return [];
+    }
+  }
+
+  const { labelDe, labelEn } = getPrimaryLyricsLanguageForTitles(concept);
+  const lp = (lyricsPrimary || "").slice(0, 12000);
+  const l2 = lyricsSecondary
+    ? `\n\n--- Variante 2 (inhaltlich derselbe Song, andere Formulierung) ---\n${lyricsSecondary.slice(0, 12000)}`
+    : "";
+  const prompt = `Konzept-Thema: ${concept.topic}
+Genre: ${concept.genre.join(", ")}
+Stimmung: ${concept.mood.join(", ")}
+
+Lyrics Variante 1:
+${lp}
+${l2}
+
+AUFGABE: Schlage GENAU 3 verschiedene Songtitel vor, die zum Inhalt und zur Stimmung passen.
+Die Titel gelten für beide Varianten gleichermaßen (gleicher Songinhalt).
+Sprache der Titel: dieselbe wie der zu singende Text laut Konzept — „${labelDe}“ (für das Modell: ${labelEn}).
+Nur kurze Titelzeilen, keine Untertitel, keine Anführungszeichen um die Titel.`;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: prompt,
+    config: {
+      systemInstruction:
+        SYSTEM_INSTRUCTION +
+        "\n\nAntworte NUR als JSON gemäß Schema. Keine Einleitung, kein Markdown außerhalb des JSON.",
+      temperature: 0.75,
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          titles: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["titles"],
+      },
+    },
+  }));
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    const arr = Array.isArray(parsed.titles) ? parsed.titles : [];
+    return arr
+      .map((s: unknown) => cleanText(String(s)).trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
 export const generateStylePrompt = async (
   concept: SongConcept,
   _lang: 'de' | 'en' = 'de',
@@ -1330,6 +1447,75 @@ Rules:
           productionTip: { type: Type.STRING },
         },
         required: ["twistTitle", "twistDescription", "addGenres", "addInstruments", "addMoods", "productionTip"],
+      },
+    },
+  }));
+  return JSON.parse(response.text || "{}");
+};
+
+// ——— Chaos Mode: kontrolliertes Gegenteil zu „bestmöglichem“ Sound ———
+export interface ChaosModeResult {
+  chaosTitle: string;
+  chaosDescription: string;
+  /** Kurz: welches „System“ (Zahlen/Formel-Idee) der Vorschlag nutzt – für die UI. */
+  systemLine: string;
+  addGenres: string[];
+  addInstruments: string[];
+  addMoods: string[];
+  productionTip: string;
+}
+
+export const generateChaosMode = async (concept: SongConcept): Promise<ChaosModeResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden.");
+  const ai = new GoogleGenAI({ apiKey });
+  const salt = Math.random().toString(36).substring(7);
+  const t = Date.now();
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: `Current concept (use as raw material to DESTABILIZE, not to polish):
+- Topic: "${concept.topic || 'not set'}"
+- Genres: ${concept.genre.length ? concept.genre.join(', ') : 'none'}
+- Mood: ${concept.mood.length ? concept.mood.join(', ') : 'none'}
+- Tempo: ${concept.tempo.length ? concept.tempo.join(', ') : 'none'}
+- Instruments: ${concept.instrumentation?.length ? concept.instrumentation.join(', ') : 'none'}
+- Timbre: ${concept.timbre?.length ? concept.timbre.join(', ') : 'none'}
+- Exclude (still avoid): ${concept.excludedStyles?.length ? concept.excludedStyles.join(', ') : 'none'}
+- Vocals: ${concept.vocals.length ? concept.vocals.join(', ') : 'none'}
+- Instrumental: ${concept.isInstrumental ? 'yes' : 'no'}
+- Entropy seed: ${salt}
+- Time salt: ${t}
+
+Task: Propose CONTROLLED CHAOS — the opposite of a safe, "best-sounding" production. Use a clear internal "system" inspired by mathematics or numbers (e.g. derive a fake BPM rule from character counts, use π/φ as ratios in the story of the sound, prime numbers for section lengths, Fibonacci for layering) — but output must stay usable in Suno V 5.5 (concrete genres, instruments, moods, one production tip).`,
+    config: {
+      systemInstruction: `You are a chaotic-good music provocateur. Your job is the OPPOSITE of "make it sound best": propose intentional friction, weirdness, and surprise — but with a visible "system" (numbers, formulas, sequences) so it feels like chaos with rules.
+
+Rules:
+- chaosTitle: Catchy 2-6 word label for this chaos recipe (German if the topic is German-heavy, else English).
+- chaosDescription: 2-4 sentences: what wild thing happens musically and why the "system" creates it.
+- systemLine: ONE short line naming the mathematical/numeric conceit (e.g. "BPM anchor = (topic length mod 37) + 71; layers follow Fibonacci counts") — can be playful, not literally computed by you.
+- addGenres: 1-3 genre tags that CLASH or hybridize oddly with the existing direction (not generic pop polish).
+- addInstruments: 2-5 specific instruments, textures, or production elements that increase controlled chaos (e.g. "bit-crushed vocal throw", "polyrhythm woodblocks").
+- addMoods: 1-3 mood words that heighten tension/weirdness.
+- productionTip: One concrete Suno-facing tip (style prompt or regie idea in English is OK).
+- Still respect excludedStyles: do not suggest those sounds/styles.
+- Do NOT suggest anything illegal, hateful, or explicit.
+- Vary wildly between runs (use seeds).`,
+      ...DEFAULT_THINKING,
+      temperature: 1.35,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          chaosTitle: { type: Type.STRING },
+          chaosDescription: { type: Type.STRING },
+          systemLine: { type: Type.STRING },
+          addGenres: { type: Type.ARRAY, items: { type: Type.STRING } },
+          addInstruments: { type: Type.ARRAY, items: { type: Type.STRING } },
+          addMoods: { type: Type.ARRAY, items: { type: Type.STRING } },
+          productionTip: { type: Type.STRING },
+        },
+        required: ["chaosTitle", "chaosDescription", "systemLine", "addGenres", "addInstruments", "addMoods", "productionTip"],
       },
     },
   }));

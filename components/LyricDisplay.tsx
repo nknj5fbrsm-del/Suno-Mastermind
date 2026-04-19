@@ -15,9 +15,26 @@ interface LyricDisplayProps {
   onConceptChange?: (patch: Partial<SongConcept>) => void;
   onGenerateLyrics?: () => Promise<void>;
   isGenerating?: boolean;
+  songTitleSuggestions?: string[];
+  selectedSongTitle?: string | null;
+  onSelectSongTitle?: (title: string) => void;
+  songTitlesLoading?: boolean;
 }
 
-const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, concept, isInstrumental, onRegenerate, onUpdate, onConceptChange, onGenerateLyrics, isGenerating }) => {
+const LyricDisplay: React.FC<LyricDisplayProps> = ({
+  lyrics: initialLyrics,
+  concept,
+  isInstrumental,
+  onRegenerate,
+  onUpdate,
+  onConceptChange,
+  onGenerateLyrics,
+  isGenerating,
+  songTitleSuggestions = [],
+  selectedSongTitle = null,
+  onSelectSongTitle,
+  songTitlesLoading = false,
+}) => {
   const { tr } = useLang();
 
   const toggleLanguage = (val: string) => {
@@ -179,26 +196,62 @@ const LyricDisplay: React.FC<LyricDisplayProps> = ({ lyrics: initialLyrics, conc
       )}
 
       {initialLyrics && (
-      <div className="glass-card rounded-3xl p-6 space-y-4">
-        <button
-          type="button"
-          onClick={() => setIsLyricsTutorialOpen((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 group min-w-0 text-left"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-2xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
-              <i className="fas fa-lightbulb text-suno-primary text-sm"></i>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="glass-card rounded-3xl p-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => setIsLyricsTutorialOpen((v) => !v)}
+            className="w-full flex items-center justify-between gap-3 group min-w-0 text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-2xl bg-suno-primary/15 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-lightbulb text-suno-primary text-sm"></i>
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">{tr.lyrics.lyricsTipTutorialTitle}</p>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary">{tr.lyrics.lyricsTipTutorialTitle}</p>
-          </div>
-          <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLyricsTutorialOpen ? 'rotate-180' : ''}`}></i>
-        </button>
-        {isLyricsTutorialOpen && (
-          <div className="rounded-2xl px-4 py-3 bg-white/40 dark:bg-white/5 border border-white/50 dark:border-white/10">
-            <LyricsTipTutorialBody
-              sections={tr.lyrics.lyricsTipTutorialSections}
-              tagline={tr.lyrics.lyricsTipTutorialTagline}
-            />
+            <i className={`fas fa-chevron-down text-zinc-400 text-[11px] transition-transform flex-shrink-0 ${isLyricsTutorialOpen ? 'rotate-180' : ''}`}></i>
+          </button>
+          {isLyricsTutorialOpen && (
+            <div className="rounded-2xl px-4 py-3 bg-white/40 dark:bg-white/5 border border-white/50 dark:border-white/10">
+              <LyricsTipTutorialBody
+                sections={tr.lyrics.lyricsTipTutorialSections}
+                tagline={tr.lyrics.lyricsTipTutorialTagline}
+              />
+            </div>
+          )}
+        </div>
+
+        {(songTitlesLoading || songTitleSuggestions.length > 0) && (
+          <div className="glass-card rounded-3xl p-6 space-y-3 flex flex-col min-h-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-suno-primary flex items-center gap-1.5">
+              <i className="fas fa-signature text-[9px]"></i> {tr.lyrics.songTitleSuggestionsTitle}
+            </p>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              {isInstrumental ? tr.lyrics.songTitleSuggestionsHintInstrumental : tr.lyrics.songTitleSuggestionsHint}
+            </p>
+            {songTitlesLoading ? (
+              <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                <i className="fas fa-spinner fa-spin text-suno-primary"></i>
+                …
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {songTitleSuggestions.map((title, idx) => (
+                  <button
+                    key={`${title}-${idx}`}
+                    type="button"
+                    onClick={() => onSelectSongTitle?.(title)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                      selectedSongTitle === title
+                        ? 'bg-suno-primary text-white border-suno-primary shadow-md'
+                        : 'bg-white/20 dark:bg-black/20 border-suno-primary/25 text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary/15'
+                    }`}
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -8,8 +8,8 @@ type CopyPillType = 'lyrics' | 'clean' | 'style' | 'story' | 'cover' | 'suno';
 interface ArtworkDisplayProps {
   coverUrl: string;
   songDescription: string;
-  titleSuggestions?: string[];
-  selectedTitleSuggestion?: string;
+  /** Optional: erscheint beim Clean-Text-Kopieren direkt unter dem App-Prefix (z. B. auf der Lyrics-Seite gewählt). */
+  cleanCopyTitle?: string;
   lyrics: string;
   /** Wenn gesetzt: zwei Pills „Variante 1“ / „Variante 2“, jeweils aufklappbar mit Copy-Optionen. */
   lyricsVariants?: [string, string] | null;
@@ -18,7 +18,6 @@ interface ArtworkDisplayProps {
   styleVariants?: [GeneratedStyle, GeneratedStyle] | null;
   coverError?: string | null;
   onUpdateStory: (newStory: string) => void;
-  onSelectTitleSuggestion: (title: string) => void;
   onRegenerateCover: (style: string) => Promise<void>;
 }
 
@@ -41,15 +40,13 @@ https://suno-mastermind-v2.vercel.app
 const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({
   coverUrl,
   songDescription,
-  titleSuggestions = [],
-  selectedTitleSuggestion,
+  cleanCopyTitle = '',
   lyrics,
   lyricsVariants,
   stylePrompt,
   styleVariants,
   coverError,
   onUpdateStory,
-  onSelectTitleSuggestion,
   onRegenerateCover
 }) => {
   const { tr } = useLang();
@@ -96,7 +93,10 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({
 
   const handleCopyLyricsClean = (lyricsText?: string) => {
     const cleaned = (lyricsText ?? lyrics).replace(/\[.*?\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    const text = `${CLEAN_COPY_PREFIX}\n\n${cleaned}`;
+    const title = cleanCopyTitle.trim();
+    const text = title
+      ? `${CLEAN_COPY_PREFIX}\n\n${title}\n\n${cleaned}`
+      : `${CLEAN_COPY_PREFIX}\n\n${cleaned}`;
     try {
       navigator.clipboard.writeText(text);
       showToast(tr.artwork.copied, 'success');
@@ -410,29 +410,6 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({
 
         {/* ─── Song Story ─── */}
         <div className="glass-card rounded-3xl p-5 flex flex-col gap-3">
-          {titleSuggestions.length > 0 && (
-            <div className="rounded-2xl border border-suno-primary/20 bg-suno-primary/5 p-3 space-y-2">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-suno-primary flex items-center gap-1.5">
-                <i className="fas fa-signature text-[8px]"></i> {tr.artwork.titleSuggestionsTitle}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {titleSuggestions.map((title, idx) => (
-                  <button
-                    key={`${title}-${idx}`}
-                    type="button"
-                    onClick={() => onSelectTitleSuggestion(title)}
-                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
-                      selectedTitleSuggestion === title
-                        ? 'bg-suno-primary text-white border-suno-primary shadow-md'
-                        : 'bg-white/20 dark:bg-black/20 border-suno-primary/25 text-zinc-700 dark:text-zinc-200 hover:bg-suno-primary/15'
-                    }`}
-                  >
-                    {title}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-suno-secondary flex items-center gap-1.5">
             <i className="fas fa-quote-left text-[8px]"></i> {tr.artwork.storyTitle}
           </p>

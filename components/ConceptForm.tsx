@@ -6,6 +6,7 @@ import {
   analyzeTopic, generateConceptStoryIdea, analyzeAudio, AudioAnalysisResult,
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
+  generateChaosMode, ChaosModeResult,
   synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
   analyzeChordProgression,
 } from '../services/geminiService';
@@ -15,12 +16,17 @@ import ChordInspirationModal from './ChordInspirationModal';
 
 interface ConceptFormProps {
   initialConcept: SongConcept;
-  onSubmit: (concept: SongConcept) => void;
+  /** `nav` = zu Lyrics (bestehende Inhalte); `pipeline` = Lyrics/Style leeren und neu ausrichten. */
+  onConceptContinue: (concept: SongConcept, mode: 'nav' | 'pipeline') => void;
   /** Wird bei jeder Änderung aufgerufen, damit die App den aktuellen Konzept-Stand behält (z. B. beim Tab-Wechsel ohne „Weiter“). */
   onConceptChange?: (concept: SongConcept) => void;
+  /** Nach abgeschlossener Kette: zwei Buttons (nur wechseln vs. Pipeline zurücksetzen). */
+  showPipelineChoice?: boolean;
+  /** Rechter Hinweis am Einzel-„Weiter“-Button (nur wenn kein Pipeline-Zweier-Modus). */
+  nextStepSecondaryLabel?: string;
 }
 
-type CreativeLabToolHelpId = 'refMixer' | 'chords' | 'fusion' | 'boost';
+type CreativeLabToolHelpId = 'refMixer' | 'chords' | 'fusion' | 'boost' | 'chaos';
 
 const LabHelpIconButton: React.FC<{
   onClick: () => void;
@@ -824,7 +830,7 @@ const ReferenzMixer: React.FC<{
 };
 
 // ─── CONCEPT FORM ─────────────────────────────────────────────────────────
-const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onConceptChange }) => {
+const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptContinue, onConceptChange, showPipelineChoice, nextStepSecondaryLabel }) => {
   const { tr, lang } = useLang();
   const { showToast } = useToast();
   const opts = tr.conceptOptions;
@@ -847,6 +853,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
   // Kreativ-Boost
   const [isBoosting, setIsBoosting] = useState(false);
   const [boostResult, setBoostResult] = useState<CreativeBoostResult | null>(null);
+
+  // Chaos Mode
+  const [isChaosing, setIsChaosing] = useState(false);
+  const [chaosResult, setChaosResult] = useState<ChaosModeResult | null>(null);
 
   // Kreativ-Lab (gesamt ein-/ausklappbar)
   const [isLabOpen, setIsLabOpen] = useState(false);
@@ -880,7 +890,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     setTimeout(() => setGenreFieldPulse(false), 2500);
   };
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSubmit(concept); };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onConceptContinue(concept, 'nav'); };
 
   const handleRandomize = async () => {
     setIsRandomizing(true);
@@ -1129,6 +1139,33 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
     setBoostResult(null);
   };
 
+  // ─── Chaos Mode ───
+  const handleChaos = async () => {
+    if (isChaosing) return;
+    setIsChaosing(true);
+    setChaosResult(null);
+    try {
+      const result = await generateChaosMode(concept);
+      setChaosResult(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally {
+      setIsChaosing(false);
+    }
+  };
+
+  const applyChaos = () => {
+    if (!chaosResult) return;
+    setConcept(prev => ({
+      ...prev,
+      genre: mergeDetailLists(prev.genre, chaosResult.addGenres ?? []),
+      instrumentation: mergeDetailLists(prev.instrumentation ?? [], chaosResult.addInstruments ?? []),
+      mood: mergeDetailLists(prev.mood, chaosResult.addMoods ?? []),
+    }));
+    setChaosResult(null);
+  };
+
   const kreativLabContent = isLabOpen ? (
     <div className="space-y-4 pt-2 border-t border-white/10 dark:border-white/5">
       {/* Obere Reihe: Referenz-Mixer + Akkorde (gleiches Breakpoint wie Fusion & Boost) */}
@@ -1351,6 +1388,116 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
             </div>
           )}
         </div>
+      </div>
+
+      {/* Chaos Mode (volle Breite) */}
+      <div className="rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/5 dark:bg-fuchsia-500/10 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-fuchsia-500/25 flex items-center justify-center flex-shrink-0">
+              <i className="fas fa-atom text-fuchsia-400 text-[11px]" aria-hidden />
+            </div>
+            <p className="text-xs font-black uppercase tracking-wider text-fuchsia-200 truncate">{tr.concept.chaosMode}</p>
+            <LabHelpIconButton accent="primary" onClick={() => setCreativeToolHelp('chaos')} />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleChaos}
+          disabled={isChaosing}
+          className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all border ${
+            isChaosing
+              ? 'glass-btn text-fuchsia-300 border-fuchsia-500/40 animate-pulse'
+              : 'glass-btn text-fuchsia-200 border-fuchsia-500/35 hover:bg-fuchsia-500/20 hover:border-fuchsia-400/60'
+          }`}
+        >
+          {isChaosing ? (
+            <>
+              <i className="fas fa-spinner animate-spin"></i> {tr.concept.chaosModeLoading}
+            </>
+          ) : (
+            <>
+              <i className="fas fa-atom"></i> {tr.concept.chaosMode}
+            </>
+          )}
+        </button>
+
+        {chaosResult && (
+          <div className="space-y-3 animate-scale-in rounded-2xl border border-fuchsia-500/35 bg-fuchsia-950/20 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-xl bg-fuchsia-500/30 flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-atom text-fuchsia-300 text-sm" aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-zinc-100 truncate">{chaosResult.chaosTitle}</p>
+                  <p className="text-[10px] font-mono text-fuchsia-300/90 leading-snug mt-1 break-words">
+                    <span className="font-black uppercase tracking-wider text-fuchsia-400/95 mr-1.5">{tr.concept.chaosSystemLabel}:</span>
+                    {chaosResult.systemLine}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChaosResult(null)}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all text-[10px] flex-shrink-0"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-zinc-300 leading-relaxed">{chaosResult.chaosDescription}</p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(chaosResult.addGenres ?? []).map((g, i) => (
+                <span key={`cg${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/30">
+                  <i className="fas fa-music mr-1 text-[7px]" aria-hidden />
+                  {g}
+                </span>
+              ))}
+              {(chaosResult.addInstruments ?? []).map((inst, i) => (
+                <span key={`ci${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/25">
+                  <i className="fas fa-guitar mr-1 text-[7px]" aria-hidden />
+                  {inst}
+                </span>
+              ))}
+              {(chaosResult.addMoods ?? []).map((m, i) => (
+                <span key={`cm${i}`} className="text-[9px] font-bold px-2 py-1 rounded-lg bg-suno-secondary/15 text-suno-secondary border border-suno-secondary/25">
+                  <i className="fas fa-face-smile mr-1 text-[7px]" aria-hidden />
+                  {m}
+                </span>
+              ))}
+            </div>
+
+            {chaosResult.productionTip?.trim() && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-black/25 border border-fuchsia-500/20">
+                <i className="fas fa-lightbulb text-fuchsia-400 text-[10px] mt-0.5 flex-shrink-0" aria-hidden />
+                <p className="text-[10px] text-zinc-300 leading-relaxed">
+                  <span className="font-black uppercase tracking-wider text-fuchsia-300 mr-1">{tr.concept.chaosTip}:</span>
+                  {chaosResult.productionTip}
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={applyChaos}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-100 hover:bg-fuchsia-500/35 transition-all"
+              >
+                <i className="fas fa-check"></i> {tr.concept.chaosApply}
+              </button>
+              <button
+                type="button"
+                onClick={() => setChaosResult(null)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider glass-btn text-zinc-500 hover:text-red-500 transition-all"
+              >
+                {tr.concept.chaosDismiss}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   ) : null;
@@ -1793,6 +1940,12 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
                   </div>
                   <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescBoost}</p>
                 </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-fuchsia-500/25 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-atom text-fuchsia-300 text-xs"></i>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed pt-0.5">{tr.concept.creativeLabDescChaos}</p>
+                </div>
               </div>
             </div>
           </div>,
@@ -1814,6 +1967,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
                   {creativeToolHelp === 'chords' && tr.concept.chordInspirationBtn}
                   {creativeToolHelp === 'fusion' && tr.concept.fusionLab}
                   {creativeToolHelp === 'boost' && tr.concept.creativeBoost}
+                  {creativeToolHelp === 'chaos' && tr.concept.chaosMode}
                 </h3>
                 <button
                   type="button"
@@ -1828,6 +1982,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
                 {creativeToolHelp === 'chords' && tr.concept.creativeLabDescChord}
                 {creativeToolHelp === 'fusion' && tr.concept.creativeLabDescFusion}
                 {creativeToolHelp === 'boost' && tr.concept.creativeLabDescBoost}
+                {creativeToolHelp === 'chaos' && tr.concept.creativeLabDescChaos}
               </p>
             </div>
           </div>,
@@ -1882,17 +2037,42 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onSubmit, onC
       </div>
 
       {/* ═══ WEITER (zu Lyrics) ═══ */}
-      <div className="relative z-0 mt-20 md:mt-24">
+      {showPipelineChoice ? (
+        <div className="flex flex-col sm:flex-row gap-3 mt-20 md:mt-24">
+          <button
+            type="button"
+            onClick={() => onConceptContinue(concept, 'nav')}
+            className="flex-1 glass-btn border border-white/25 dark:border-white/15 py-5 md:py-6 rounded-3xl text-zinc-800 dark:text-zinc-100 shadow-xl px-4 touch-target flex flex-col items-center justify-center gap-1.5 text-center"
+          >
+            <i className="fas fa-arrow-right text-lg text-suno-primary"></i>
+            <span className="font-black text-sm md:text-base uppercase tracking-[0.12em] leading-tight">{tr.workflow.conceptNavOnly}</span>
+            <span className="text-[10px] font-semibold normal-case tracking-normal text-zinc-500 dark:text-zinc-400 leading-snug max-w-[260px]">{tr.workflow.conceptNavOnlySub}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onConceptContinue(concept, 'pipeline')}
+            className="flex-1 btn-create relative py-5 md:py-6 rounded-3xl text-white shadow-2xl px-4 touch-target flex flex-col items-center justify-center gap-1.5 text-center"
+          >
+            <i className="fas fa-rotate text-lg"></i>
+            <span className="font-black text-sm md:text-base uppercase tracking-[0.12em] leading-tight">{tr.workflow.conceptPipelineReset}</span>
+            <span className="text-[10px] font-semibold normal-case tracking-normal text-white/85 leading-snug max-w-[260px]">{tr.workflow.conceptPipelineResetSub}</span>
+          </button>
+        </div>
+      ) : (
+      <div className="relative z-0 mt-20 md:mt-24 group">
         <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
         <button type="submit"
           className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3">
           <i className="fas fa-arrow-right text-lg"></i>
           {tr.concept.nextBtn}
+          {nextStepSecondaryLabel && (
           <span className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium normal-case tracking-normal hidden md:block">
-            Zum Lyrics-Tab
+            {nextStepSecondaryLabel}
           </span>
+          )}
         </button>
       </div>
+      )}
 
     </form>
 

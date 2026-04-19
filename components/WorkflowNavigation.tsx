@@ -5,22 +5,38 @@ import { useLang } from '../App';
 interface WorkflowNavigationProps {
   activeStep: WorkflowStep;
   setActiveStep: (step: WorkflowStep) => void;
-  /** Konzept „fertig“ (z. B. Thema ausgefüllt) – Lyrics-Tab erst dann klickbar. */
+  /** Konzept „fertig“ (z. B. Thema ausgefüllt). */
   hasConcept: boolean;
+  /** Lyrics-Tab erst nach „Weiter“ im Konzept (bzw. freigeschaltete Kette). */
+  lyricsTabEnabled: boolean;
   hasLyrics: boolean;
+  /** Style-Tab erst nach „Weiter“ im Lyrics-Schritt. */
+  styleTabEnabled: boolean;
   hasStyle: boolean;
   /** Wenn true, sind zwei Lyrics-Varianten vorhanden; Style ist dann klickbar (generiert Style aus beiden). */
   hasLyricsVariants?: boolean;
+  /** Cover-Tab: erst nach „Weiter“ vom Style (oder schon auf Cover / Archiv). */
+  coverTabEnabled: boolean;
 }
 
-const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({ activeStep, setActiveStep, hasConcept, hasLyrics, hasStyle, hasLyricsVariants }) => {
+const WorkflowNavigation: React.FC<WorkflowNavigationProps> = ({
+  activeStep,
+  setActiveStep,
+  hasConcept,
+  lyricsTabEnabled,
+  hasLyrics,
+  styleTabEnabled,
+  hasStyle,
+  hasLyricsVariants,
+  coverTabEnabled,
+}) => {
   const { tr } = useLang();
   const steps = [
     { id: WorkflowStep.DASHBOARD, icon: 'fa-house',         label: tr.nav.home,    enabled: true },
     { id: WorkflowStep.CONCEPT,   icon: 'fa-wand-sparkles', label: tr.nav.concept, enabled: true },
-    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: hasConcept },
-    { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: hasStyle || !!hasLyricsVariants },
-    { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: hasStyle },
+    { id: WorkflowStep.LYRICS,    icon: 'fa-align-left',    label: tr.nav.lyrics,  enabled: hasConcept && lyricsTabEnabled },
+    { id: WorkflowStep.STYLE,     icon: 'fa-sliders',       label: tr.nav.style,   enabled: styleTabEnabled && (hasStyle || !!hasLyricsVariants) },
+    { id: WorkflowStep.ARTWORK,   icon: 'fa-image',         label: tr.nav.cover,   enabled: coverTabEnabled },
   ];
 
   return (

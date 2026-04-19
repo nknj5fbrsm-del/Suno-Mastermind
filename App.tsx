@@ -2,9 +2,17 @@ import React, { useState, useEffect, useRef, createContext, useContext, useMemo,
 import { createPortal } from 'react-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
-import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, simplifyLyricsText, enrichStylePrompt } from './services/geminiService';
+import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, simplifyLyricsText, enrichStylePrompt, generateLyricsTitleSuggestions } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
 import { t, Lang } from './translations';
+import {
+  buildCoverGenSnapshot,
+  buildStyleGenSnapshot,
+  computeNeedsCoverRegen,
+  computeNeedsStyleRegen,
+  type CoverGenSnapshot,
+  type StyleGenSnapshot,
+} from './pipelineSnapshot';
 
 // Lazy: Step-Views erst bei Bedarf laden (schnellerer Start)
 import WorkflowNavigation from './components/WorkflowNavigation';
@@ -71,6 +79,20 @@ const COVER_COOLDOWN_MS = 90_000;
 
 const App: React.FC = () => {
   const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
+  /** Cover-Tab erst nach „Weiter“ vom Style; bei Archiv-Recall od. auf Cover: frei. */
+  const [coverStepUnlocked, setCoverStepUnlocked] = useState(false);
+  /** Lyrics-Tab erst nach „Weiter“ im Konzept (bzw. nach abgeschlossener Kette / Recall). */
+  const [lyricsStepUnlocked, setLyricsStepUnlocked] = useState(false);
+  /** Style-Tab erst nach „Weiter“ im Lyrics-Schritt. */
+  const [styleStepUnlocked, setStyleStepUnlocked] = useState(false);
+  /** Einmal Konzept → … → Cover durchlaufen: Weiter-Buttons werden zu reiner Navigation, bis etwas „dirty“ wird. */
+  const [workflowChainComplete, setWorkflowChainComplete] = useState(false);
+  /** Letzter Stand, mit dem Style-Prompts zur Lyrics/Konzept-Kombination passen. */
+  const [styleGenSnap, setStyleGenSnap] = useState<StyleGenSnapshot | null>(null);
+  /** Letzter Stand, zu dem das (Dual-)Cover passt. */
+  const [coverGenSnap, setCoverGenSnap] = useState<CoverGenSnapshot | null>(null);
+  const styleGenSnapRef = useRef<StyleGenSnapshot | null>(null);
+  const coverGenSnapRef = useRef<CoverGenSnapshot | null>(null);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -103,6 +125,10 @@ const App: React.FC = () => {
   const [styleVariants, setStyleVariants] = useState<[GeneratedStyle, GeneratedStyle] | null>(null);
   /** Varianten, deren Sprache/Gesangsstil im Lyrics-Tab geändert wurde – Style wird beim Wechsel ins Style-Tab nachgezogen. */
   const [styleRegenPendingForVariants, setStyleRegenPendingForVariants] = useState<(1 | 2)[]>([]);
+  /** Songtitel aus Lyrics-Kontext (gemeinsam für beide Varianten); nach Style-Gen in styleData gemerged. */
+  const [songTitleSuggestions, setSongTitleSuggestions] = useState<string[]>([]);
+  const [selectedSongTitle, setSelectedSongTitle] = useState<string | null>(null);
+  const [songTitlesLoading, setSongTitlesLoading] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string>('');
   const [coverError, setCoverError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -116,6 +142,43 @@ const App: React.FC = () => {
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
   const tr = useMemo(() => t[lang], [lang]);
   const langValue = useMemo(() => ({ lang, tr }), [lang, tr]);
+
+  const needsStyleRegenUi = useMemo(
+    () => computeNeedsStyleRegen(concept, lyrics, lyricsVariants, styleGenSnap),
+    [concept, lyrics, lyricsVariants, styleGenSnap]
+  );
+  const needsDualCoverRun = useMemo(() => {
+    if (!lyricsVariants || lyricsVariants.length < 2 || !styleData) return false;
+    return computeNeedsCoverRegen(
+      concept,
+      lyrics,
+      lyricsVariants,
+      styleData,
+      styleVariants,
+      coverUrl,
+      styleGenSnap,
+      coverGenSnap
+    );
+  }, [concept, lyrics, lyricsVariants, styleData, styleVariants, coverUrl, styleGenSnap, coverGenSnap]);
+
+  const lyricsNextUsesAi = !workflowChainComplete || needsStyleRegenUi;
+  const styleNextUsesAi = !workflowChainComplete || needsStyleRegenUi || needsDualCoverRun;
+
+  useEffect(() => {
+    styleGenSnapRef.current = styleGenSnap;
+  }, [styleGenSnap]);
+  useEffect(() => {
+    coverGenSnapRef.current = coverGenSnap;
+  }, [coverGenSnap]);
+
+  useEffect(() => {
+    if (activeStep === WorkflowStep.ARTWORK && styleData) {
+      setWorkflowChainComplete(true);
+      setLyricsStepUnlocked(true);
+      setStyleStepUnlocked(true);
+      setCoverStepUnlocked(true);
+    }
+  }, [activeStep, styleData]);
 
   useEffect(() => {
     // Theme Initialisierung – App läuft ausschließlich im Dark-Mode
@@ -188,6 +251,15 @@ const App: React.FC = () => {
       excludedStyles: [],
     });
     setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setStyleRegenPendingForVariants([]); setCoverUrl('');
+    setSongTitleSuggestions([]); setSelectedSongTitle(null); setSongTitlesLoading(false);
+    setCoverStepUnlocked(false);
+    setLyricsStepUnlocked(false);
+    setStyleStepUnlocked(false);
+    setWorkflowChainComplete(false);
+    setStyleGenSnap(null);
+    setCoverGenSnap(null);
+    styleGenSnapRef.current = null;
+    coverGenSnapRef.current = null;
     setCurrentHistoryItemId(null);
     setActiveStep(WorkflowStep.CONCEPT);
   }, []);
@@ -201,11 +273,127 @@ const App: React.FC = () => {
     }
   };
 
-  /** Nur Konzept übernehmen und zum Lyrics-Tab wechseln („Weiter“ im Konzept). */
-  const handleConceptNext = useCallback((inputConcept: SongConcept) => {
+  const mergeLyricsTitlesIntoStyle = useCallback(
+    (style: GeneratedStyle): GeneratedStyle => ({
+      ...style,
+      titleSuggestions:
+        songTitleSuggestions.length > 0 ? songTitleSuggestions : (style.titleSuggestions ?? []),
+      selectedTitleSuggestion: selectedSongTitle ?? style.selectedTitleSuggestion,
+    }),
+    [songTitleSuggestions, selectedSongTitle]
+  );
+
+  type TitleRefreshOverride = { concept?: SongConcept; primary?: string; secondary?: string | null };
+
+  const refreshSongTitles = useCallback(
+    async (override?: TitleRefreshOverride) => {
+      const c = override?.concept ?? concept;
+      const primary = override?.primary ?? (lyricsVariants ? lyricsVariants[0] : lyrics);
+      const secondary =
+        override?.secondary !== undefined
+          ? override.secondary
+          : lyricsVariants
+            ? lyricsVariants[1]
+            : null;
+      if (c.isInstrumental) {
+        if (!c.topic?.trim()) {
+          setSongTitleSuggestions([]);
+          setSelectedSongTitle(null);
+          return;
+        }
+      } else if (!primary?.trim()) {
+        setSongTitleSuggestions([]);
+        setSelectedSongTitle(null);
+        return;
+      }
+      setSongTitlesLoading(true);
+      try {
+        const titles = await generateLyricsTitleSuggestions(c, primary, secondary, lang);
+        setSongTitleSuggestions(titles);
+        setSelectedSongTitle((prev) => (prev && titles.includes(prev) ? prev : null));
+      } catch {
+        setSongTitleSuggestions([]);
+      } finally {
+        setSongTitlesLoading(false);
+      }
+    },
+    [concept, lyrics, lyricsVariants, lang]
+  );
+
+  const handleSelectSongTitle = useCallback(
+    (title: string) => {
+      setSelectedSongTitle(title);
+      setStyleData((prev) => (prev ? { ...prev, selectedTitleSuggestion: title } : null));
+      showToast(tr.lyrics.titleSelectedForCleanToast, 'info');
+      if (!currentHistoryItemId) return;
+      setHistory((prev) => {
+        const target = prev.find((h) => h.id === currentHistoryItemId);
+        if (!target) return prev;
+        const updated: SongHistoryItem = {
+          ...target,
+          styleData: { ...target.styleData, selectedTitleSuggestion: title },
+        };
+        void saveSongToDB(updated);
+        return prev.map((h) => (h.id === currentHistoryItemId ? updated : h));
+      });
+    },
+    [currentHistoryItemId, showToast, tr.lyrics.titleSelectedForCleanToast]
+  );
+
+  /** Konzept → Lyrics: `nav` = bestehende Inhalte optional per Snapshot „bestätigen“; `pipeline` = Lyrics/Style/Cover leeren. */
+  const handleConceptNext = useCallback((inputConcept: SongConcept, mode: 'nav' | 'pipeline') => {
     setConcept(inputConcept);
+    setLyricsStepUnlocked(true);
+    setCoverStepUnlocked(false);
+
+    if (mode === 'pipeline') {
+      setLyrics('');
+      setLyricsVariants(null);
+      setStyleData(null);
+      setStyleVariants(null);
+      setStyleRegenPendingForVariants([]);
+      setSongTitleSuggestions([]); setSelectedSongTitle(null); setSongTitlesLoading(false);
+      setCoverUrl('');
+      setCoverError(null);
+      setStyleGenSnap(null);
+      setCoverGenSnap(null);
+      styleGenSnapRef.current = null;
+      coverGenSnapRef.current = null;
+      setStyleStepUnlocked(false);
+    } else if (styleData) {
+      const sSnap = buildStyleGenSnapshot(inputConcept, lyrics, lyricsVariants);
+      setStyleGenSnap(sSnap);
+      styleGenSnapRef.current = sSnap;
+      const cSnap = buildCoverGenSnapshot(inputConcept, lyrics, lyricsVariants, styleData, styleVariants);
+      setCoverGenSnap(cSnap);
+      coverGenSnapRef.current = cSnap;
+    }
     setActiveStep(WorkflowStep.LYRICS);
-  }, []);
+  }, [lyrics, lyricsVariants, styleData, styleVariants]);
+
+  /** Snapshots an aktuellen Stand anbinden (ohne KI) – „ohne neue KI weiter“. */
+  const reanchorStyleAndCoverSnapshots = useCallback(() => {
+    if (!styleData) return;
+    const sSnap = buildStyleGenSnapshot(concept, lyrics, lyricsVariants);
+    setStyleGenSnap(sSnap);
+    styleGenSnapRef.current = sSnap;
+    const cSnap = buildCoverGenSnapshot(concept, lyrics, lyricsVariants, styleData, styleVariants);
+    setCoverGenSnap(cSnap);
+    coverGenSnapRef.current = cSnap;
+  }, [concept, lyrics, lyricsVariants, styleData, styleVariants]);
+
+  const handleLyricsNextNavOnly = useCallback(() => {
+    if (styleData) reanchorStyleAndCoverSnapshots();
+    setStyleStepUnlocked(true);
+    setCoverStepUnlocked(false);
+    setActiveStep(WorkflowStep.STYLE);
+  }, [styleData, reanchorStyleAndCoverSnapshots]);
+
+  const handleStyleStepNextNavOnly = useCallback(() => {
+    if (styleData) reanchorStyleAndCoverSnapshots();
+    setCoverStepUnlocked(true);
+    setActiveStep(WorkflowStep.ARTWORK);
+  }, [styleData, reanchorStyleAndCoverSnapshots]);
 
   /** Create-Flow: Konzept aus State, ggf. analysieren, 2 Lyrics + 2 Styles generieren (von Lyrics-Tab aus). */
   const handleGenerateLyrics = useCallback(async () => {
@@ -250,15 +438,28 @@ const App: React.FC = () => {
       const lyricsB = cleanAiText(genLyricsB);
       setLyricsVariants([lyricsA, lyricsB]);
       setLyrics(lyricsA);
+      // Sprache/Gesangsstil pro Spalte entkoppeln (Variante 2 sonst Fallback auf dieselben Arrays wie Variante 1).
+      setConcept((prev) =>
+        prev.isInstrumental
+          ? prev
+          : {
+              ...prev,
+              languageVariant2: [...(prev.language ?? [])],
+              vocalsVariant2: [...(prev.vocals ?? [])],
+            }
+      );
       setLoadingProgress(100);
+      setLyricsStepUnlocked(true);
+      setCoverStepUnlocked(false);
       setActiveStep(WorkflowStep.LYRICS);
+      void refreshSongTitles({ concept: finalConcept, primary: lyricsA, secondary: lyricsB });
     } catch (error) {
       handleError(error);
     } finally {
       setIsLoading(false);
       setLoadingProgress(0);
     }
-  }, [concept, tr, lang, handleError]);
+  }, [concept, tr, lang, handleError, refreshSongTitles]);
 
   const onConceptChange = useCallback((patch: Partial<SongConcept>) => setConcept(prev => ({ ...prev, ...patch })), []);
   const onUpdateLyrics = useCallback((l: string) => setLyrics(l), []);
@@ -276,50 +477,221 @@ const App: React.FC = () => {
 
   const isCoverQuotaError = (msg: string) => /429|quota|resource_exhausted|rate-limit/i.test(msg);
 
-  /** Lyrics „Weiter“: Style-Prompt generieren und zum Style-Tab wechseln (keine Auto-Generierung beim Tab-Wechsel). */
+  /** Style-Prompt(s) aus aktuellem Konzept + Lyrics erzeugen und Pipeline-Snapshots setzen (ohne Tab-Wechsel). */
+  const runStylePromptGeneration = useCallback(async () => {
+    const hasTwo = lyricsVariants && lyricsVariants.length >= 2;
+    const hasOne = lyrics?.trim();
+    if (!hasTwo && !hasOne) return;
+    if (hasTwo) {
+      const conceptForB: SongConcept = {
+        ...concept,
+        language: (concept.languageVariant2 && concept.languageVariant2.length > 0) ? concept.languageVariant2 : concept.language,
+        vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
+      };
+      const [styleA, styleB] = await Promise.all([
+        generateStylePrompt(concept, lang, [lyricsVariants![0]]),
+        generateStylePrompt(conceptForB, lang, [lyricsVariants![1]])
+      ]);
+      setStyleVariants([mergeLyricsTitlesIntoStyle(styleA), mergeLyricsTitlesIntoStyle(styleB)]);
+      setStyleData(mergeLyricsTitlesIntoStyle(styleA));
+    } else {
+      const styleA = await generateStylePrompt(concept, lang, [lyrics!]);
+      setStyleData(mergeLyricsTitlesIntoStyle(styleA));
+      setStyleVariants(null);
+    }
+    const snap = buildStyleGenSnapshot(concept, lyrics, lyricsVariants);
+    setStyleGenSnap(snap);
+    styleGenSnapRef.current = snap;
+    setCoverGenSnap(null);
+    coverGenSnapRef.current = null;
+  }, [concept, lang, lyrics, lyricsVariants, mergeLyricsTitlesIntoStyle]);
+
+  /** Lyrics „Weiter“: Style-Prompt generieren und zum Style-Tab wechseln (nach kompletter Kette ggf. nur navigieren). */
   const handleLyricsNext = useCallback(async () => {
     const hasTwo = lyricsVariants && lyricsVariants.length >= 2;
     const hasOne = lyrics?.trim();
     if (!hasTwo && !hasOne) return;
+
+    if (workflowChainComplete && !computeNeedsStyleRegen(concept, lyrics, lyricsVariants, styleGenSnap)) {
+      setActiveStep(WorkflowStep.STYLE);
+      return;
+    }
+
     setIsLoading(true);
     setLoadingText(tr.loading.generatingStyle);
     setLoadingProgress(30);
     try {
-      if (hasTwo) {
-        const conceptForB: SongConcept = {
-          ...concept,
-          language: (concept.languageVariant2 && concept.languageVariant2.length > 0) ? concept.languageVariant2 : concept.language,
-          vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
-        };
-        const [styleA, styleB] = await Promise.all([
-          generateStylePrompt(concept, lang, [lyricsVariants![0]]),
-          generateStylePrompt(conceptForB, lang, [lyricsVariants![1]])
-        ]);
-        setStyleVariants([styleA, styleB]);
-        setStyleData(styleA);
-      } else {
-        const styleA = await generateStylePrompt(concept, lang, [lyrics!]);
-        setStyleData(styleA);
-        setStyleVariants(null);
-      }
+      await runStylePromptGeneration();
       setLoadingProgress(100);
+      setCoverStepUnlocked(false);
+      setStyleStepUnlocked(true);
       setActiveStep(WorkflowStep.STYLE);
     } catch (e) { handleError(e); }
     finally { setIsLoading(false); setLoadingProgress(0); }
-  }, [concept, lang, lyrics, lyricsVariants, tr.loading.generatingStyle, handleError]);
+  }, [concept, lyrics, lyricsVariants, workflowChainComplete, styleGenSnap, runStylePromptGeneration, tr.loading.generatingStyle, handleError]);
+
+  /** Tab-Wechsel (z. B. Navigation + „Weiter“ am Style-Ende); bei zwei Lyrics-Varianten: Cover ggf. generieren. */
+  const handleWorkflowStepChange = useCallback(async (step: WorkflowStep) => {
+    if (step === WorkflowStep.ARTWORK) {
+      setCoverStepUnlocked(true);
+    }
+
+    const dualCoverPipeline =
+      step === WorkflowStep.ARTWORK &&
+      lyricsVariants &&
+      lyricsVariants.length >= 2 &&
+      styleData &&
+      computeNeedsCoverRegen(
+        concept,
+        lyrics,
+        lyricsVariants,
+        styleData,
+        styleVariants,
+        coverUrl,
+        styleGenSnapRef.current,
+        coverGenSnapRef.current
+      );
+
+    if (dualCoverPipeline) {
+      if (coverRequestInFlightRef.current) return;
+      const cooldownLeft = getCoverCooldownRemainingMs();
+      if (cooldownLeft > 0) {
+        const sec = Math.ceil(cooldownLeft / 1000);
+        const msg = `Cover-Generierung pausiert: bitte ${sec}s warten und erneut versuchen.`;
+        setCoverError(msg);
+        showToast(msg, 'info');
+        setActiveStep(WorkflowStep.ARTWORK);
+        return;
+      }
+      coverRequestInFlightRef.current = true;
+      setIsLoading(true);
+      setLoadingText(tr.loading.generatingCover);
+      setLoadingProgress(50);
+      setCoverError(null);
+      try {
+        const genCover = await generateCoverArt(concept);
+        setCoverUrl(genCover);
+        const cSnap = buildCoverGenSnapshot(concept, lyrics, lyricsVariants, styleData, styleVariants);
+        setCoverGenSnap(cSnap);
+        coverGenSnapRef.current = cSnap;
+        const item: SongHistoryItem = {
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          concept,
+          lyrics: lyricsVariants[0],
+          lyricsVariant2: lyricsVariants[1],
+          styleData: styleData!,
+          ...(styleVariants ? { styleVariant2: styleVariants[1] } : {}),
+          coverUrl: genCover,
+        };
+        await saveSongToDB(item);
+        setCurrentHistoryItemId(item.id);
+        setHistory(prev => [item, ...prev]);
+      } catch (e) {
+        handleError(e);
+        const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
+        if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
+        setCoverError(msg);
+      } finally {
+        coverRequestInFlightRef.current = false;
+        setIsLoading(false);
+        setLoadingProgress(0);
+        setActiveStep(WorkflowStep.ARTWORK);
+      }
+      return;
+    }
+    setActiveStep(step);
+  }, [concept, coverUrl, handleError, lyrics, lyricsVariants, showToast, styleData, styleVariants, tr.loading.generatingCover]);
+
+  /** Style „Weiter“: ggf. Style neu, dann Cover (Dual) oder nur zum Cover-Tab. */
+  const handleStyleStepNext = useCallback(async () => {
+    if (coverRequestInFlightRef.current) return;
+
+    if (computeNeedsStyleRegen(concept, lyrics, lyricsVariants, styleGenSnapRef.current)) {
+      setIsLoading(true);
+      setLoadingText(tr.loading.generatingStyle);
+      setLoadingProgress(30);
+      try {
+        await runStylePromptGeneration();
+        setLoadingProgress(100);
+        setStyleStepUnlocked(true);
+        setCoverStepUnlocked(false);
+      } catch (e) {
+        handleError(e);
+        return;
+      } finally {
+        setIsLoading(false);
+        setLoadingProgress(0);
+      }
+    }
+
+    const dualNeedsCover =
+      lyricsVariants &&
+      lyricsVariants.length >= 2 &&
+      styleData &&
+      computeNeedsCoverRegen(
+        concept,
+        lyrics,
+        lyricsVariants,
+        styleData,
+        styleVariants,
+        coverUrl,
+        styleGenSnapRef.current,
+        coverGenSnapRef.current
+      );
+
+    if (dualNeedsCover) {
+      await handleWorkflowStepChange(WorkflowStep.ARTWORK);
+      return;
+    }
+
+    setCoverStepUnlocked(true);
+    setActiveStep(WorkflowStep.ARTWORK);
+  }, [concept, lyrics, lyricsVariants, styleData, styleVariants, coverUrl, runStylePromptGeneration, handleWorkflowStepChange, tr.loading.generatingStyle, handleError]);
 
   const handleRecall = useCallback((item: SongHistoryItem) => {
-    setConcept({
+    let recalledConcept: SongConcept = {
       ...item.concept,
       timbre: item.concept.timbre ?? [],
-    });
+    };
+    const lv: [string, string] | null =
+      item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null;
+    const sv: [GeneratedStyle, GeneratedStyle] | null =
+      item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null;
+    if (lv != null && !recalledConcept.isInstrumental) {
+      if (recalledConcept.languageVariant2 === undefined) {
+        recalledConcept = {
+          ...recalledConcept,
+          languageVariant2: [...(recalledConcept.language ?? [])],
+        };
+      }
+      if (recalledConcept.vocalsVariant2 === undefined) {
+        recalledConcept = {
+          ...recalledConcept,
+          vocalsVariant2: [...(recalledConcept.vocals ?? [])],
+        };
+      }
+    }
+    setConcept(recalledConcept);
     setLyrics(item.lyrics);
-    setLyricsVariants(item.lyricsVariant2 != null ? [item.lyrics, item.lyricsVariant2] : null);
+    setLyricsVariants(lv);
     setStyleData(item.styleData);
-    setStyleVariants(item.styleVariant2 != null ? [item.styleData, item.styleVariant2] : null);
+    setStyleVariants(sv);
     setStyleRegenPendingForVariants([]);
+    setSongTitleSuggestions(item.styleData.titleSuggestions ?? []);
+    setSelectedSongTitle(item.styleData.selectedTitleSuggestion ?? null);
     setCoverUrl(item.coverUrl);
     setCurrentHistoryItemId(item.id);
+    const sSnap = buildStyleGenSnapshot(recalledConcept, item.lyrics, lv);
+    setStyleGenSnap(sSnap);
+    styleGenSnapRef.current = sSnap;
+    const cSnap = buildCoverGenSnapshot(recalledConcept, item.lyrics, lv, item.styleData, sv);
+    setCoverGenSnap(cSnap);
+    coverGenSnapRef.current = cSnap;
+    setLyricsStepUnlocked(true);
+    setStyleStepUnlocked(true);
+    setCoverStepUnlocked(true);
+    setWorkflowChainComplete(true);
     setActiveStep(WorkflowStep.LYRICS);
   }, []);
   const handleDeleteFromHistory = useCallback(async (id: string) => {
@@ -370,8 +742,8 @@ const App: React.FC = () => {
         for (const variant of toRegen) {
           if (variant === 1) {
             const styleA = await generateStylePrompt(concept, lang, [lyricsVariants[0]]);
-            setStyleVariants(prev => prev ? [styleA, prev[1]] : null);
-            setStyleData(styleA);
+            setStyleVariants(prev => prev ? [mergeLyricsTitlesIntoStyle(styleA), prev[1]] : null);
+            setStyleData(mergeLyricsTitlesIntoStyle(styleA));
           } else {
             const conceptForB: SongConcept = {
               ...concept,
@@ -379,16 +751,21 @@ const App: React.FC = () => {
               vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
             };
             const styleB = await generateStylePrompt(conceptForB, lang, [lyricsVariants[1]]);
-            setStyleVariants(prev => prev ? [prev[0], styleB] : null);
+            setStyleVariants(prev => prev ? [prev[0], mergeLyricsTitlesIntoStyle(styleB)] : null);
           }
         }
+        const snap = buildStyleGenSnapshot(concept, lyrics, lyricsVariants);
+        setStyleGenSnap(snap);
+        styleGenSnapRef.current = snap;
+        setCoverGenSnap(null);
+        coverGenSnapRef.current = null;
       } catch (e) {
         handleError(e);
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [activeStep, styleRegenPendingForVariants]);
+  }, [activeStep, styleRegenPendingForVariants, concept, lang, lyrics, lyricsVariants, styleVariants, handleError, tr.loading.generatingStyle, mergeLyricsTitlesIntoStyle]);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -580,58 +957,14 @@ const App: React.FC = () => {
         <div className="border-t border-white/30 dark:border-white/6 py-1.5 px-4 md:px-0">
           <WorkflowNavigation
           activeStep={activeStep}
-          setActiveStep={async (step) => {
-            if (step === WorkflowStep.ARTWORK && lyricsVariants && lyricsVariants.length >= 2 && styleData && !coverUrl) {
-              if (coverRequestInFlightRef.current) return;
-              const cooldownLeft = getCoverCooldownRemainingMs();
-              if (cooldownLeft > 0) {
-                const sec = Math.ceil(cooldownLeft / 1000);
-                const msg = `Cover-Generierung pausiert: bitte ${sec}s warten und erneut versuchen.`;
-                setCoverError(msg);
-                showToast(msg, 'info');
-                setActiveStep(WorkflowStep.ARTWORK);
-                return;
-              }
-              coverRequestInFlightRef.current = true;
-              setIsLoading(true);
-              setLoadingText(tr.loading.generatingCover);
-              setLoadingProgress(50);
-              setCoverError(null);
-              try {
-                const genCover = await generateCoverArt(concept);
-                setCoverUrl(genCover);
-                const item: SongHistoryItem = {
-                  id: crypto.randomUUID(),
-                  timestamp: Date.now(),
-                  concept,
-                  lyrics: lyricsVariants[0],
-                  lyricsVariant2: lyricsVariants[1],
-                  styleData: styleData!,
-                  ...(styleVariants ? { styleVariant2: styleVariants[1] } : {}),
-                  coverUrl: genCover,
-                };
-                await saveSongToDB(item);
-                setCurrentHistoryItemId(item.id);
-                setHistory(prev => [item, ...prev]);
-              } catch (e) {
-                handleError(e);
-                const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
-                if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
-                setCoverError(msg);
-              } finally {
-                coverRequestInFlightRef.current = false;
-                setIsLoading(false);
-                setLoadingProgress(0);
-                setActiveStep(WorkflowStep.ARTWORK);
-              }
-              return;
-            }
-            setActiveStep(step);
-          }}
+          setActiveStep={handleWorkflowStepChange}
           hasConcept={!!concept.topic?.trim()}
+          lyricsTabEnabled={lyricsStepUnlocked}
           hasLyrics={!!lyrics || !!lyricsVariants}
+          styleTabEnabled={styleStepUnlocked}
           hasStyle={!!styleData}
           hasLyricsVariants={!!lyricsVariants}
+          coverTabEnabled={!!styleData && (coverStepUnlocked || activeStep === WorkflowStep.ARTWORK)}
         />
         </div>
 
@@ -666,7 +999,15 @@ const App: React.FC = () => {
         )}
         <Suspense fallback={<div className="min-h-[280px] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-suno-primary border-t-transparent animate-spin" /></div>}>
         {activeStep === WorkflowStep.DASHBOARD && <DashboardDisplay history={history} onRecall={handleRecall} onDelete={handleDeleteFromHistory} onToggleFavorite={handleToggleFavorite} onStartNew={handleStartNew} />}
-        {activeStep === WorkflowStep.CONCEPT && <ConceptForm initialConcept={concept} onSubmit={handleConceptNext} onConceptChange={onConceptChange} />}
+        {activeStep === WorkflowStep.CONCEPT && (
+          <ConceptForm
+            initialConcept={concept}
+            onConceptContinue={handleConceptNext}
+            onConceptChange={onConceptChange}
+            showPipelineChoice={workflowChainComplete && (!!lyrics?.trim() || !!lyricsVariants || !!styleData)}
+            nextStepSecondaryLabel={workflowChainComplete ? tr.workflow.conceptNextHintNav : tr.workflow.conceptNextHintFirst}
+          />
+        )}
         {activeStep === WorkflowStep.LYRICS && (
           <>
           {lyricsVariants ? (
@@ -687,10 +1028,12 @@ const App: React.FC = () => {
                 setIsLoading(true);
                 try {
                   const conceptForA = concept;
+                  const b = lyricsVariants?.[1] ?? '';
                   const result = await generateLyrics(conceptForA);
                   const cleaned = cleanAiText(result);
                   setLyricsVariants(prev => prev ? [cleaned, prev[1]] : null);
                   setLyrics(cleaned);
+                  void refreshSongTitles({ primary: cleaned, secondary: b });
                 } catch (e) { handleError(e); }
                 finally { setIsLoading(false); }
               }}
@@ -707,9 +1050,11 @@ const App: React.FC = () => {
                       ? concept.vocalsVariant2
                       : concept.vocals,
                   };
+                  const a = lyricsVariants?.[0] ?? '';
                   const result = await generateLyrics(conceptForB);
                   const cleaned = cleanAiText(result);
                   setLyricsVariants(prev => prev ? [prev[0], cleaned] : null);
+                  void refreshSongTitles({ concept: conceptForB, primary: a, secondary: cleaned });
                 } catch (e) { handleError(e); }
                 finally { setIsLoading(false); }
               }}
@@ -717,15 +1062,52 @@ const App: React.FC = () => {
                 if (!styleVariants) return;
                 setStyleRegenPendingForVariants(prev => prev.includes(variant) ? prev : [...prev, variant]);
               }}
+              songTitleSuggestions={songTitleSuggestions}
+              selectedSongTitle={selectedSongTitle}
+              onSelectSongTitle={handleSelectSongTitle}
+              songTitlesLoading={songTitlesLoading}
             />
           ) : (
-            <LyricDisplay lyrics={lyrics} concept={concept} isInstrumental={concept.isInstrumental} onRegenerate={async () => { setLoadingText(tr.loading.generatingLyrics); setLoadingProgress(10); setIsLoading(true); setLyrics(""); try { setLoadingProgress(50); const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) }); setLyrics(cleanAiText(result)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdate={onUpdateLyrics} onConceptChange={onConceptChange} onGenerateLyrics={handleGenerateLyrics} isGenerating={isLoading} />
+            <LyricDisplay
+              lyrics={lyrics}
+              concept={concept}
+              isInstrumental={concept.isInstrumental}
+              onRegenerate={async () => {
+                setLoadingText(tr.loading.generatingLyrics);
+                setLoadingProgress(10);
+                setIsLoading(true);
+                setLyrics('');
+                try {
+                  setLoadingProgress(50);
+                  const result = await generateLyrics(concept, { onChunk: (t) => setLyrics(t) });
+                  const cleaned = cleanAiText(result);
+                  setLyrics(cleaned);
+                  void refreshSongTitles({ primary: cleaned, secondary: null });
+                  setLoadingProgress(100);
+                } catch (e) {
+                  handleError(e);
+                } finally {
+                  setIsLoading(false);
+                  setLoadingProgress(0);
+                }
+              }}
+              onUpdate={onUpdateLyrics}
+              onConceptChange={onConceptChange}
+              onGenerateLyrics={handleGenerateLyrics}
+              isGenerating={isLoading}
+              songTitleSuggestions={songTitleSuggestions}
+              selectedSongTitle={selectedSongTitle}
+              onSelectSongTitle={handleSelectSongTitle}
+              songTitlesLoading={songTitlesLoading}
+            />
           )}
           {/* Weiter (zu Style) – Style erst hier generieren, gleiches Design wie Konzept */}
           {(() => {
             const canNext = !!(lyricsVariants?.length >= 2 || lyrics?.trim());
+            const showLyricsChoice = workflowChainComplete && lyricsNextUsesAi && canNext;
             return (
-              <div className={`relative z-0 mt-20 md:mt-24 ${canNext ? 'group' : ''}`}>
+              <div className="mt-20 md:mt-24 space-y-3">
+              <div className={`relative z-0 ${canNext ? 'group' : ''}`}>
                 {canNext && (
                   <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60" />
                 )}
@@ -735,19 +1117,32 @@ const App: React.FC = () => {
               disabled={isLoading || !(lyricsVariants?.length >= 2 || lyrics?.trim())}
               className={`btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-45 disabled:cursor-not-allowed ${canNext ? '' : 'shadow-lg'}`}
             >
-              <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : 'fa-arrow-right'} text-lg`} />
+              <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : lyricsNextUsesAi ? 'fa-wand-magic-sparkles' : 'fa-arrow-right'} text-lg`} />
               {tr.concept.nextBtn}
               <span className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium normal-case tracking-normal hidden md:block">
-                {tr.lyrics.nextToStyle}
+                {lyricsNextUsesAi ? tr.workflow.lyricsNextHintAi : tr.workflow.lyricsNextHintNav}
               </span>
             </button>
+              </div>
+            {showLyricsChoice && (
+              <button
+                type="button"
+                onClick={handleLyricsNextNavOnly}
+                disabled={isLoading}
+                className="w-full glass-btn border border-white/20 dark:border-white/10 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 flex items-center justify-center gap-2 disabled:opacity-45"
+              >
+                <i className="fas fa-arrow-right text-suno-primary"></i>
+                {tr.workflow.skipAiToStyle}
+              </button>
+            )}
               </div>
             );
           })()}
           </>
         )}
         {activeStep === WorkflowStep.STYLE && (
-          styleData ? (
+          <>
+          {styleData ? (
           styleVariants ? (
             <StyleDisplay
               data={styleData}
@@ -770,8 +1165,8 @@ const App: React.FC = () => {
                     generateStylePrompt(conceptForA, lang, lyricsVariants ? [lyricsVariants[0]] : undefined),
                     generateStylePrompt(conceptForB, lang, lyricsVariants ? [lyricsVariants[1]] : undefined),
                   ]);
-                  setStyleVariants([a, b]);
-                  setStyleData(a);
+                  setStyleVariants([mergeLyricsTitlesIntoStyle(a), mergeLyricsTitlesIntoStyle(b)]);
+                  setStyleData(mergeLyricsTitlesIntoStyle(a));
                 } catch (e) {
                   handleError(e);
                 } finally {
@@ -791,8 +1186,8 @@ const App: React.FC = () => {
               onRegenerateA={async () => {
                 const conceptForA = concept;
                 const a = await generateStylePrompt(conceptForA, lang, lyricsVariants ? [lyricsVariants[0]] : undefined);
-                setStyleVariants(prev => prev ? [a, prev[1]] : null);
-                setStyleData(a);
+                setStyleVariants(prev => prev ? [mergeLyricsTitlesIntoStyle(a), prev[1]] : null);
+                setStyleData(mergeLyricsTitlesIntoStyle(a));
               }}
               onRegenerateB={async () => {
                 const conceptForB: SongConcept = {
@@ -805,11 +1200,11 @@ const App: React.FC = () => {
                     : concept.vocals,
                 };
                 const b = await generateStylePrompt(conceptForB, lang, lyricsVariants ? [lyricsVariants[1]] : undefined);
-                setStyleVariants(prev => prev ? [prev[0], b] : null);
+                setStyleVariants(prev => prev ? [prev[0], mergeLyricsTitlesIntoStyle(b)] : null);
               }}
             />
           ) : (
-            <StyleDisplay data={styleData} onRegenerate={async () => { setLoadingText(tr.loading.generatingStyle); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); setStyleData(await generateStylePrompt(concept, lang, lyricsVariants ?? undefined)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdatePrompt={(prompt) => setStyleData(prev => prev ? { ...prev, prompt } : null)} onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)} />
+            <StyleDisplay data={styleData} onRegenerate={async () => { setLoadingText(tr.loading.generatingStyle); setLoadingProgress(10); setIsLoading(true); try { setLoadingProgress(50); const s = await generateStylePrompt(concept, lang, lyricsVariants ?? undefined); setStyleData(mergeLyricsTitlesIntoStyle(s)); setLoadingProgress(100); } catch(e) { handleError(e); } finally { setIsLoading(false); setLoadingProgress(0); } }} onUpdatePrompt={(prompt) => setStyleData(prev => prev ? { ...prev, prompt } : null)} onEnrichStyleA={(prompt) => enrichStylePrompt(prompt, concept)} />
           )
           ) : (
             <div className="glass-card rounded-2xl p-8 text-center max-w-md mx-auto">
@@ -821,36 +1216,50 @@ const App: React.FC = () => {
               </button>
             </div>
           )
+        }
+          {styleData && (
+            <div className="mt-20 md:mt-24 space-y-3">
+            <div className="relative z-0 group">
+              <div className="absolute -inset-0.5 suno-gradient rounded-3xl blur opacity-30 transition-opacity duration-500 group-hover:opacity-60" />
+              <button
+                type="button"
+                onClick={() => void handleStyleStepNext()}
+                disabled={isLoading}
+                className="btn-create relative w-full py-5 md:py-6 rounded-3xl text-white font-black text-lg md:text-xl uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <i className={`fas ${isLoading ? 'fa-spinner fa-spin' : styleNextUsesAi ? 'fa-wand-magic-sparkles' : 'fa-arrow-right'} text-lg`} />
+                {tr.concept.nextBtn}
+                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-white/30 text-sm font-medium normal-case tracking-normal hidden md:block">
+                  {styleNextUsesAi ? tr.workflow.styleNextHintAi : tr.workflow.styleNextHintNav}
+                </span>
+              </button>
+            </div>
+            {workflowChainComplete && styleNextUsesAi && (
+              <button
+                type="button"
+                onClick={handleStyleStepNextNavOnly}
+                disabled={isLoading}
+                className="w-full glass-btn border border-white/20 dark:border-white/10 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 flex items-center justify-center gap-2 disabled:opacity-45"
+              >
+                <i className="fas fa-arrow-right text-suno-primary"></i>
+                {tr.workflow.skipAiToCover}
+              </button>
+            )}
+            </div>
+          )}
+          </>
         )}
         {activeStep === WorkflowStep.ARTWORK && styleData && (
           <ArtworkDisplay
             coverUrl={coverUrl}
             songDescription={styleData.songDescription}
-            titleSuggestions={styleData.titleSuggestions}
-            selectedTitleSuggestion={styleData.selectedTitleSuggestion}
+            cleanCopyTitle={selectedSongTitle ?? styleData.selectedTitleSuggestion ?? ''}
             lyrics={lyrics}
             lyricsVariants={lyricsVariants}
             stylePrompt={styleData.prompt}
             styleVariants={styleVariants}
             coverError={coverError}
             onUpdateStory={(s) => setStyleData(prev => prev ? { ...prev, songDescription: s } : null)}
-            onSelectTitleSuggestion={(selectedTitle) => {
-              setStyleData(prev => prev ? { ...prev, selectedTitleSuggestion: selectedTitle } : null);
-              if (!currentHistoryItemId) return;
-              setHistory(prev => {
-                const target = prev.find(h => h.id === currentHistoryItemId);
-                if (!target) return prev;
-                const updated: SongHistoryItem = {
-                  ...target,
-                  styleData: {
-                    ...target.styleData,
-                    selectedTitleSuggestion: selectedTitle,
-                  },
-                };
-                void saveSongToDB(updated);
-                return prev.map(h => h.id === currentHistoryItemId ? updated : h);
-              });
-            }}
             onRegenerateCover={async (style) => {
               if (coverRequestInFlightRef.current) return;
               const cooldownLeft = getCoverCooldownRemainingMs();
@@ -870,6 +1279,11 @@ const App: React.FC = () => {
                 setLoadingProgress(50);
                 const genCover = await generateCoverArt(concept, style);
                 setCoverUrl(genCover);
+                if (styleData) {
+                  const cSnap = buildCoverGenSnapshot(concept, lyrics, lyricsVariants, styleData, styleVariants);
+                  setCoverGenSnap(cSnap);
+                  coverGenSnapRef.current = cSnap;
+                }
                 setLoadingProgress(100);
               } catch (e) {
                 handleError(e);
