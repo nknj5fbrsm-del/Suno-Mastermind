@@ -652,6 +652,13 @@ export interface ImageInspirationResult {
   titleIdeas: string[];
 }
 
+export interface MusicLinkInspirationResult {
+  platform: "apple_music" | "spotify" | "unknown";
+  artist: string;
+  title: string;
+  suggestions: string[];
+}
+
 export const analyzeAudio = async (
   audioBase64: string,
   mimeType: string,
@@ -856,6 +863,103 @@ Output valid JSON only.`;
       throw new Error("CONTENT_BLOCKED");
     }
     throw err instanceof Error ? err : new Error(msg || "Image analysis failed");
+  }
+};
+
+export const analyzeMusicLinkInspiration = async (
+  url: string,
+  lang: UiLang = "de"
+): Promise<MusicLinkInspirationResult> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const trimmed = cleanText(url).trim();
+  if (!trimmed) throw new Error(lang === "de" ? "Bitte einen Link eingeben." : "Please enter a link.");
+
+  const prompt =
+    lang === "de"
+      ? `Du bekommst einen Musik-Link (Apple Music oder Spotify): "${trimmed}".
+
+Aufgabe:
+1) Extrahiere Artist und Titel so präzise wie möglich.
+2) Erstelle GENAU 3 hochwertige Song-Idee-Vorschläge (je 1-2 Sätze), inspiriert vom mutmaßlichen Stil/Vibe.
+
+Regeln:
+- Nutze nur plausible Informationen aus Linkstruktur/typischen Metadaten; nichts erfinden, wenn unklar.
+- Wenn Artist/Titel unklar sind, setze den jeweiligen Wert auf "Unbekannt".
+- "platform" ist exakt einer von: "apple_music", "spotify", "unknown".
+- "suggestions" muss genau 3 nicht-leere Strings enthalten.
+
+Antworte ausschließlich als valides JSON.`
+      : `You get a music link (Apple Music or Spotify): "${trimmed}".
+
+Task:
+1) Extract artist and title as accurately as possible.
+2) Create EXACTLY 3 high-quality song-idea suggestions (1-2 sentences each), inspired by the likely vibe/style.
+
+Rules:
+- Use only plausible information from URL structure / likely metadata; do not fabricate certainty.
+- If artist/title are unclear, set the value to "Unknown".
+- "platform" must be exactly one of: "apple_music", "spotify", "unknown".
+- "suggestions" must contain exactly 3 non-empty strings.
+
+Respond only with valid JSON.`;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: prompt,
+    config: {
+      ...DEFAULT_THINKING,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          platform: { type: Type.STRING, enum: ["apple_music", "spotify", "unknown"] },
+          artist: { type: Type.STRING },
+          title: { type: Type.STRING },
+          suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ["platform", "artist", "title", "suggestions"],
+      },
+    },
+  }));
+
+  const fallbackUnknown = lang === "de" ? "Unbekannt" : "Unknown";
+  const fallback: MusicLinkInspirationResult = {
+    platform: "unknown",
+    artist: fallbackUnknown,
+    title: fallbackUnknown,
+    suggestions: [
+      lang === "de"
+        ? "Ein Song über den Moment, in dem du zwischen Aufbruch und Rückzug festhängst, mit klarer Bildsprache und starker Dynamik."
+        : "A song about being stuck between moving forward and pulling back, with vivid imagery and dynamic contrast.",
+      lang === "de"
+        ? "Eine Szene aus dem Alltag, die langsam kippt und eine unerwartet emotionale Wahrheit freilegt."
+        : "An everyday scene that slowly shifts and reveals an unexpectedly emotional truth.",
+      lang === "de"
+        ? "Ein persönlicher, direkter Text mit cineastischer Atmosphäre und einem klaren Hook im Refrain."
+        : "A personal, direct lyric with cinematic atmosphere and a clear chorus hook.",
+    ],
+  };
+
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    const platformRaw = String(parsed.platform ?? "").trim();
+    const platform: MusicLinkInspirationResult["platform"] =
+      platformRaw === "apple_music" || platformRaw === "spotify" ? platformRaw : "unknown";
+    const artist = cleanText(String(parsed.artist ?? "")).trim() || fallbackUnknown;
+    const title = cleanText(String(parsed.title ?? "")).trim() || fallbackUnknown;
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean).slice(0, 3)
+      : [];
+    return {
+      platform,
+      artist,
+      title,
+      suggestions: suggestions.length === 3 ? suggestions : fallback.suggestions,
+    };
+  } catch {
+    return fallback;
   }
 };
 

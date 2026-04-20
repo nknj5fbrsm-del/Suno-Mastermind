@@ -8,7 +8,7 @@ import {
   generateCreativeBoost, CreativeBoostResult,
   generateChaosMode, ChaosModeResult,
   synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
-  analyzeChordProgression,
+  analyzeChordProgression, analyzeMusicLinkInspiration, MusicLinkInspirationResult,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
@@ -180,6 +180,16 @@ interface InspirationImageFile {
   base64: string;
   mimeType: string;
   dataUrl: string;
+}
+
+function isSupportedMusicServiceLink(url: string): boolean {
+  const value = url.trim().toLowerCase();
+  if (!value) return false;
+  return (
+    value.includes("music.apple.com/") ||
+    value.includes("itunes.apple.com/") ||
+    value.includes("open.spotify.com/")
+  );
 }
 
 const readAudioFile = (file: File): Promise<AudioFile> =>
@@ -840,6 +850,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [musicLinkInput, setMusicLinkInput] = useState('');
+  const [musicLinkResult, setMusicLinkResult] = useState<MusicLinkInspirationResult | null>(null);
+  const [isAnalyzingMusicLink, setIsAnalyzingMusicLink] = useState(false);
   const [isChordModalOpen, setIsChordModalOpen] = useState(false);
   const [chordDraft, setChordDraft] = useState('');
   const [isChordAnalyzing, setIsChordAnalyzing] = useState(false);
@@ -991,6 +1005,40 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
     showToast(tr.concept.imageApplySuccess, 'success');
     setIsImageModalOpen(false);
   };
+
+  const handleAnalyzeMusicLink = async () => {
+    const raw = musicLinkInput.trim();
+    if (!raw || isAnalyzingMusicLink) return;
+    if (!isSupportedMusicServiceLink(raw)) {
+      showToast(tr.concept.linkInspirationUnsupported, 'error');
+      return;
+    }
+    setIsAnalyzingMusicLink(true);
+    try {
+      const result = await analyzeMusicLinkInspiration(raw, lang);
+      setMusicLinkResult(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally {
+      setIsAnalyzingMusicLink(false);
+    }
+  };
+
+  const handleApplyMusicLinkIdea = (idea: string) => {
+    const suggestion = (idea || '').trim();
+    if (!suggestion) return;
+    setConcept(prev => ({
+      ...prev,
+      topic: suggestion,
+      inspirationSource: prev.topic.trim() ? 'mixed' : 'text',
+    }));
+    showToast(tr.concept.linkInspirationApplySuccess, 'success');
+    setIsLinkModalOpen(false);
+  };
+
+  const trimmedMusicLinkInput = musicLinkInput.trim();
+  const isMusicLinkSupported = !trimmedMusicLinkInput || isSupportedMusicServiceLink(trimmedMusicLinkInput);
 
   const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -1544,7 +1592,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             onChange={(e) => setConcept(prev => ({ ...prev, topic: e.target.value }))}
           />
           <div className="flex shrink-0 justify-center border-t border-zinc-200/70 bg-zinc-50/50 px-2 py-1.5 dark:border-white/10 dark:bg-black/15">
-            <div className="flex w-full max-w-lg justify-center gap-1.5">
+            <div className="flex w-full max-w-3xl justify-center gap-1.5">
               <button
                 type="button"
                 onClick={handleRandomize}
@@ -1564,6 +1612,19 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                 <span className="min-w-0 truncate">{tr.concept.imageInspirationTitle}</span>
                 {(inspirationImage || concept.imageInspirationText?.trim()) && (
                   <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-secondary/25 px-1 text-[8px] font-black">
+                    1
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLinkModalOpen(true)}
+                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg border border-suno-primary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
+              >
+                <i className="fas fa-link flex-shrink-0 text-[9px]"></i>
+                <span className="min-w-0 truncate">{tr.concept.linkInspirationTitle}</span>
+                {musicLinkResult && (
+                  <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
                     1
                   </span>
                 )}
@@ -1730,6 +1791,104 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
               >
                 <i className="fas fa-arrow-turn-up mr-1"></i>
                 {tr.concept.imageApply}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isLinkModalOpen && createPortal(
+        <div className="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsLinkModalOpen(false)}>
+          <div
+            className="w-full max-w-2xl glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-suno-primary">
+                <i className="fas fa-link mr-2"></i>{tr.concept.linkInspirationTitle}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsLinkModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-zinc-400 leading-relaxed">{tr.concept.linkInspirationHint}</p>
+
+            <div className="flex flex-col sm:flex-row items-stretch gap-2">
+              <input
+                type="url"
+                placeholder={tr.concept.linkInspirationPlaceholder}
+                value={musicLinkInput}
+                onChange={(e) => {
+                  setMusicLinkInput(e.target.value);
+                  setMusicLinkResult(null);
+                }}
+                className="glass-input flex-1 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500"
+              />
+              <button
+                type="button"
+                onClick={handleAnalyzeMusicLink}
+                disabled={isAnalyzingMusicLink || !trimmedMusicLinkInput || !isMusicLinkSupported}
+                className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all ${
+                  isAnalyzingMusicLink ? 'glass-btn text-suno-primary opacity-70' : 'btn-create text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <i className={`fas ${isAnalyzingMusicLink ? 'fa-spinner animate-spin' : 'fa-wand-magic-sparkles'} mr-1`}></i>
+                {isAnalyzingMusicLink ? tr.concept.linkInspirationAnalyzing : tr.concept.linkInspirationAnalyze}
+              </button>
+            </div>
+            <p className={`text-[9px] ${isMusicLinkSupported ? 'text-zinc-400' : 'text-red-400 font-semibold'}`}>
+              {isMusicLinkSupported ? tr.concept.linkInspirationSupportedHint : tr.concept.linkInspirationUnsupported}
+            </p>
+
+            {musicLinkResult && (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-suno-primary/25 bg-suno-primary/10 px-3 py-2">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-suno-primary mb-1">
+                    {tr.concept.linkInspirationDetected}
+                  </p>
+                  <p className="text-[10px] text-zinc-200">
+                    <span className="font-bold">{musicLinkResult.artist}</span>
+                    <span className="text-zinc-400"> · </span>
+                    <span>{musicLinkResult.title}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-300">
+                    {tr.concept.linkInspirationIdeas}
+                  </p>
+                  {musicLinkResult.suggestions.map((idea, i) => (
+                    <div key={`link-idea-${i}`} className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3 space-y-2">
+                      <p className="text-[11px] text-zinc-200 leading-relaxed">{idea}</p>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleApplyMusicLinkIdea(idea)}
+                          className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white"
+                        >
+                          <i className="fas fa-arrow-turn-up mr-1"></i>
+                          {tr.concept.linkInspirationApply}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsLinkModalOpen(false)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
+              >
+                {tr.about.close}
               </button>
             </div>
           </div>
