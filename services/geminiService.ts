@@ -236,14 +236,58 @@ function rememberRandomIdea(idea: string): void {
 }
 
 function buildRandomStoryAxes(lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') {
-  const settingsDe = ['Nachtzug', 'Kleinstadt-Bar', 'U-Bahn', 'Supermarkt um Mitternacht', 'Büroflur', 'Dorfplatz', 'Raststätte', 'Küche bei Regen', 'Parkhausdach', 'Bahnhof', 'Kiosk kurz vor Feierabend', 'Wohnblock-Innenhof'];
-  const settingsEn = ['night train', 'small-town bar', 'subway platform', 'midnight supermarket', 'office corridor', 'village square', 'highway rest stop', 'kitchen in the rain', 'parking garage roof', 'train station', 'corner shop before closing', 'apartment courtyard'];
+  const settingsDe = [
+    'Hafenkneipe in Reykjavík kurz vor Morgengrauen', 'Dachgarten eines Hochhauses in Lagos bei Stromausfall', 'Näherei am Stadtrand von Dhaka in der Nachtschicht',
+    'Fischmarkt in Bergen kurz nach Sturmwarnung', 'Hinterhofwerkstatt in Neapel während Siesta', 'Busdepot in Bogotá vor Schichtwechsel',
+    'Bibliothek in Kyoto direkt vor Ladenschluss', 'Waldhütte in Lappland während der Polarnacht', 'Dorfbrunnen in der Toskana zur Mittagsglut',
+    'Containerhafen in Busan bei Nebel', 'Schulhof in Nairobi am letzten Ferientag', 'Krankenhauskantine in São Paulo um 5 Uhr früh',
+    'Bäckerei in Beirut vor Sonnenaufgang', 'Wüstenrand bei Ouarzazate kurz nach Sandsturm', 'Markthalle in Marseille an einem Feiertag',
+    'fähre über den Bosporus bei Gegenwind', 'Winzerkeller in Mendoza zur Lesezeit', 'Werkzeugladen in Accra am Monatsende',
+    'kleines Radiostudio in Thessaloniki mit Notbetrieb', 'Flussufer in Varanasi nach dem Monsun', 'Küstenstraße auf den Färöern bei Seitenwind',
+    'Pflegeheim-Garten in Linz kurz vor dem ersten Schnee', 'Mietshausflur in Tirana nach einem Nachbarschaftsstreit', 'Straßencafé in Montevideo bei Nachmittagshitze',
+    'Provinzflughafen in Island mit gestrichenem Flug', 'Bergdorf in Peru während eines Dorffestes', 'Hafenpromenade in Tallinn kurz vor Sonnenaufgang',
+    'Nachtbäckerei in Istanbul kurz vor dem Gebetsruf', 'Kinofoyer in Porto nach der letzten Vorstellung', 'Werkhalle in Ostrava während Wartungsstopp'
+  ];
+  const settingsEn = [
+    'harbor pub in Reykjavik before dawn', 'rooftop garden in Lagos during a blackout', 'garment workshop outside Dhaka on night shift',
+    'fish market in Bergen after a storm alert', 'backyard repair shop in Naples during siesta', 'bus depot in Bogota before shift change',
+    'library in Kyoto right before closing', 'forest cabin in Lapland during polar night', 'village fountain in Tuscany at noon heat',
+    'container port in Busan in fog', 'schoolyard in Nairobi on the last day of break', 'hospital canteen in Sao Paulo at 5 a.m.',
+    'bakery in Beirut before sunrise', 'desert edge near Ouarzazate after a sandstorm', 'market hall in Marseille on a holiday',
+    'ferry crossing the Bosporus in headwind', 'wine cellar in Mendoza during harvest', 'hardware store in Accra at month end',
+    'small radio studio in Thessaloniki in emergency mode', 'riverside in Varanasi after monsoon', 'coastal road on the Faroe Islands in crosswind',
+    'care home garden in Linz before first snow', 'apartment hallway in Tirana after a neighbor conflict', 'street cafe in Montevideo in afternoon heat',
+    'regional airport in Iceland with a canceled flight', 'mountain village in Peru during a local festival', 'harbor promenade in Tallinn before sunrise',
+    'night bakery in Istanbul before the call to prayer', 'cinema foyer in Porto after the last screening', 'factory floor in Ostrava during maintenance shutdown'
+  ];
 
-  const conflictsDe = ['zu spät für den entscheidenden Moment', 'falsche Nachricht zur falschen Zeit', 'eine alte Schuld taucht wieder auf', 'ein Versprechen wird auf die Probe gestellt', 'zwei Ziele passen nicht mehr zusammen', 'ein Missverständnis eskaliert', 'Mut gegen Sicherheit', 'Nähe gegen Stolz'];
-  const conflictsEn = ['too late for the decisive moment', 'the wrong message at the worst time', 'an old debt resurfaces', 'a promise gets tested', 'two goals no longer fit together', 'a misunderstanding escalates', 'courage versus safety', 'closeness versus pride'];
+  const conflictsDe = [
+    'zu spät für einen Abschied, der alles geändert hätte', 'eine alte Vereinbarung kippt im falschen Moment', 'zwei Generationen wollen dasselbe, aber sprechen nicht dieselbe Sprache',
+    'ein kleiner Fehler löst eine große Kettenreaktion aus', 'jemand muss zwischen Loyalität und Selbstschutz entscheiden', 'ein Schweigen wird schwerer als ein Streit',
+    'ein lang verdrängtes Thema bricht beim falschen Anlass auf', 'zwei Menschen hören denselben Satz und verstehen das Gegenteil', 'ein Plan scheitert, weil niemand die Wahrheit ausspricht',
+    'die Hoffnung lebt, aber der Mut fehlt für den ersten Schritt', 'ein Erfolg kostet plötzlich etwas Unerwartetes', 'aus Fürsorge wird Kontrolle',
+    'eine Routine wird zur Falle', 'jemand kommt zurück, aber nicht als dieselbe Person', 'ein Versprechen war ehrlich gemeint, aber unmöglich einzuhalten',
+    'ein Missverständnis wird öffentlich und privat gleichzeitig', 'jemand kämpft gegen eine unsichtbare Frist', 'ein Zufall zeigt, was lange übersehen wurde'
+  ];
+  const conflictsEn = [
+    'too late for a goodbye that would have changed everything', 'an old agreement collapses at the worst moment', 'two generations want the same thing but speak different emotional languages',
+    'a small mistake triggers a large chain reaction', 'someone must choose between loyalty and self-protection', 'silence becomes heavier than argument',
+    'a buried issue breaks open at the wrong occasion', 'two people hear the same sentence and understand opposites', 'a plan fails because no one says the truth out loud',
+    'hope is alive, but courage for the first step is missing', 'success suddenly costs something unexpected', 'care turns into control',
+    'a routine becomes a trap', 'someone returns, but not as the same person', 'a promise was sincere but impossible to keep',
+    'a misunderstanding goes public and private at once', 'someone races against an invisible deadline', 'a coincidence reveals what was ignored for years'
+  ];
 
-  const emotionsDe = ['aufgewühlt aber hoffnungsvoll', 'bitter-süß und nachdenklich', 'drängend und unruhig', 'zärtlich aber verletzlich', 'euphorisch mit Bruchkante', 'melancholisch mit Vorwärtsdrang'];
-  const emotionsEn = ['restless but hopeful', 'bittersweet and reflective', 'urgent and uneasy', 'tender but vulnerable', 'euphoric with a crack in it', 'melancholic with forward motion'];
+  const emotionsDe = [
+    'zerrissen und entschlossen', 'müde, aber widerständig', 'sanft und gleichzeitig unversöhnlich', 'zitternd vor Wut und Sehnsucht',
+    'versöhnt, aber nicht vergessen', 'wachsam und verletzlich', 'überfordert und trotzig', 'ruhig auf der Oberfläche, stürmisch darunter',
+    'nüchtern und doch voller Hoffnung', 'euphorisch mit Absturzkante', 'beschämt und mutig zugleich', 'verletzlich, aber humorvoll'
+  ];
+  const emotionsEn = [
+    'torn but determined', 'exhausted yet defiant', 'gentle and unforgiving at once', 'shaking between anger and longing',
+    'reconciled but not forgetful', 'alert and vulnerable', 'overwhelmed and stubborn', 'calm on the surface, storm underneath',
+    'matter-of-fact yet hopeful', 'euphoric with a cliff edge', 'ashamed and brave at once', 'fragile but witty'
+  ];
 
   const perspectivesDe = ['Ich-Perspektive', 'Du-Perspektive', 'beobachtende Erzählperspektive'];
   const perspectivesEn = ['first-person perspective', 'second-person perspective', 'observational narrator perspective'];
@@ -286,7 +330,30 @@ function buildRandomStoryAxes(lang: 'de' | 'en', mode: 'music' | 'current' | 'wi
   };
 }
 
-const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | 'wildcard' | 'random') => {
+function buildOverusedMotifBlock(lang: 'de' | 'en', recentIdeas: string[], mode: 'music' | 'current' | 'wildcard' | 'random'): string {
+  if (mode !== 'random' || recentIdeas.length === 0) return '';
+  const motifsDe = ['zug', 'u-bahn', 'bahnhof', 'neon', 'regen', 'nachtstadt', 'nasse scheiben', 'gleis'];
+  const motifsEn = ['train', 'subway', 'station', 'neon', 'rain', 'night city', 'wet window', 'platform'];
+  const motifs = lang === 'de' ? motifsDe : motifsEn;
+  const haystack = recentIdeas.join(' \n ').toLowerCase();
+  const matched = motifs.filter((m) => haystack.includes(m));
+  if (matched.length === 0) return '';
+  return lang === 'de'
+    ? `\nZusätzliche Anti-Repeat-Regel: Vermeide in dieser Ausgabe explizit diese übernutzten Motive: ${matched.join(', ')}.`
+    : `\nAdditional anti-repeat rule: Explicitly avoid these overused motifs in this output: ${matched.join(', ')}.`;
+}
+
+function isNeutralRandomPreset(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  return !v || /^(zufall|random|alles|all)$/.test(v);
+}
+
+const conceptStoryPromptBody = (
+  lang: 'de' | 'en',
+  mode: 'music' | 'current' | 'wildcard' | 'random',
+  directionPreset?: string,
+  directionCustom?: string
+) => {
   const axes = buildRandomStoryAxes(lang, mode);
   const recentIdeas = getRecentRandomIdeas();
   const recentBlock = recentIdeas.length
@@ -294,6 +361,7 @@ const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | '
       ? `\nVermeide starke Ähnlichkeit zu diesen zuletzt verwendeten Ideen:\n- ${recentIdeas.slice(0, 8).join('\n- ')}`
       : `\nAvoid strong similarity to these recently used ideas:\n- ${recentIdeas.slice(0, 8).join('\n- ')}`)
     : '';
+  const motifBlock = buildOverusedMotifBlock(lang, recentIdeas, mode);
   const categoryInstruction = lang === 'de'
     ? (
       mode === 'music' ? 'Schwerpunkt: Musikerleben (Probe, Backstage, Bühne, Studio, Tourbus, Technikpanne, Booker, Club, Festival).' :
@@ -307,10 +375,20 @@ const conceptStoryPromptBody = (lang: 'de' | 'en', mode: 'music' | 'current' | '
       mode === 'wildcard' ? 'Focus: free creative scene with a strong hook, still grounded and relatable.' :
       'Pick a random focus from broad everyday life (relationships, work, family, places, personal turning points) — NOT musician/band context.'
     );
+  const preset = cleanText(String(directionPreset ?? '')).trim();
+  const custom = cleanText(String(directionCustom ?? '')).trim();
+  const hasDirection = mode === 'random' && (!isNeutralRandomPreset(preset) || custom.length > 0);
+  const directionInstructionDe = hasDirection
+    ? `\nZusätzliche Richtungs-Vorgabe (MUSS in Output klar erkennbar sein):\n- Auswahl: ${preset || 'Zufall'}\n- Eigene Richtung: ${custom || '—'}`
+    : '';
+  const directionInstructionEn = hasDirection
+    ? `\nAdditional direction constraint (MUST be clearly reflected in output):\n- Preset: ${preset || 'Random'}\n- Custom direction: ${custom || '—'}`
+    : '';
 
   return lang === 'de'
     ? `Erzeuge genau EINE Song-Story-Idee (für das Feld „Thema“ im Konzept). Stil: Option A — realistisch und von echten Alltagssituationen inspiriert, aber fiktionalisiert.
 ${categoryInstruction}
+${directionInstructionDe}
 
 Kreative Leitplanken (zufällig vorgegeben, MUSS klar erkennbar sein):
 - Setting: ${axes.setting}
@@ -321,19 +399,27 @@ Kreative Leitplanken (zufällig vorgegeben, MUSS klar erkennbar sein):
 - Modus-Farbe: ${axes.modeFlavor}
 
 Regeln:
-- 2-4 Sätze, konkrete Szene, klare emotionale Spannung, gut singbar.
+- Kein Fließtext-Absatz. Liefere NUR strukturierte Felder.
 - Keine behaupteten Fakten über reale Ereignisse.
 - Keine Namen echter Personen (weder lebend noch verstorben).
 - Bei Tagesgeschehen: keine konkreten Daten, Orte oder verifizierbaren Claims.
 - Kein „das ist wirklich passiert“-Wording.
 - Keine vulgären/extremen Inhalte, kein Hass, keine Verleumdung.
-- Nur Story, keine Genre-/BPM-/Produktionstipps.
 - Musikalisch umsetzbar: klarer Refrain-Ansatz, singbare Kernzeile, konkrete Bildsprache statt abstrakter Theorie.
-- Wenn mode = random: KEIN Musikerleben-Kontext (keine Bandprobe, keine Bühne, kein Backstage, kein Studio, kein Tourbus, kein Auftritt).
+- Wenn mode = random: KEIN Musikerleben-Kontext (keine Bandprobe, keine Bühne, kein Backstage, kein Studio, kein Tourbus, kein Auftritt) und keine Standardbilder wie Zug/U-Bahn/Bahnhof/Neon/Regen.
 ${recentBlock}
-- Ausgabe als JSON mit Feld "story" in Deutsch.`
+${motifBlock}
+- Ausgabeschema (alles auf Deutsch):
+  - title: kurze Überschrift (2-6 Wörter)
+  - genre: 1 Genre-Label
+  - mood: 1-3 Wörter
+  - setting: 3-8 Wörter (konkreter Ort/Szene)
+  - narratorPerspective: Wer singt? (z. B. "Ich", "Wir", "beobachtender Erzähler")
+  - coreIdea: 1-2 kurze Sätze, direkt als Song-Idee nutzbar (max. 220 Zeichen)
+- Ausgabe als valides JSON mit GENAU diesen Feldern.`
     : `Generate exactly ONE song story idea (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
 ${categoryInstruction}
+${directionInstructionEn}
 
 Creative rails (randomized and MUST be clearly reflected):
 - Setting: ${axes.setting}
@@ -344,51 +430,104 @@ Creative rails (randomized and MUST be clearly reflected):
 - Mode flavor: ${axes.modeFlavor}
 
 Rules:
-- 2-4 sentences, concrete scene, clear emotional pull, singable.
+- No paragraph prose. Return structured fields only.
 - Do not assert real-world facts about actual events.
 - No names of real public figures (living or dead).
 - For current-affairs mode: no specific dates/places/verifiable claims.
 - Do not phrase it as “this really happened”.
 - No vulgar/extreme content, hate, or defamation.
-- Story only, no genre/BPM/production advice.
 - Musically usable: clear chorus angle, singable core line, concrete imagery over abstract theory.
-- If mode = random: NO musician-life context (no rehearsal, stage, backstage, studio, tour bus, or gig framing).
+- If mode = random: NO musician-life context (no rehearsal, stage, backstage, studio, tour bus, or gig framing) and avoid default imagery like train/subway/station/neon/rain.
 ${recentBlock}
-- Return JSON with field "story" in English.`;
+${motifBlock}
+- Output schema (all in English):
+  - title: short heading (2-6 words)
+  - genre: 1 genre label
+  - mood: 1-3 words
+  - setting: 3-8 words (specific scene/location)
+  - narratorPerspective: who sings? (e.g. "I", "we", "observational narrator")
+  - coreIdea: 1-2 short sentences, directly usable as song idea (max. 220 chars)
+- Return valid JSON with EXACTLY these fields.`;
 };
+
+interface StructuredConceptStoryIdea {
+  title: string;
+  genre: string;
+  mood: string;
+  setting: string;
+  narratorPerspective: string;
+  coreIdea: string;
+}
 
 export const generateConceptStoryIdea = async (
   mode: 'music' | 'current' | 'wildcard' | 'random',
-  lang: 'de' | 'en' = 'de'
+  lang: 'de' | 'en' = 'de',
+  directionPreset?: string,
+  directionCustom?: string
 ): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: conceptStoryPromptBody(lang, mode),
+    contents: conceptStoryPromptBody(lang, mode, directionPreset, directionCustom),
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
       ...DEFAULT_THINKING,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
-        properties: { story: { type: Type.STRING } },
-        required: ["story"],
+        properties: {
+          title: { type: Type.STRING },
+          genre: { type: Type.STRING },
+          mood: { type: Type.STRING },
+          setting: { type: Type.STRING },
+          narratorPerspective: { type: Type.STRING },
+          coreIdea: { type: Type.STRING },
+        },
+        required: ["title", "genre", "mood", "setting", "narratorPerspective", "coreIdea"],
       },
     },
   }));
-  const fallback = lang === 'de'
-    ? 'Im Proberaum fällt kurz vor dem Auftritt die Anlage aus und die Band spielt den Refrain unplugged weiter. Das Publikum klatscht den Takt und macht aus der Panne einen Moment, den niemand vergisst. Hinterher bleibt das Gefühl, dass echte Nähe lauter sein kann als jeder Verstärker.'
-    : 'Minutes before a gig, the PA cuts out and the band keeps the chorus alive unplugged. The crowd claps in time and turns a breakdown into a shared high. Afterwards they realize connection can be louder than any amplifier.';
+  const fallback: StructuredConceptStoryIdea = lang === 'de'
+    ? {
+      title: "Verpasster Rückruf",
+      genre: "Indie Pop",
+      mood: "dringlich, verletzlich",
+      setting: "Parkbank nach Feierabend",
+      narratorPerspective: "Ich",
+      coreIdea: "Nach einem verpassten Rückruf kippt ein normaler Abend in ein ehrliches Gespräch über Nähe und Stolz.",
+    }
+    : {
+      title: "Missed Callback",
+      genre: "Indie Pop",
+      mood: "urgent, vulnerable",
+      setting: "park bench after work",
+      narratorPerspective: "I",
+      coreIdea: "A missed callback turns an ordinary evening into an honest talk about closeness and pride.",
+    };
+
+  const formatStructuredIdea = (idea: StructuredConceptStoryIdea): string =>
+    lang === 'de'
+      ? `[Titel] ${idea.title}\n[Genre] ${idea.genre}\n[Stimmung & Setting] ${idea.mood} · ${idea.setting}\n[Perspektive] ${idea.narratorPerspective}\n[Kernidee] ${idea.coreIdea}`
+      : `[Title] ${idea.title}\n[Genre] ${idea.genre}\n[Mood & Setting] ${idea.mood} · ${idea.setting}\n[Perspective] ${idea.narratorPerspective}\n[Core idea] ${idea.coreIdea}`;
   try {
     const parsed = JSON.parse(response.text || "{}");
-    const story = cleanText(String(parsed.story ?? fallback)).trim();
-    rememberRandomIdea(story);
-    return story;
+    const structured: StructuredConceptStoryIdea = {
+      title: cleanText(String(parsed.title ?? fallback.title)).trim(),
+      genre: cleanText(String(parsed.genre ?? fallback.genre)).trim(),
+      mood: cleanText(String(parsed.mood ?? fallback.mood)).trim(),
+      setting: cleanText(String(parsed.setting ?? fallback.setting)).trim(),
+      narratorPerspective: cleanText(String(parsed.narratorPerspective ?? fallback.narratorPerspective)).trim(),
+      coreIdea: cleanText(String(parsed.coreIdea ?? fallback.coreIdea)).trim(),
+    };
+    const formatted = formatStructuredIdea(structured);
+    rememberRandomIdea(formatted);
+    return formatted;
   } catch {
-    rememberRandomIdea(fallback);
-    return fallback;
+    const formattedFallback = formatStructuredIdea(fallback);
+    rememberRandomIdea(formattedFallback);
+    return formattedFallback;
   }
 };
 

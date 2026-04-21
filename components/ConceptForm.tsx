@@ -847,6 +847,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const [concept, setConcept] = useState<SongConcept>(initialConcept);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isRandomizing, setIsRandomizing] = useState(false);
+  const [randomThemePreset, setRandomThemePreset] = useState<string>(opts.randomThemes[0] ?? 'Zufall');
+  const [randomDirectionCustom, setRandomDirectionCustom] = useState('');
+  const [isRandomModalOpen, setIsRandomModalOpen] = useState(false);
+  const [randomSuggestion, setRandomSuggestion] = useState('');
   const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -898,6 +902,12 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
     lastSentTopicRef.current = concept.topic;
   }, [concept]);
 
+  useEffect(() => {
+    if (!opts.randomThemes.includes(randomThemePreset)) {
+      setRandomThemePreset(opts.randomThemes[0] ?? randomThemePreset);
+    }
+  }, [lang, opts.randomThemes, randomThemePreset]);
+
   const focusGenreField = () => {
     setGenreFieldPulse(true);
     genreFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -909,12 +919,49 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const handleRandomize = async () => {
     setIsRandomizing(true);
     try {
-      const topic = await generateConceptStoryIdea('random', lang);
-      setConcept(prev => ({ ...prev, topic }));
+      const topic = await generateConceptStoryIdea(
+        'random',
+        lang,
+        randomThemePreset,
+        randomDirectionCustom
+      );
+      setRandomSuggestion(topic);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
       showToast(tr.errors.aiErrorPrefix + msg, 'error');
     } finally { setIsRandomizing(false); }
+  };
+
+  const extractRandomSuggestionForTopic = (text: string): string => {
+    const raw = String(text ?? '');
+    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return '';
+
+    const cleanLine = (line: string): string => {
+      if (/^\[Titel\]\s*/i.test(line)) return `Titel: ${line.replace(/^\[Titel\]\s*/i, '').trim()}`;
+      if (/^\[Title\]\s*/i.test(line)) return `Title: ${line.replace(/^\[Title\]\s*/i, '').trim()}`;
+      if (/^\[Genre\]\s*/i.test(line)) return `Genre: ${line.replace(/^\[Genre\]\s*/i, '').trim()}`;
+      if (/^\[Stimmung\s*&\s*Setting\]\s*/i.test(line)) return `Stimmung & Setting: ${line.replace(/^\[Stimmung\s*&\s*Setting\]\s*/i, '').trim()}`;
+      if (/^\[Mood\s*&\s*Setting\]\s*/i.test(line)) return `Mood & Setting: ${line.replace(/^\[Mood\s*&\s*Setting\]\s*/i, '').trim()}`;
+      if (/^\[Perspektive\]\s*/i.test(line)) return `Perspektive: ${line.replace(/^\[Perspektive\]\s*/i, '').trim()}`;
+      if (/^\[Perspective\]\s*/i.test(line)) return `Perspective: ${line.replace(/^\[Perspective\]\s*/i, '').trim()}`;
+      if (/^\[Kernidee\]\s*/i.test(line)) return line.replace(/^\[Kernidee\]\s*/i, '').trim();
+      if (/^\[Core idea\]\s*/i.test(line)) return line.replace(/^\[Core idea\]\s*/i, '').trim();
+      return line
+        .replace(/^Kernidee:\s*/i, '')
+        .replace(/^Core idea:\s*/i, '')
+        .trim();
+    };
+
+    return lines.map(cleanLine).filter(Boolean).join('\n').trim();
+  };
+
+  const handleApplyRandomSuggestion = () => {
+    const suggestion = extractRandomSuggestionForTopic(randomSuggestion);
+    if (!suggestion) return;
+    setConcept(prev => ({ ...prev, topic: suggestion }));
+    showToast(tr.concept.randomApplySuccess, 'success');
+    setIsRandomModalOpen(false);
   };
 
   const runSongIdeaAnalysis = async (mode: 'merge' | 'replace') => {
@@ -1595,13 +1642,12 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             <div className="grid w-full max-w-3xl grid-cols-1 gap-1.5 sm:grid-cols-3">
               <button
                 type="button"
-                onClick={handleRandomize}
-                disabled={isRandomizing}
+                onClick={() => setIsRandomModalOpen(true)}
                 title={opts.randomizeTitle}
                 className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
               >
                 <span className="truncate">{opts.randomThemes[0]}</span>
-                <i className={`fas fa-dice flex-shrink-0 text-[9px] ${isRandomizing ? 'animate-spin' : ''}`}></i>
+                <i className="fas fa-dice flex-shrink-0 text-[9px]"></i>
               </button>
               <button
                 type="button"
@@ -1664,6 +1710,105 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
           </div>
         </div>
       </div>
+
+      {isRandomModalOpen && createPortal(
+        <div className="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsRandomModalOpen(false)}>
+          <div
+            className="w-full max-w-2xl glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-suno-primary">
+                <i className="fas fa-dice mr-2"></i>{tr.concept.randomModalTitle}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsRandomModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-zinc-400 leading-relaxed">{tr.concept.randomModalHint}</p>
+
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                  {tr.concept.randomDirectionLabel}
+                </span>
+                <select
+                  value={randomThemePreset}
+                  onChange={(e) => setRandomThemePreset(e.target.value)}
+                  className="glass-input w-full rounded-lg px-2.5 py-2 text-[10px] font-semibold text-zinc-200"
+                >
+                  {opts.randomThemes.map((preset) => (
+                    <option key={preset} value={preset}>{preset}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                  {tr.concept.randomDirectionCustomLabel}
+                </span>
+                <input
+                  type="text"
+                  value={randomDirectionCustom}
+                  onChange={(e) => setRandomDirectionCustom(e.target.value)}
+                  placeholder={tr.concept.randomDirectionCustomPlaceholder}
+                  className="glass-input w-full rounded-lg px-2.5 py-2 text-[10px] text-zinc-200 placeholder:text-zinc-500"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleRandomize}
+                disabled={isRandomizing}
+                className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] transition-all ${
+                  isRandomizing ? 'glass-btn text-suno-primary opacity-70' : 'btn-create text-white'
+                }`}
+              >
+                <i className={`fas ${isRandomizing ? 'fa-spinner animate-spin' : 'fa-wand-magic-sparkles'} mr-1`}></i>
+                {isRandomizing ? tr.concept.randomAnalyzing : tr.concept.randomGenerate}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
+                {tr.concept.randomResultLabel}
+              </label>
+              <textarea
+                className="glass-input w-full rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 resize-none h-36 custom-scrollbar"
+                placeholder={tr.concept.randomResultPlaceholder}
+                value={randomSuggestion}
+                onChange={(e) => setRandomSuggestion(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsRandomModalOpen(false)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
+              >
+                {tr.about.close}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyRandomSuggestion}
+                disabled={!randomSuggestion.trim()}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-arrow-turn-up mr-1"></i>
+                {tr.concept.randomApply}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {isImageModalOpen && createPortal(
         <div className="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsImageModalOpen(false)}>
