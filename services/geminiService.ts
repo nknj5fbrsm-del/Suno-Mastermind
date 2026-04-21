@@ -348,6 +348,55 @@ function isNeutralRandomPreset(value: string): boolean {
   return !v || /^(zufall|random|alles|all)$/.test(v);
 }
 
+function normalizePreset(value: string): string {
+  return cleanText(String(value ?? ""))
+    .toLowerCase()
+    .replace(/[,&]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isArtMusicOnlyPreset(value: string): boolean {
+  const n = normalizePreset(value);
+  return n === "kunst musik" || n === "art music";
+}
+
+function strictPresetInstruction(
+  lang: 'de' | 'en',
+  mode: 'music' | 'current' | 'wildcard' | 'random',
+  preset: string
+): string {
+  if (mode !== 'random' || !isArtMusicOnlyPreset(preset)) return '';
+  return lang === 'de'
+    ? `\nSTRICT PRESET MATCH (Kunst & Musik):
+- MUSS klar im Feld bleiben: Kunst- und/oder Musikkontext.
+- Erlaubte Kontexte: Bühne, Probe, Ensemble, Chor, Orchester, Instrument, Komposition, Arrangement, Atelier, Galerie, Museum, Konzert, Festival, Tanz, Performance.
+- VERBOTEN: allgemeiner Arbeitsalltag ohne Kunstbezug (Büro, Schicht, Pflegeleitung, Kundenmeeting, KPI, Deadline-Jobdrama), reine Familien-/Beziehungsstory ohne künstlerischen Bezug.
+- Wenn der Entwurf diese Regeln verletzt, verwerfe ihn intern und liefere eine neue, passende Version.`
+    : `\nSTRICT PRESET MATCH (Art & Music):
+- MUST stay clearly in art/music domain.
+- Allowed contexts: stage, rehearsal, ensemble, choir, orchestra, instrument, composition, arrangement, studio, atelier, gallery, museum, concert, festival, dance, performance.
+- FORBIDDEN: generic work-life drama without art context (office, shift duty, management pressure, KPI/deadline drama), pure family/relationship story without artistic anchor.
+- If a draft violates these rules, discard it internally and regenerate a compliant one.`;
+}
+
+function validateArtMusicStructuredIdea(idea: StructuredConceptStoryIdea): boolean {
+  const text = `${idea.title} ${idea.genre} ${idea.mood} ${idea.setting} ${idea.narratorPerspective} ${idea.coreIdea}`.toLowerCase();
+  const must = [
+    'kunst', 'musik', 'bühne', 'probe', 'chor', 'orchester', 'ensemble', 'instrument',
+    'komposition', 'arrangement', 'atelier', 'galerie', 'museum', 'konzert', 'festival',
+    'performance', 'dance', 'choir', 'orchestra', 'ensemble', 'instrument', 'composition',
+    'arrangement', 'studio', 'atelier', 'gallery', 'museum', 'concert', 'festival', 'art', 'music',
+  ];
+  const forbidden = [
+    'pflegeleitung', 'büro', 'kundenmeeting', 'kpi', 'schicht', 'office', 'meeting',
+    'deadline', 'shift', 'management pressure', 'arbeitswelt-pflichten',
+  ];
+  const mustHits = must.filter((k) => text.includes(k)).length;
+  const forbiddenHits = forbidden.filter((k) => text.includes(k)).length;
+  return mustHits >= 2 && forbiddenHits === 0;
+}
+
 const conceptStoryPromptBody = (
   lang: 'de' | 'en',
   mode: 'music' | 'current' | 'wildcard' | 'random',
@@ -384,11 +433,13 @@ const conceptStoryPromptBody = (
   const directionInstructionEn = hasDirection
     ? `\nAdditional direction constraint (MUST be clearly reflected in output):\n- Preset: ${preset || 'Random'}\n- Custom direction: ${custom || '—'}`
     : '';
+  const strictPresetBlock = strictPresetInstruction(lang, mode, preset);
 
   return lang === 'de'
     ? `Erzeuge genau EINE Song-Story-Idee (für das Feld „Thema“ im Konzept). Stil: Option A — realistisch und von echten Alltagssituationen inspiriert, aber fiktionalisiert.
 ${categoryInstruction}
 ${directionInstructionDe}
+${strictPresetBlock}
 
 Kreative Leitplanken (zufällig vorgegeben, MUSS klar erkennbar sein):
 - Setting: ${axes.setting}
@@ -420,6 +471,7 @@ ${motifBlock}
     : `Generate exactly ONE song story idea (for a concept “topic” field). Style: Option A — realistic and inspired by real-life situations, but fictionalized.
 ${categoryInstruction}
 ${directionInstructionEn}
+${strictPresetBlock}
 
 Creative rails (randomized and MUST be clearly reflected):
 - Setting: ${axes.setting}
@@ -459,12 +511,22 @@ interface StructuredConceptStoryIdea {
   coreIdea: string;
 }
 
+function sanitizeCoreIdea(text: string): string {
+  let s = cleanText(String(text ?? "")).trim();
+  // Remove appended hook/refrain labels and trailing fragments.
+  s = s.replace(/\s*(?:^|[\n\r]|[.!?]\s+)(?:hook(?:-frage| question)?|refrain)\s*:\s*.*/gi, "").trim();
+  // If the model still injected a bracketed hook tag, strip it.
+  s = s.replace(/\[(?:hook|hook[-\s]?frage|hook question|refrain)\][^\n\r]*/gi, "").trim();
+  return s;
+}
+
 export const generateConceptStoryIdea = async (
   mode: 'music' | 'current' | 'wildcard' | 'random',
   lang: 'de' | 'en' = 'de',
   directionPreset?: string,
   directionCustom?: string
 ): Promise<string> => {
+  const preset = cleanText(String(directionPreset ?? '')).trim();
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
@@ -506,6 +568,23 @@ export const generateConceptStoryIdea = async (
       narratorPerspective: "I",
       coreIdea: "A missed callback turns an ordinary evening into an honest talk about closeness and pride.",
     };
+  const fallbackArtMusic: StructuredConceptStoryIdea = lang === 'de'
+    ? {
+      title: "Zwischen Takt und Stille",
+      genre: "Art-Pop",
+      mood: "konzentriert, verletzlich",
+      setting: "Proberaum vor der Premiere",
+      narratorPerspective: "Ich",
+      coreIdea: "Während das Ensemble den letzten Durchlauf probt, ringe ich darum, ob ich die mutigere Fassung spielen soll und damit alles riskiere.",
+    }
+    : {
+      title: "Between Tempo and Silence",
+      genre: "Art Pop",
+      mood: "focused, vulnerable",
+      setting: "rehearsal room before premiere",
+      narratorPerspective: "I",
+      coreIdea: "As the ensemble rehearses the final run, I wrestle with whether to play the bolder version and risk everything.",
+    };
 
   const formatStructuredIdea = (idea: StructuredConceptStoryIdea): string =>
     lang === 'de'
@@ -519,8 +598,14 @@ export const generateConceptStoryIdea = async (
       mood: cleanText(String(parsed.mood ?? fallback.mood)).trim(),
       setting: cleanText(String(parsed.setting ?? fallback.setting)).trim(),
       narratorPerspective: cleanText(String(parsed.narratorPerspective ?? fallback.narratorPerspective)).trim(),
-      coreIdea: cleanText(String(parsed.coreIdea ?? fallback.coreIdea)).trim(),
+      coreIdea: sanitizeCoreIdea(String(parsed.coreIdea ?? fallback.coreIdea)),
     };
+    if (!structured.coreIdea) structured.coreIdea = fallback.coreIdea;
+    if (mode === 'random' && isArtMusicOnlyPreset(preset) && !validateArtMusicStructuredIdea(structured)) {
+      const formattedFallback = formatStructuredIdea(fallbackArtMusic);
+      rememberRandomIdea(formattedFallback);
+      return formattedFallback;
+    }
     const formatted = formatStructuredIdea(structured);
     rememberRandomIdea(formatted);
     return formatted;
