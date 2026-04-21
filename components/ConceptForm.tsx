@@ -1592,13 +1592,13 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             onChange={(e) => setConcept(prev => ({ ...prev, topic: e.target.value }))}
           />
           <div className="flex shrink-0 justify-center border-t border-zinc-200/70 bg-zinc-50/50 px-2 py-1.5 dark:border-white/10 dark:bg-black/15">
-            <div className="flex w-full max-w-3xl justify-center gap-1.5">
+            <div className="grid w-full max-w-3xl grid-cols-1 gap-1.5 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={handleRandomize}
                 disabled={isRandomizing}
                 title={opts.randomizeTitle}
-                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
+                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
               >
                 <span className="truncate">{opts.randomThemes[0]}</span>
                 <i className={`fas fa-dice flex-shrink-0 text-[9px] ${isRandomizing ? 'animate-spin' : ''}`}></i>
@@ -1606,7 +1606,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
               <button
                 type="button"
                 onClick={() => setIsImageModalOpen(true)}
-                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg border border-suno-secondary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-secondary transition-colors hover:border-suno-secondary hover:bg-suno-secondary hover:text-white"
+                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-secondary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-secondary transition-colors hover:border-suno-secondary hover:bg-suno-secondary hover:text-white"
               >
                 <i className="fas fa-image flex-shrink-0 text-[9px]"></i>
                 <span className="min-w-0 truncate">{tr.concept.imageInspirationTitle}</span>
@@ -1619,7 +1619,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
               <button
                 type="button"
                 onClick={() => setIsLinkModalOpen(true)}
-                className="glass-btn flex min-h-[2rem] flex-1 items-center justify-center gap-1 rounded-lg border border-suno-primary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
+                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-primary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
               >
                 <i className="fas fa-link flex-shrink-0 text-[9px]"></i>
                 <span className="min-w-0 truncate">{tr.concept.linkInspirationTitle}</span>

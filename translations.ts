@@ -86,7 +86,7 @@ export const t = {
     concept: {
       newProject: 'Neues Projekt', songIdea: 'Song-Idee',
       enterTopicFirst: 'Bitte gib zuerst ein Thema ein.',
-      placeholder: '',
+      placeholder: 'deine Idee hier eingeben',
       placeholderInstrumental: '',
       songIdeaFieldHelpLyrics: 'Wähle deinen Einstieg:\n• Wovon handelt dein Song?\n• Nutze den Würfel für Ideen.\n• Lade ein Bild hoch für Inspiration.\n• Oder füge einen Apple-/Spotify-Link ein (Artist/Titel wird extrahiert).',
       songIdeaFieldHelpInstrumental: 'Beschreibe die Musik: Stil, Atmosphäre, Instrumente …',
@@ -449,7 +449,7 @@ export const t = {
     concept: {
       newProject: 'New Project', songIdea: 'Song Idea',
       enterTopicFirst: 'Please enter a topic first.',
-      placeholder: '',
+      placeholder: 'enter your idea here',
       placeholderInstrumental: '',
       songIdeaFieldHelpLyrics: 'Choose your starting point:\n• What is your song about?\n• Use the dice for ideas.\n• Upload an image for inspiration.\n• Or paste an Apple/Spotify link (artist/title is extracted).',
       songIdeaFieldHelpInstrumental: 'Describe the music: style, atmosphere, instruments…',
