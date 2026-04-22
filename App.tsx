@@ -77,6 +77,7 @@ const HeaderLogo = () => (
 
 const COVER_COOLDOWN_KEY = 'cover_cooldown_until';
 const COVER_COOLDOWN_MS = 90_000;
+const QUOTA_POST_COOLDOWN_YELLOW_MS = 30_000;
 const formatTokenCount = (value: number): string => {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
@@ -280,8 +281,22 @@ const App: React.FC = () => {
     return Math.max(0, Math.ceil((until - clockMs) / 1000));
   }, [tokenUsage.quota.cooldownUntil, clockMs]);
 
+  const effectiveQuotaStatus = useMemo<'green' | 'yellow' | 'red'>(() => {
+    const cooldownUntil = tokenUsage.quota.cooldownUntil ?? 0;
+    const cooldownActive = cooldownUntil > clockMs;
+    const postCooldownYellowActive =
+      cooldownUntil > 0 &&
+      clockMs > cooldownUntil &&
+      clockMs <= cooldownUntil + QUOTA_POST_COOLDOWN_YELLOW_MS;
+    if (cooldownActive) return 'red';
+    if (postCooldownYellowActive) return 'yellow';
+    if (tokenUsage.quota.usageRatio >= 0.95) return 'red';
+    if (tokenUsage.quota.usageRatio >= 0.8) return 'yellow';
+    return 'green';
+  }, [tokenUsage.quota.cooldownUntil, tokenUsage.quota.usageRatio, clockMs]);
+
   const quotaStatusUi = useMemo(() => {
-    if (tokenUsage.quota.status === 'red') {
+    if (effectiveQuotaStatus === 'red') {
       return {
         dot: 'bg-red-500',
         text: lang === 'de' ? 'Stop' : 'Stop',
@@ -290,11 +305,18 @@ const App: React.FC = () => {
           : (lang === 'de' ? 'Quota-Risiko hoch' : 'High quota risk'),
       };
     }
-    if (tokenUsage.quota.status === 'yellow') {
+    if (effectiveQuotaStatus === 'yellow') {
+      const cooldownUntil = tokenUsage.quota.cooldownUntil ?? 0;
+      const postCooldownWatchSec =
+        cooldownUntil > 0 && clockMs > cooldownUntil && clockMs <= cooldownUntil + QUOTA_POST_COOLDOWN_YELLOW_MS
+          ? Math.ceil((cooldownUntil + QUOTA_POST_COOLDOWN_YELLOW_MS - clockMs) / 1000)
+          : 0;
       return {
         dot: 'bg-amber-400',
         text: lang === 'de' ? 'Vorsicht' : 'Caution',
-        hint: lang === 'de' ? 'Weiter möglich' : 'Likely okay',
+        hint: postCooldownWatchSec > 0
+          ? (lang === 'de' ? `Stabilisiert sich ${formatSeconds(postCooldownWatchSec)}` : `Stabilizing ${formatSeconds(postCooldownWatchSec)}`)
+          : (lang === 'de' ? 'Weiter möglich' : 'Likely okay'),
       };
     }
     return {
@@ -302,7 +324,7 @@ const App: React.FC = () => {
       text: lang === 'de' ? 'OK' : 'OK',
       hint: lang === 'de' ? 'Weitergenerieren' : 'Can continue',
     };
-  }, [tokenUsage.quota.status, quotaCooldownLeftSec, lang]);
+  }, [effectiveQuotaStatus, quotaCooldownLeftSec, tokenUsage.quota.cooldownUntil, clockMs, lang]);
 
   const changeTheme = (theme: ThemeName) => {
     setActiveTheme(theme);
@@ -1026,8 +1048,8 @@ const App: React.FC = () => {
                     <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
                     <p className="text-[10px] text-zinc-400 pt-1">
                       {lang === 'de'
-                        ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Grün: keine frischen Quota-Signale. Gelb: erhöhte Last oder kürzlich Quota-Signale. Rot: frischer 429/Quota-Fehler oder aktiver Cooldown, kurz warten empfohlen.'
-                        : 'The traffic light estimates whether further generation is likely without quota errors. Green: no fresh quota signals. Yellow: elevated load or recent quota signals. Red: fresh 429/quota error or active cooldown, waiting briefly is recommended.'}
+                        ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Rot: aktiver Cooldown nach 429. Nach Ablauf folgt 30 Sekunden Gelb (Stabilisierung), danach Grün, sofern kein neuer Fehler auftritt.'
+                        : 'The traffic light estimates whether further generation is likely without quota errors. Red: active cooldown after 429. After cooldown, it stays Yellow for 30 seconds (stabilizing), then turns Green if no new error occurs.'}
                     </p>
                     <p className="text-[10px] text-zinc-400">
                       {lang === 'de'
@@ -1116,8 +1138,8 @@ const App: React.FC = () => {
                 <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
                   {lang === 'de'
-                    ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Grün: keine frischen Quota-Signale. Gelb: erhöhte Last oder kürzlich Quota-Signale. Rot: frischer 429/Quota-Fehler oder aktiver Cooldown, kurz warten empfohlen.'
-                    : 'The traffic light estimates whether further generation is likely without quota errors. Green: no fresh quota signals. Yellow: elevated load or recent quota signals. Red: fresh 429/quota error or active cooldown, waiting briefly is recommended.'}
+                    ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Rot: aktiver Cooldown nach 429. Nach Ablauf folgt 30 Sekunden Gelb (Stabilisierung), danach Grün, sofern kein neuer Fehler auftritt.'
+                    : 'The traffic light estimates whether further generation is likely without quota errors. Red: active cooldown after 429. After cooldown, it stays Yellow for 30 seconds (stabilizing), then turns Green if no new error occurs.'}
                 </p>
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
                   {lang === 'de'
