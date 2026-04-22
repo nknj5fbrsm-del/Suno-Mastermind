@@ -1038,6 +1038,18 @@ const App: React.FC = () => {
 
           {/* Right: Controls */}
           <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Mobile: KI-Status */}
+            <button
+              type="button"
+              onClick={() => setIsQuotaInfoOpen(prev => !prev)}
+              className="md:hidden glass-btn touch-target rounded-xl flex items-center justify-center gap-1.5 px-2.5 text-zinc-600 dark:text-zinc-300 hover:text-suno-primary"
+              title={lang === 'de' ? 'KI-Status anzeigen' : 'Show AI status'}
+              aria-expanded={isQuotaInfoOpen}
+              aria-haspopup="dialog"
+            >
+              <GeminiMiniLogo />
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${quotaStatusUi.dot}`}></span>
+            </button>
             {/* Language toggle */}
             <button onClick={toggleLang}
               className="glass-btn touch-target rounded-xl flex items-center gap-1 px-3 font-black text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:text-suno-primary"
@@ -1080,6 +1092,51 @@ const App: React.FC = () => {
           </div>
           </div>
         </div>
+
+        {/* Mobile: KI-Status Mini-Modal */}
+        {isQuotaInfoOpen && createPortal(
+          <div className="md:hidden fixed inset-0 z-[95] bg-black/55 backdrop-blur-sm flex items-start justify-center p-4" onClick={() => setIsQuotaInfoOpen(false)}>
+            <div
+              className="mt-14 w-full max-w-sm glass-card rounded-2xl p-3.5 shadow-2xl animate-scale-in"
+              role="dialog"
+              aria-label={lang === 'de' ? 'KI Status Details' : 'AI status details'}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <GeminiMiniLogo />
+                  <span className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
+                    {lang === 'de' ? 'Gemini Status' : 'Gemini Status'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuotaInfoOpen(false)}
+                  className="glass-btn touch-target rounded-xl text-zinc-400 hover:text-red-400"
+                  aria-label={lang === 'de' ? 'Schließen' : 'Close'}
+                >
+                  <i className="fas fa-times text-xs"></i>
+                </button>
+              </div>
+              <div className="space-y-1.5 text-[11px] text-zinc-700 dark:text-zinc-300">
+                <p className="flex items-center gap-1.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${quotaStatusUi.dot}`}></span>
+                  <span className="font-semibold">{quotaStatusUi.text}</span>
+                  <span>{quotaStatusUi.hint}</span>
+                </p>
+                <p>{lang === 'de' ? 'Heute verbraucht:' : 'Used today:'} <span className="font-semibold">{formatTokenCount(tokenUsage.todayTotal)}</span></p>
+                <p>{lang === 'de' ? 'Rest (geschätzt):' : 'Left (estimated):'} <span className="font-semibold">{formatTokenCount(tokenUsage.quota.remainingTodayTokens)}</span></p>
+                <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
+                  {lang === 'de'
+                    ? 'Ampel ist eine Schätzung aus Tokenverbrauch und Quota-Fehlern (z. B. 429).'
+                    : 'Traffic light is an estimate based on token usage and quota errors (e.g. 429).'}
+                </p>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
         {/* ── Row 2: Workflow Navigation ── */}
         <div className="border-t border-white/30 dark:border-white/6 py-1.5 px-4 md:px-0">
