@@ -986,70 +986,58 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Center: Gemini Quota Ampel */}
-          <div className="hidden md:flex relative" ref={quotaButtonRef}>
-            <button
-              type="button"
-              onClick={() => setIsQuotaInfoOpen(prev => !prev)}
-              className="glass-btn rounded-xl px-3 py-1.5 min-w-[160px] flex items-center justify-center gap-2 text-zinc-700 dark:text-zinc-200"
-              title={lang === 'de' ? 'KI-Status anzeigen' : 'Show AI status'}
-              aria-expanded={isQuotaInfoOpen}
-              aria-haspopup="dialog"
-            >
-              <GeminiMiniLogo />
-              <span className={`inline-block w-2.5 h-2.5 rounded-full ${quotaStatusUi.dot}`}></span>
-              <span className="text-[10px] font-black uppercase tracking-wider">
-                {lang === 'de' ? 'KI Status' : 'AI Status'}
-              </span>
-            </button>
-            {isQuotaInfoOpen && (
-              <div
-                ref={quotaInfoRef}
-                className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-[320px] glass-card rounded-2xl p-3.5 z-[80] shadow-2xl animate-scale-in"
-                role="dialog"
-                aria-label={lang === 'de' ? 'KI Status Details' : 'AI status details'}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <GeminiMiniLogo />
-                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
-                      {lang === 'de' ? 'Gemini Status' : 'Gemini Status'}
-                    </span>
-                  </div>
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${tokenUsage.quota.status === 'red' ? 'text-red-400' : tokenUsage.quota.status === 'yellow' ? 'text-amber-300' : 'text-emerald-300'}`}>
-                    <span className={`inline-block w-2 h-2 rounded-full ${quotaStatusUi.dot}`}></span>
-                    {quotaStatusUi.text}
-                  </span>
-                </div>
-                <div className="space-y-1.5 text-[11px] text-zinc-700 dark:text-zinc-300">
-                  <p>{quotaStatusUi.hint}</p>
-                  <p>{lang === 'de' ? 'Heute verbraucht:' : 'Used today:'} <span className="font-semibold">{formatTokenCount(tokenUsage.todayTotal)}</span></p>
-                  <p>{lang === 'de' ? 'Rest (geschätzt):' : 'Left (estimated):'} <span className="font-semibold">{formatTokenCount(tokenUsage.quota.remainingTodayTokens)}</span></p>
-                  <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
-                    {lang === 'de'
-                      ? 'Ampel ist eine Schätzung aus Tokenverbrauch und Quota-Fehlern (z. B. 429).'
-                      : 'Traffic light is an estimate based on token usage and quota errors (e.g. 429).'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Right: Controls */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Mobile: KI-Status */}
-            <button
-              type="button"
-              onClick={() => setIsQuotaInfoOpen(prev => !prev)}
-              className="md:hidden glass-btn touch-target rounded-xl flex items-center justify-center gap-1.5 px-2.5 text-zinc-600 dark:text-zinc-300 hover:text-suno-primary"
-              title={lang === 'de' ? 'KI-Status anzeigen' : 'Show AI status'}
-              aria-expanded={isQuotaInfoOpen}
-              aria-haspopup="dialog"
-            >
-              <GeminiMiniLogo />
-              <span className={`inline-block w-2.5 h-2.5 rounded-full ${quotaStatusUi.dot}`}></span>
-            </button>
+            {/* KI-Status */}
+            <div className="relative" ref={quotaButtonRef}>
+              <button
+                type="button"
+                onClick={() => setIsQuotaInfoOpen(prev => !prev)}
+                className="glass-btn touch-target rounded-xl flex items-center justify-center gap-1.5 px-2.5 text-zinc-600 dark:text-zinc-300 hover:text-suno-primary"
+                title={lang === 'de' ? 'KI-Status anzeigen' : 'Show AI status'}
+                aria-expanded={isQuotaInfoOpen}
+                aria-haspopup="dialog"
+              >
+                <GeminiMiniLogo />
+                <span className={`inline-block w-2.5 h-2.5 rounded-full ${quotaStatusUi.dot}`}></span>
+              </button>
+              {isQuotaInfoOpen && (
+                <div
+                  ref={quotaInfoRef}
+                  className="hidden md:block absolute top-[calc(100%+8px)] right-0 w-[320px] rounded-2xl p-3.5 z-[120] shadow-2xl animate-scale-in border border-white/15 bg-zinc-950/95 backdrop-blur-xl"
+                  role="dialog"
+                  aria-label={lang === 'de' ? 'KI Status Details' : 'AI status details'}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <GeminiMiniLogo />
+                      <span className="text-xs font-black uppercase tracking-wider text-zinc-100">
+                        {lang === 'de' ? 'Gemini Status' : 'Gemini Status'}
+                      </span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${tokenUsage.quota.status === 'red' ? 'text-red-400' : tokenUsage.quota.status === 'yellow' ? 'text-amber-300' : 'text-emerald-300'}`}>
+                      <span className={`inline-block w-2 h-2 rounded-full ${quotaStatusUi.dot}`}></span>
+                      {quotaStatusUi.text}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-[11px] text-zinc-200">
+                    <p>{quotaStatusUi.hint}</p>
+                    <p>{lang === 'de' ? 'Heute verbraucht:' : 'Used today:'} <span className="font-semibold">{formatTokenCount(tokenUsage.todayTotal)}</span></p>
+                    <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
+                    <p className="text-[10px] text-zinc-400 pt-1">
+                      {lang === 'de'
+                        ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Grün: keine frischen Quota-Signale. Gelb: erhöhte Last oder kürzlich Quota-Signale. Rot: frischer 429/Quota-Fehler oder aktiver Cooldown, kurz warten empfohlen.'
+                        : 'The traffic light estimates whether further generation is likely without quota errors. Green: no fresh quota signals. Yellow: elevated load or recent quota signals. Red: fresh 429/quota error or active cooldown, waiting briefly is recommended.'}
+                    </p>
+                    <p className="text-[10px] text-zinc-400">
+                      {lang === 'de'
+                        ? 'Tokenwerte stammen aus Gemini usageMetadata (Input/Output/Gesamt), wenn vom Modell zurückgegeben.'
+                        : 'Token values come from Gemini usageMetadata (input/output/total), when returned by the model.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Language toggle */}
             <button onClick={toggleLang}
               className="glass-btn touch-target rounded-xl flex items-center gap-1 px-3 font-black text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:text-suno-primary"
@@ -1095,9 +1083,9 @@ const App: React.FC = () => {
 
         {/* Mobile: KI-Status Mini-Modal */}
         {isQuotaInfoOpen && createPortal(
-          <div className="md:hidden fixed inset-0 z-[95] bg-black/55 backdrop-blur-sm flex items-start justify-center p-4" onClick={() => setIsQuotaInfoOpen(false)}>
+          <div className="md:hidden fixed inset-0 z-[120] bg-black/75 backdrop-blur-md flex items-start justify-center p-4" onClick={() => setIsQuotaInfoOpen(false)}>
             <div
-              className="mt-14 w-full max-w-sm glass-card rounded-2xl p-3.5 shadow-2xl animate-scale-in"
+              className="mt-14 w-full max-w-sm rounded-2xl p-3.5 shadow-2xl animate-scale-in border border-white/15 bg-zinc-950/95 backdrop-blur-xl"
               role="dialog"
               aria-label={lang === 'de' ? 'KI Status Details' : 'AI status details'}
               onClick={(e) => e.stopPropagation()}
@@ -1118,19 +1106,23 @@ const App: React.FC = () => {
                   <i className="fas fa-times text-xs"></i>
                 </button>
               </div>
-              <div className="space-y-1.5 text-[11px] text-zinc-700 dark:text-zinc-300">
+              <div className="space-y-1.5 text-[11px] text-zinc-200">
                 <p className="flex items-center gap-1.5">
                   <span className={`inline-block w-2 h-2 rounded-full ${quotaStatusUi.dot}`}></span>
                   <span className="font-semibold">{quotaStatusUi.text}</span>
                   <span>{quotaStatusUi.hint}</span>
                 </p>
                 <p>{lang === 'de' ? 'Heute verbraucht:' : 'Used today:'} <span className="font-semibold">{formatTokenCount(tokenUsage.todayTotal)}</span></p>
-                <p>{lang === 'de' ? 'Rest (geschätzt):' : 'Left (estimated):'} <span className="font-semibold">{formatTokenCount(tokenUsage.quota.remainingTodayTokens)}</span></p>
                 <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
                   {lang === 'de'
-                    ? 'Ampel ist eine Schätzung aus Tokenverbrauch und Quota-Fehlern (z. B. 429).'
-                    : 'Traffic light is an estimate based on token usage and quota errors (e.g. 429).'}
+                    ? 'Die Ampel bewertet die Wahrscheinlichkeit für weitere Generierung ohne Quota-Fehler. Grün: keine frischen Quota-Signale. Gelb: erhöhte Last oder kürzlich Quota-Signale. Rot: frischer 429/Quota-Fehler oder aktiver Cooldown, kurz warten empfohlen.'
+                    : 'The traffic light estimates whether further generation is likely without quota errors. Green: no fresh quota signals. Yellow: elevated load or recent quota signals. Red: fresh 429/quota error or active cooldown, waiting briefly is recommended.'}
+                </p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                  {lang === 'de'
+                    ? 'Tokenwerte stammen aus Gemini usageMetadata (Input/Output/Gesamt), wenn vom Modell zurückgegeben.'
+                    : 'Token values come from Gemini usageMetadata (input/output/total), when returned by the model.'}
                 </p>
               </div>
             </div>
