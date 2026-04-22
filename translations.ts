@@ -53,6 +53,7 @@ export const t = {
       untitled: 'Ohne Titel',
       whatsNew: 'Was ist neu',
       whatsNewItems: [
+        { date: '2026-04-22', text: 'Header · KI-Status (Gemini): Neue Ampel-Anzeige (grün/gelb/rot) zentral zwischen SUNO und DE/EN. Per Klick öffnet sich ein Mini-Modal mit Kurz-Erklärung sowie Tokenwerten (Heute, Rest geschätzt, Session), damit schneller erkennbar ist, ob weitere Generierung voraussichtlich ohne Quota-Fehler möglich ist.' },
         { date: '2026-04-20', text: 'Konzept · Song-Idee: Neuer Button „Inspiration aus Link“ neben Zufall und Bild-Inspiration. Im Modal können Apple-Music- und Spotify-Links eingefügt werden; die KI extrahiert Artist/Titel und erzeugt übernehmbare Song-Idee-Vorschläge. Mit Domain-Precheck inkl. Inline-Hinweis und deaktiviertem Analyse-Button bei nicht unterstützten Links.' },
         { date: '2026-04-17', text: 'Lyrics-Workflow & Titel: Drei Songtitel-Vorschläge auf der Lyrics-Seite (nicht mehr im Cover-Tab); gewählter Titel für „Clean Text kopieren“. Nach Zwei-Varianten-Generierung eigene Sprach-/Gesangsstil-Dropdowns pro Spalte; bei geänderter Sprache oder Stil Hinweis auf „Neu generieren“. Instrumental: drei englische Titel aus Song-Idee, Stimmung und Instrumentarium im Konzept.' },
         { date: '2026-04-17', text: 'Konzept · Kreativ & Analyse Lab: Chaos Mode – die KI schlägt bewusst kreative Reibung vor (mit nachvollziehbarem „System“, z. B. Zahlen/Formeln); Vorschlag optional ins Konzept übernehmen.' },
@@ -448,6 +449,7 @@ export const t = {
       untitled: 'Untitled',
       whatsNew: "What's New",
       whatsNewItems: [
+        { date: '2026-04-22', text: 'Header · AI status (Gemini): New traffic-light indicator (green/yellow/red) centered between SUNO and DE/EN. Clicking it opens a mini modal with a short explanation and token values (today, estimated remaining, session), so you can quickly see whether further generation is likely without quota errors.' },
         { date: '2026-04-20', text: 'Concept · Song idea: New “Inspiration from link” button next to Random and Image Inspiration. The modal accepts Apple Music and Spotify links; AI extracts artist/title and generates apply-ready song-idea drafts. Includes domain precheck with inline hint and disabled Analyze button for unsupported links.' },
         { date: '2026-04-17', text: 'Lyrics workflow & titles: Three song title suggestions on the Lyrics step (no longer on the Cover tab); picked title used for “Copy Clean Text”. After two-variant generation, separate language/vocal dropdowns per column; if you change language or style, a hint points to “Regenerate”. Instrumental: three English titles from your concept (idea, mood, instrumentation).' },
         { date: '2026-04-17', text: 'Concept · Creative & Analysis Lab: Chaos Mode — AI proposes intentional creative friction (with an explainable “system”, e.g. numbers/formulas); you can apply the suggestion to the concept optionally.' },

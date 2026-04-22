@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
 import { generateLyrics, generateStylePrompt, generateCoverArt, generateRandomTopic, analyzeTopic, enrichRegie, simplifyLyricsText, enrichStylePrompt, generateLyricsTitleSuggestions } from './services/geminiService';
 import { loadHistoryFromDB, saveSongToDB, deleteSongFromDB } from './services/storageService';
+import { getTokenUsageSnapshot, recordQuotaError, subscribeTokenUsage } from './services/tokenUsageTracker';
 import { t, Lang } from './translations';
 import {
   buildCoverGenSnapshot,
@@ -76,6 +77,30 @@ const HeaderLogo = () => (
 
 const COVER_COOLDOWN_KEY = 'cover_cooldown_until';
 const COVER_COOLDOWN_MS = 90_000;
+const formatTokenCount = (value: number): string => {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return String(value);
+};
+const formatSeconds = (value: number): string => {
+  const total = Math.max(0, Math.floor(value));
+  const min = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+};
+
+const GeminiMiniLogo = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+    <defs>
+      <linearGradient id="geminiMiniGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#60a5fa" />
+        <stop offset="50%" stopColor="#a855f7" />
+        <stop offset="100%" stopColor="#f472b6" />
+      </linearGradient>
+    </defs>
+    <path d="M12 2.5l2.3 5.2L19.5 10l-5.2 2.3L12 17.5l-2.3-5.2L4.5 10l5.2-2.3L12 2.5z" fill="url(#geminiMiniGrad)" />
+  </svg>
+);
 
 const App: React.FC = () => {
   const [activeStep, setActiveStep] = useState<WorkflowStep>(WorkflowStep.DASHBOARD);
@@ -95,9 +120,12 @@ const App: React.FC = () => {
   const coverGenSnapRef = useRef<CoverGenSnapshot | null>(null);
   const [activeTheme, setActiveTheme] = useState<ThemeName>('mastermind');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [isQuotaInfoOpen, setIsQuotaInfoOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
+  const quotaButtonRef = useRef<HTMLDivElement>(null);
+  const quotaInfoRef = useRef<HTMLDivElement>(null);
   const [themeDropdownAnchor, setThemeDropdownAnchor] = useState<{ top: number; right: number } | null>(null);
   
   // BYOK State: Wir nutzen jetzt einen String statt nur eines Booleans
@@ -138,6 +166,8 @@ const App: React.FC = () => {
   const [currentHistoryItemId, setCurrentHistoryItemId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('suno-lang') as Lang) || 'de');
   const [toast, setToast] = useState<ToastState>(null);
+  const [tokenUsage, setTokenUsage] = useState(() => getTokenUsageSnapshot());
+  const [clockMs, setClockMs] = useState<number>(() => Date.now());
   const coverRequestInFlightRef = useRef(false);
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
   const tr = useMemo(() => t[lang], [lang]);
@@ -181,6 +211,16 @@ const App: React.FC = () => {
   }, [activeStep, styleData]);
 
   useEffect(() => {
+    const unsubscribe = subscribeTokenUsage(setTokenUsage);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     // Theme Initialisierung – App läuft ausschließlich im Dark-Mode
     const savedTheme = (localStorage.getItem('suno-theme') as ThemeName) || 'mastermind';
     setActiveTheme(savedTheme);
@@ -197,7 +237,10 @@ const App: React.FC = () => {
       const target = event.target as Node;
       const inMenu = themeMenuRef.current?.contains(target);
       const inDropdown = themeDropdownRef.current?.contains(target);
+      const inQuotaButton = quotaButtonRef.current?.contains(target);
+      const inQuotaInfo = quotaInfoRef.current?.contains(target);
       if (!inMenu && !inDropdown) setIsThemeMenuOpen(false);
+      if (!inQuotaButton && !inQuotaInfo) setIsQuotaInfoOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside as any);
@@ -224,10 +267,42 @@ const App: React.FC = () => {
     if (message.includes("API key not valid") || message.includes("403") || message.includes("401")) {
       setIsKeySaved(false);
       showToast(tr.errors.apiKeyInvalid, 'error');
+    } else if (/429|quota|resource_exhausted|rate-limit/i.test(message)) {
+      recordQuotaError(60_000);
+      showToast(tr.errors.aiErrorPrefix + message, 'error');
     } else {
       showToast(tr.errors.aiErrorPrefix + message, 'error');
     }
   }, [showToast, tr]);
+
+  const quotaCooldownLeftSec = useMemo(() => {
+    const until = tokenUsage.quota.cooldownUntil ?? 0;
+    return Math.max(0, Math.ceil((until - clockMs) / 1000));
+  }, [tokenUsage.quota.cooldownUntil, clockMs]);
+
+  const quotaStatusUi = useMemo(() => {
+    if (tokenUsage.quota.status === 'red') {
+      return {
+        dot: 'bg-red-500',
+        text: lang === 'de' ? 'Stop' : 'Stop',
+        hint: quotaCooldownLeftSec > 0
+          ? (lang === 'de' ? `Warte ${formatSeconds(quotaCooldownLeftSec)}` : `Wait ${formatSeconds(quotaCooldownLeftSec)}`)
+          : (lang === 'de' ? 'Quota-Risiko hoch' : 'High quota risk'),
+      };
+    }
+    if (tokenUsage.quota.status === 'yellow') {
+      return {
+        dot: 'bg-amber-400',
+        text: lang === 'de' ? 'Vorsicht' : 'Caution',
+        hint: lang === 'de' ? 'Weiter möglich' : 'Likely okay',
+      };
+    }
+    return {
+      dot: 'bg-emerald-400',
+      text: lang === 'de' ? 'OK' : 'OK',
+      hint: lang === 'de' ? 'Weitergenerieren' : 'Can continue',
+    };
+  }, [tokenUsage.quota.status, quotaCooldownLeftSec, lang]);
 
   const changeTheme = (theme: ThemeName) => {
     setActiveTheme(theme);
@@ -590,7 +665,10 @@ const App: React.FC = () => {
       } catch (e) {
         handleError(e);
         const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
-        if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
+        if (isCoverQuotaError(msg)) {
+          setCoverCooldown(COVER_COOLDOWN_MS);
+          recordQuotaError(COVER_COOLDOWN_MS);
+        }
         setCoverError(msg);
       } finally {
         coverRequestInFlightRef.current = false;
@@ -873,7 +951,7 @@ const App: React.FC = () => {
 
         {/* ── Row 1: Logo + Links + Controls (auf Mobile horizontal scrollbar) ── */}
         <div className="overflow-x-auto overflow-y-hidden md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
-          <div className="flex items-center justify-between py-2.5 min-w-max md:min-w-0">
+          <div className="flex items-center justify-between py-2.5 min-w-max md:min-w-0 gap-3">
 
           {/* Left: Logo + Name */}
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -906,6 +984,56 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">Suno</span>
               </a>
             </div>
+          </div>
+
+          {/* Center: Gemini Quota Ampel */}
+          <div className="hidden md:flex relative" ref={quotaButtonRef}>
+            <button
+              type="button"
+              onClick={() => setIsQuotaInfoOpen(prev => !prev)}
+              className="glass-btn rounded-xl px-3 py-1.5 min-w-[160px] flex items-center justify-center gap-2 text-zinc-700 dark:text-zinc-200"
+              title={lang === 'de' ? 'KI-Status anzeigen' : 'Show AI status'}
+              aria-expanded={isQuotaInfoOpen}
+              aria-haspopup="dialog"
+            >
+              <GeminiMiniLogo />
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${quotaStatusUi.dot}`}></span>
+              <span className="text-[10px] font-black uppercase tracking-wider">
+                {lang === 'de' ? 'KI Status' : 'AI Status'}
+              </span>
+            </button>
+            {isQuotaInfoOpen && (
+              <div
+                ref={quotaInfoRef}
+                className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-[320px] glass-card rounded-2xl p-3.5 z-[80] shadow-2xl animate-scale-in"
+                role="dialog"
+                aria-label={lang === 'de' ? 'KI Status Details' : 'AI status details'}
+              >
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <GeminiMiniLogo />
+                    <span className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
+                      {lang === 'de' ? 'Gemini Status' : 'Gemini Status'}
+                    </span>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${tokenUsage.quota.status === 'red' ? 'text-red-400' : tokenUsage.quota.status === 'yellow' ? 'text-amber-300' : 'text-emerald-300'}`}>
+                    <span className={`inline-block w-2 h-2 rounded-full ${quotaStatusUi.dot}`}></span>
+                    {quotaStatusUi.text}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-[11px] text-zinc-700 dark:text-zinc-300">
+                  <p>{quotaStatusUi.hint}</p>
+                  <p>{lang === 'de' ? 'Heute verbraucht:' : 'Used today:'} <span className="font-semibold">{formatTokenCount(tokenUsage.todayTotal)}</span></p>
+                  <p>{lang === 'de' ? 'Rest (geschätzt):' : 'Left (estimated):'} <span className="font-semibold">{formatTokenCount(tokenUsage.quota.remainingTodayTokens)}</span></p>
+                  <p>{lang === 'de' ? 'Aktuelle Session:' : 'Current session:'} <span className="font-semibold">{formatTokenCount(tokenUsage.sessionTotal)}</span></p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 pt-1">
+                    {lang === 'de'
+                      ? 'Ampel ist eine Schätzung aus Tokenverbrauch und Quota-Fehlern (z. B. 429).'
+                      : 'Traffic light is an estimate based on token usage and quota errors (e.g. 429).'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right: Controls */}
@@ -1288,7 +1416,10 @@ const App: React.FC = () => {
               } catch (e) {
                 handleError(e);
                 const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
-                if (isCoverQuotaError(msg)) setCoverCooldown(COVER_COOLDOWN_MS);
+                if (isCoverQuotaError(msg)) {
+                  setCoverCooldown(COVER_COOLDOWN_MS);
+                  recordQuotaError(COVER_COOLDOWN_MS);
+                }
                 setCoverError(msg);
               } finally {
                 coverRequestInFlightRef.current = false;

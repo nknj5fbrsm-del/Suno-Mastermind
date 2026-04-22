@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SongConcept, GeneratedStyle } from "../types";
 import { t } from "../translations";
+import { extractUsageMeta, recordTokenUsage } from "./tokenUsageTracker";
 
 type UiLang = "de" | "en";
 
@@ -42,12 +43,32 @@ async function withRetry<T>(
     baseDelay = 2000,
     maxDelay = 30000,
     retryOn429 = true,
-  }: { maxRetries?: number; baseDelay?: number; maxDelay?: number; retryOn429?: boolean } = {}
+    feature = "general",
+    model = "unknown",
+  }: {
+    maxRetries?: number;
+    baseDelay?: number;
+    maxDelay?: number;
+    retryOn429?: boolean;
+    feature?: string;
+    model?: string;
+  } = {}
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      const result = await fn();
+      const usage = extractUsageMeta(result);
+      if (usage) {
+        recordTokenUsage({
+          model,
+          feature,
+          promptTokens: usage.promptTokenCount,
+          completionTokens: usage.candidatesTokenCount,
+          totalTokens: usage.totalTokenCount,
+        });
+      }
+      return result;
     } catch (err: unknown) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
@@ -1251,13 +1272,22 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
     model: TEXT_MODEL,
     contents: prompt,
     config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 1.0, ...DEFAULT_THINKING },
-  }));
+  }), { feature: "lyrics", model: TEXT_MODEL });
 
   // Streaming-Updates leicht drosseln, um unnötig viele Re-Renders zu vermeiden
   let lastEmit = 0;
   const EMIT_INTERVAL_MS = 80;
+  let streamTotalTokens = 0;
+  let streamPromptTokens = 0;
+  let streamCompletionTokens = 0;
 
   for await (const chunk of stream) {
+    const usage = extractUsageMeta(chunk);
+    if (usage) {
+      streamTotalTokens = Math.max(streamTotalTokens, Number(usage.totalTokenCount ?? 0));
+      streamPromptTokens = Math.max(streamPromptTokens, Number(usage.promptTokenCount ?? 0));
+      streamCompletionTokens = Math.max(streamCompletionTokens, Number(usage.candidatesTokenCount ?? 0));
+    }
     const text = chunk.text ?? "";
     if (text) {
       accumulated += text;
@@ -1274,6 +1304,15 @@ const noBrassNote = `\n- KEINE Trompete/Brass/Bläser (kein tpt, trumpet, horns,
   // Sicherstellen, dass das finale Ergebnis mindestens einmal im Callback landet
   if (onChunk && accumulated) {
     onChunk(accumulated);
+  }
+  if (streamTotalTokens > 0 || streamPromptTokens > 0 || streamCompletionTokens > 0) {
+    recordTokenUsage({
+      model: TEXT_MODEL,
+      feature: "lyrics_stream",
+      promptTokens: streamPromptTokens,
+      completionTokens: streamCompletionTokens,
+      totalTokens: streamTotalTokens,
+    });
   }
   const cleaned = cleanText(accumulated);
   return stripLyricsPreamble(cleaned);
@@ -1561,10 +1600,28 @@ export const generateStylePrompt = async (
         required: ["prompt", "promptEffect", "similarArtists", "weirdness", "styleInfluence", "recommendationReason", "songDescription", "titleSuggestions"],
       },
     },
-  }));
+  }), { feature: "style", model: TEXT_MODEL });
+  let streamTotalTokens = 0;
+  let streamPromptTokens = 0;
+  let streamCompletionTokens = 0;
   for await (const chunk of stream) {
+    const usage = extractUsageMeta(chunk);
+    if (usage) {
+      streamTotalTokens = Math.max(streamTotalTokens, Number(usage.totalTokenCount ?? 0));
+      streamPromptTokens = Math.max(streamPromptTokens, Number(usage.promptTokenCount ?? 0));
+      streamCompletionTokens = Math.max(streamCompletionTokens, Number(usage.candidatesTokenCount ?? 0));
+    }
     const text = chunk.text ?? "";
     if (text) accumulated += text;
+  }
+  if (streamTotalTokens > 0 || streamPromptTokens > 0 || streamCompletionTokens > 0) {
+    recordTokenUsage({
+      model: TEXT_MODEL,
+      feature: "style_stream",
+      promptTokens: streamPromptTokens,
+      completionTokens: streamCompletionTokens,
+      totalTokens: streamTotalTokens,
+    });
   }
   const response = { text: accumulated };
   const SAFE_MIN = 15;
