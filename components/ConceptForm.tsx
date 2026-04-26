@@ -9,6 +9,7 @@ import {
   generateChaosMode, ChaosModeResult,
   synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
   analyzeChordProgression, analyzeMusicLinkInspiration, MusicLinkInspirationResult,
+  generateSongIdeaCopilotDraft, SongIdeaCopilotDraft,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
@@ -27,6 +28,7 @@ interface ConceptFormProps {
 }
 
 type CreativeLabToolHelpId = 'refMixer' | 'chords' | 'fusion' | 'boost' | 'chaos';
+type CopilotMessage = { role: 'assistant' | 'user'; text: string };
 
 const LabHelpIconButton: React.FC<{
   onClick: () => void;
@@ -855,6 +857,19 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isCopilotModalOpen, setIsCopilotModalOpen] = useState(false);
+  const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
+  const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotQuestionIdx, setCopilotQuestionIdx] = useState(0);
+  const [copilotAnswers, setCopilotAnswers] = useState({
+    topicIntent: '',
+    moodMain: '',
+    perspective: '',
+    languageAndVocalStyle: '',
+    instrumentHints: '',
+  });
+  const [copilotDraft, setCopilotDraft] = useState<SongIdeaCopilotDraft | null>(null);
   const [musicLinkInput, setMusicLinkInput] = useState('');
   const [musicLinkResult, setMusicLinkResult] = useState<MusicLinkInspirationResult | null>(null);
   const [isAnalyzingMusicLink, setIsAnalyzingMusicLink] = useState(false);
@@ -863,6 +878,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const [isChordAnalyzing, setIsChordAnalyzing] = useState(false);
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const copilotChatScrollRef = useRef<HTMLDivElement>(null);
+  const copilotChatBottomRef = useRef<HTMLDivElement>(null);
 
   // Genre-Fusion Lab
   const [isFusing, setIsFusing] = useState(false);
@@ -1086,6 +1103,130 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
 
   const trimmedMusicLinkInput = musicLinkInput.trim();
   const isMusicLinkSupported = !trimmedMusicLinkInput || isSupportedMusicServiceLink(trimmedMusicLinkInput);
+
+  const copilotQuestions = [
+    tr.concept.copilotQ1,
+    tr.concept.copilotQ2,
+    tr.concept.copilotQ3,
+    tr.concept.copilotQ4,
+    tr.concept.copilotQ5,
+  ];
+
+  const handleResetCopilot = () => {
+    setCopilotDraft(null);
+    setCopilotQuestionIdx(0);
+    setCopilotInput('');
+    setCopilotAnswers({
+      topicIntent: '',
+      moodMain: '',
+      perspective: '',
+      languageAndVocalStyle: '',
+      instrumentHints: '',
+    });
+    setCopilotMessages([{ role: 'assistant', text: copilotQuestions[0] }]);
+  };
+
+  useEffect(() => {
+    if (!isCopilotModalOpen) return;
+    if (copilotMessages.length > 0) return;
+    setCopilotMessages([{ role: 'assistant', text: copilotQuestions[0] }]);
+  }, [isCopilotModalOpen, copilotMessages.length, copilotQuestions]);
+
+  useEffect(() => {
+    if (!isCopilotModalOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      copilotChatBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isCopilotModalOpen, copilotMessages, copilotDraft, isCopilotGenerating]);
+
+  const generateCopilotDraftFromAnswers = async (answers: {
+    topicIntent: string;
+    moodMain: string;
+    perspective: string;
+    languageAndVocalStyle: string;
+    instrumentHints: string;
+  }) => {
+    setIsCopilotGenerating(true);
+    try {
+      const draft = await generateSongIdeaCopilotDraft(
+        {
+          topicIntent: answers.topicIntent,
+          moodMain: answers.moodMain,
+          perspective: answers.perspective,
+          languageAndVocalStyle: answers.languageAndVocalStyle,
+          instrumentHints: answers.instrumentHints,
+        },
+        lang
+      );
+      setCopilotDraft(draft);
+      setCopilotMessages(prev => [...prev, { role: 'assistant', text: tr.concept.copilotDraftReady }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      showToast(tr.errors.aiErrorPrefix + msg, 'error');
+    } finally {
+      setIsCopilotGenerating(false);
+    }
+  };
+
+  const handleCopilotSend = () => {
+    const value = copilotInput.trim();
+    if (!value || isCopilotGenerating || copilotDraft) return;
+    setCopilotMessages(prev => [...prev, { role: 'user', text: value }]);
+    setCopilotInput('');
+    const nextAnswers = { ...copilotAnswers };
+    if (copilotQuestionIdx === 0) nextAnswers.topicIntent = value;
+    if (copilotQuestionIdx === 1) nextAnswers.moodMain = value;
+    if (copilotQuestionIdx === 2) nextAnswers.perspective = value;
+    if (copilotQuestionIdx === 3) nextAnswers.languageAndVocalStyle = value;
+    if (copilotQuestionIdx === 4) nextAnswers.instrumentHints = value;
+    setCopilotAnswers(nextAnswers);
+
+    if (copilotQuestionIdx < copilotQuestions.length - 1) {
+      const nextIdx = copilotQuestionIdx + 1;
+      setCopilotQuestionIdx(nextIdx);
+      setCopilotMessages(prev => [...prev, { role: 'assistant', text: copilotQuestions[nextIdx] }]);
+      return;
+    }
+
+    setCopilotMessages(prev => [...prev, { role: 'assistant', text: tr.concept.copilotGenerating }]);
+    void generateCopilotDraftFromAnswers(nextAnswers);
+  };
+
+  const handleApplyCopilotDraft = () => {
+    if (!copilotDraft?.topicShort?.trim()) return;
+    const instrumentsLine = (copilotDraft.instrumentHints || []).filter(Boolean).join(' · ');
+    const contractLanguage = copilotAnswers.languageAndVocalStyle || '';
+    const contractVocals = copilotAnswers.languageAndVocalStyle || '';
+    const contractMood = copilotAnswers.moodMain || '';
+    const contractPerspective = copilotAnswers.perspective || copilotDraft.perspective || '';
+    const contractInstruments = copilotAnswers.instrumentHints || instrumentsLine || '';
+    const copilotContract = [
+      '[Copilot Contract]',
+      `Language: ${contractLanguage}`,
+      `Vocals: ${contractVocals}`,
+      `Mood: ${contractMood}`,
+      `Perspective: ${contractPerspective}`,
+      `Instruments: ${contractInstruments}`,
+      '[/Copilot Contract]',
+    ].join('\n');
+    const composed = [
+      copilotContract,
+      `Thema: ${copilotDraft.topicShort}`,
+      `Kernkonflikt: ${copilotDraft.coreConflict}`,
+      `Perspektive: ${copilotDraft.perspective}`,
+      `Emotionsbogen: ${copilotDraft.emotionArc}`,
+      `Bildwelt / Setting: ${copilotDraft.imagerySetting}`,
+      instrumentsLine ? `Instrumente: ${instrumentsLine}` : '',
+    ].filter(Boolean).join('\n');
+    setConcept(prev => ({
+      ...prev,
+      topic: composed,
+      inspirationSource: prev.topic.trim() ? 'mixed' : 'text',
+    }));
+    showToast(tr.concept.copilotApplySuccess, 'success');
+    setIsCopilotModalOpen(false);
+  };
 
   const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -1639,42 +1780,63 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             onChange={(e) => setConcept(prev => ({ ...prev, topic: e.target.value }))}
           />
           <div className="flex shrink-0 justify-center border-t border-zinc-200/70 bg-zinc-50/50 px-2 py-1.5 dark:border-white/10 dark:bg-black/15">
-            <div className="grid w-full max-w-3xl grid-cols-1 gap-1.5 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setIsRandomModalOpen(true)}
-                title={opts.randomizeTitle}
-                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
-              >
-                <span className="truncate">{opts.randomThemes[0]}</span>
-                <i className="fas fa-dice flex-shrink-0 text-[9px]"></i>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsImageModalOpen(true)}
-                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-secondary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-secondary transition-colors hover:border-suno-secondary hover:bg-suno-secondary hover:text-white"
-              >
-                <i className="fas fa-image flex-shrink-0 text-[9px]"></i>
-                <span className="min-w-0 truncate">{tr.concept.imageInspirationTitle}</span>
-                {(inspirationImage || concept.imageInspirationText?.trim()) && (
-                  <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-secondary/25 px-1 text-[8px] font-black">
-                    1
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLinkModalOpen(true)}
-                className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-primary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
-              >
-                <i className="fas fa-link flex-shrink-0 text-[9px]"></i>
-                <span className="min-w-0 truncate">{tr.concept.linkInspirationTitle}</span>
-                {musicLinkResult && (
-                  <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
-                    1
-                  </span>
-                )}
-              </button>
+            <div className="grid w-full max-w-3xl grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-suno-primary/20 bg-suno-primary/[0.05] p-1.5">
+                <div className="grid grid-cols-1 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsRandomModalOpen(true)}
+                    title={opts.randomizeTitle}
+                    className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:bg-suno-primary/10 disabled:opacity-60"
+                  >
+                    <i className="fas fa-dice flex-shrink-0 text-[9px]"></i>
+                    <span className="truncate">{opts.randomThemes[0]}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCopilotModalOpen(true)}
+                    className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-primary/30 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
+                  >
+                    <i className="fas fa-comments flex-shrink-0 text-[9px]"></i>
+                    <span className="min-w-0 truncate">{tr.concept.copilotTitle}</span>
+                    {copilotDraft && (
+                      <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
+                        1
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-suno-secondary/20 bg-suno-secondary/[0.05] p-1.5">
+                <div className="grid grid-cols-1 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsImageModalOpen(true)}
+                    className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-secondary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-secondary transition-colors hover:border-suno-secondary hover:bg-suno-secondary hover:text-white"
+                  >
+                    <i className="fas fa-image flex-shrink-0 text-[9px]"></i>
+                    <span className="min-w-0 truncate">{tr.concept.imageInspirationButton}</span>
+                    {(inspirationImage || concept.imageInspirationText?.trim()) && (
+                      <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-secondary/25 px-1 text-[8px] font-black">
+                        1
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLinkModalOpen(true)}
+                    className="glass-btn flex min-h-[2rem] w-full items-center justify-center gap-1 rounded-lg border border-suno-primary/25 px-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-suno-primary transition-colors hover:border-suno-primary hover:bg-suno-primary hover:text-white"
+                  >
+                    <i className="fas fa-link flex-shrink-0 text-[9px]"></i>
+                    <span className="min-w-0 truncate">{tr.concept.linkInspirationButton}</span>
+                    {musicLinkResult && (
+                      <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
+                        1
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2034,6 +2196,113 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                 className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
               >
                 {tr.about.close}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isCopilotModalOpen && createPortal(
+        <div className="fixed inset-0 z-[220] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsCopilotModalOpen(false)}>
+          <div
+            className="w-full max-w-2xl glass-card rounded-3xl p-6 space-y-4 bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl animate-scale-in overflow-y-auto max-h-[85vh] custom-scrollbar"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.15em] text-suno-primary">
+                <i className="fas fa-comments mr-2"></i>{tr.concept.copilotModalTitle}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsCopilotModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+              >
+                <i className="fas fa-times text-sm"></i>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-zinc-400 leading-relaxed">{tr.concept.copilotModalHint}</p>
+
+            <div className="rounded-2xl border border-zinc-700 bg-black/25 p-3 space-y-3">
+              <div ref={copilotChatScrollRef} className="h-64 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                {copilotMessages.map((m, idx) => (
+                  <div key={`copilot-msg-${idx}`} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-[11px] leading-relaxed ${
+                      m.role === 'assistant'
+                        ? 'bg-suno-primary/15 border border-suno-primary/25 text-zinc-100'
+                        : 'bg-suno-secondary/15 border border-suno-secondary/25 text-zinc-100'
+                    }`}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                <div ref={copilotChatBottomRef} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={copilotInput}
+                  onChange={(e) => setCopilotInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCopilotSend();
+                    }
+                  }}
+                  placeholder={tr.concept.copilotChatPlaceholder}
+                  className="glass-input flex-1 rounded-xl px-3 py-2 text-[11px] text-zinc-100 placeholder:text-zinc-500"
+                  disabled={isCopilotGenerating || !!copilotDraft}
+                />
+                <button
+                  type="button"
+                  onClick={handleCopilotSend}
+                  disabled={isCopilotGenerating || !copilotInput.trim() || !!copilotDraft}
+                  className="btn-create px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <i className={`fas ${isCopilotGenerating ? 'fa-spinner animate-spin' : 'fa-paper-plane'} mr-1`}></i>
+                  {tr.concept.copilotSend}
+                </button>
+              </div>
+            </div>
+
+            {copilotDraft && (
+              <div className="space-y-3 rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">{tr.concept.copilotResultLabel}</p>
+                <div className="grid grid-cols-1 gap-2 text-[11px] text-zinc-200">
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutTopic}:</span> {copilotDraft.topicShort}</p>
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutConflict}:</span> {copilotDraft.coreConflict}</p>
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutPerspective}:</span> {copilotDraft.perspective}</p>
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutArc}:</span> {copilotDraft.emotionArc}</p>
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutSetting}:</span> {copilotDraft.imagerySetting}</p>
+                  <p><span className="text-zinc-400">{tr.concept.copilotOutInstruments}:</span> {(copilotDraft.instrumentHints || []).join(' · ') || '—'}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleResetCopilot}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
+              >
+                {tr.concept.copilotRestart}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCopilotModalOpen(false)}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
+              >
+                {tr.about.close}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyCopilotDraft}
+                disabled={!copilotDraft?.topicShort?.trim()}
+                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-arrow-turn-up mr-1"></i>
+                {tr.concept.copilotApply}
               </button>
             </div>
           </div>

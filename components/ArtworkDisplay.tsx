@@ -69,6 +69,12 @@ const ArtworkDisplay: React.FC<ArtworkDisplayProps> = ({
     setShowSupportPrompt(!!coverUrl);
   }, [coverUrl]);
 
+  useEffect(() => {
+    if (!activeCopyPill) return;
+    const timer = window.setTimeout(() => setActiveCopyPill(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [activeCopyPill]);
+
   const handleDownload = () => {
     if (!coverUrl) return;
     const a = document.createElement('a');

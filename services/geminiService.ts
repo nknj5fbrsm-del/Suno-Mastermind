@@ -17,6 +17,57 @@ function pickAllowedOptions(raw: unknown, allowed: readonly string[]): string[] 
   return out;
 }
 
+interface CopilotTopicContract {
+  language: string[];
+  vocals: string[];
+  mood: string[];
+  instruments: string[];
+  legacyNoGos: string[];
+  perspective: string;
+}
+
+function parseCopilotTopicContract(topic: string): CopilotTopicContract | null {
+  const text = String(topic ?? "");
+  const blockMatch = text.match(/\[Copilot Contract\]([\s\S]*?)\[\/Copilot Contract\]/i);
+  if (!blockMatch) return null;
+  const block = blockMatch[1];
+  const pickLine = (label: string) => {
+    const m = block.match(new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im"));
+    return m ? cleanText(m[1]).trim() : "";
+  };
+  const splitList = (s: string) =>
+    s
+      .split(/[;,|]/)
+      .map((x) => cleanText(x).trim())
+      .filter(Boolean);
+  return {
+    language: splitList(pickLine("Language")),
+    vocals: splitList(pickLine("Vocals")),
+    mood: splitList(pickLine("Mood")),
+    instruments: splitList(pickLine("Instruments")),
+    legacyNoGos: splitList(pickLine("No-Gos")),
+    perspective: pickLine("Perspective"),
+  };
+}
+
+function fuzzyPickAllowedOptions(rawItems: string[], allowed: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of rawItems) {
+    const i = item.toLowerCase();
+    for (const option of allowed) {
+      const o = option.toLowerCase();
+      if (i.includes(o) || o.includes(i)) {
+        if (!seen.has(option)) {
+          seen.add(option);
+          out.push(option);
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // Text (Lyrics, Analyse, Style) – Free Tier kompatibel
 const TEXT_MODEL = "gemini-3-flash-preview";
 // Bilder (Cover Art) – Free Tier: Bildgenerierung funktioniert mit diesem Modell
@@ -532,6 +583,23 @@ interface StructuredConceptStoryIdea {
   coreIdea: string;
 }
 
+export interface SongIdeaCopilotInput {
+  topicIntent: string;
+  moodMain: string;
+  perspective: string;
+  languageAndVocalStyle: string;
+  instrumentHints: string;
+}
+
+export interface SongIdeaCopilotDraft {
+  topicShort: string;
+  coreConflict: string;
+  perspective: string;
+  emotionArc: string;
+  imagerySetting: string;
+  instrumentHints: string[];
+}
+
 function sanitizeCoreIdea(text: string): string {
   let s = cleanText(String(text ?? "")).trim();
   // Remove appended hook/refrain labels and trailing fragments.
@@ -637,6 +705,113 @@ export const generateConceptStoryIdea = async (
   }
 };
 
+export const generateSongIdeaCopilotDraft = async (
+  input: SongIdeaCopilotInput,
+  lang: 'de' | 'en' = 'de'
+): Promise<SongIdeaCopilotDraft> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt =
+    lang === 'de'
+      ? `Du bist ein Songidee-Copilot für Suno Mastermind. Erstelle einen strukturierten Songideen-Entwurf aus den Antworten.
+
+Antworten:
+- Thema / Kernidee: ${input.topicIntent || 'unbekannt'}
+- Hauptstimmung: ${input.moodMain || 'offen'}
+- Perspektive: ${input.perspective || 'offen'}
+- Sprache + Vocal-Art: ${input.languageAndVocalStyle || 'offen'}
+- Gewünschte Instrumente: ${input.instrumentHints || 'offen'}
+
+Regeln:
+- Liefere den bestmöglichen finalen Entwurf aus den gegebenen Antworten.
+- Keine Rückfragen.
+- Keine Hook-Idee und keine Titelvorschläge.
+- Nutze Instrument-Wünsche konkret in Bildwelt und Arrangement-Hinweisen.`
+      : `You are a song-idea copilot for Suno Mastermind. Create a structured song idea draft from the answers.
+
+Answers:
+- Topic / core intent: ${input.topicIntent || 'unknown'}
+- Main mood: ${input.moodMain || 'open'}
+- Perspective: ${input.perspective || 'open'}
+- Language + vocal style: ${input.languageAndVocalStyle || 'open'}
+- Desired instruments: ${input.instrumentHints || 'open'}
+
+Rules:
+- Provide the best possible final draft from the given answers.
+- Do NOT ask follow-up questions.
+- Do NOT output hook lines or title suggestions.
+- Keep output concrete, grounded and without cliches.`;
+
+  const response = await withRetry(
+    () =>
+      ai.models.generateContent({
+        model: TEXT_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          ...DEFAULT_THINKING,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              topicShort: { type: Type.STRING },
+              coreConflict: { type: Type.STRING },
+              perspective: { type: Type.STRING },
+              emotionArc: { type: Type.STRING },
+              imagerySetting: { type: Type.STRING },
+              instrumentHints: { type: Type.ARRAY, items: { type: Type.STRING } },
+            },
+            required: [
+              "topicShort",
+              "coreConflict",
+              "perspective",
+              "emotionArc",
+              "imagerySetting",
+              "instrumentHints",
+            ],
+          },
+        },
+      }),
+    { feature: "copilot_songidea", model: TEXT_MODEL }
+  );
+
+  const fallback: SongIdeaCopilotDraft =
+    lang === 'de'
+      ? {
+          topicShort: cleanText(input.topicIntent || "Eine Person ringt zwischen Sicherheit und Aufbruch.").trim(),
+          coreConflict: "Sicherheit vs. mutiger Neuanfang",
+          perspective: cleanText(input.perspective || "Ich").trim(),
+          emotionArc: "Zweifel -> Reibung -> Entscheidung",
+          imagerySetting: "Nacht, leere Straßen, erstes Morgenlicht",
+          instrumentHints: cleanText(input.instrumentHints || "").split(/[;,]/).map(s => s.trim()).filter(Boolean),
+        }
+      : {
+          topicShort: cleanText(input.topicIntent || "A person is torn between safety and a bold restart.").trim(),
+          coreConflict: "Safety vs. bold restart",
+          perspective: cleanText(input.perspective || "I").trim(),
+          emotionArc: "doubt -> friction -> decision",
+          imagerySetting: "night streets, empty station, first daylight",
+          instrumentHints: cleanText(input.instrumentHints || "").split(/[;,]/).map(s => s.trim()).filter(Boolean),
+        };
+
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    return {
+      topicShort: cleanText(String(parsed.topicShort ?? fallback.topicShort)).trim(),
+      coreConflict: cleanText(String(parsed.coreConflict ?? fallback.coreConflict)).trim(),
+      perspective: cleanText(String(parsed.perspective ?? fallback.perspective)).trim(),
+      emotionArc: cleanText(String(parsed.emotionArc ?? fallback.emotionArc)).trim(),
+      imagerySetting: cleanText(String(parsed.imagerySetting ?? fallback.imagerySetting)).trim(),
+      instrumentHints: Array.isArray(parsed.instrumentHints)
+        ? parsed.instrumentHints.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean).slice(0, 8)
+        : fallback.instrumentHints,
+    };
+  } catch {
+    return fallback;
+  }
+};
+
 export const generateHomeSongIdeas = async (lang: 'de' | 'en' = 'de'): Promise<HomeSongIdeas> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
@@ -719,6 +894,7 @@ export const analyzeTopic = async (
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
   const ai = new GoogleGenAI({ apiKey });
   const opts = t[lang].conceptOptions;
+  const copilotContract = parseCopilotTopicContract(topic);
   const timbreList = opts.timbre.join(", ");
   const exclList = opts.exclusions.join(", ");
   const instrumentalNote = isInstrumental
@@ -732,9 +908,12 @@ export const analyzeTopic = async (
       : `
 - timbre: 1–4 tone-color targets — pick ONLY exact strings from: ${timbreList}
 - excludedStyles: 0–4 elements to actively avoid (wrong vibe for this topic). ONLY exact strings from: ${exclList}. Use [] if nothing applies.`;
+  const contractNote = copilotContract
+    ? `\nCOPILOT CONTRACT (harte Vorgaben, wenn plausibel):\n- Language: ${copilotContract.language.join(", ") || "—"}\n- Vocals: ${copilotContract.vocals.join(", ") || "—"}\n- Mood: ${copilotContract.mood.join(", ") || "—"}\n- Instruments: ${copilotContract.instruments.join(", ") || "—"}\n- Perspective: ${copilotContract.perspective || "—"}\nNutze diese Angaben priorisiert und konsistent.`
+    : "";
   const response = await withRetry(() => ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Analyse für Suno V 5.5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}
+    contents: `Analyse für Suno V 5.5 – oberste Priorität: Qualität und KONSISTENZ über alle Schritte (Konzept → Lyrics → Style). Thema: "${topic}".${instrumentalNote}${contractNote}
 - Liefer genre, mood, tempo und präzise instrumentation (spezifische Instrumente, keine vagen Oberbegriffe). Instrumentation OHNE Trompete/Brass/Bläser, außer das Genre verlangt es (z. B. Jazz, Brass Band, Latin Brass).
 - vocals: Gib für jede Gesangsstimme einen EINDEUTIGEN Vornamen oder Künstlernamen, der in Lyrics und Style EXAKT so übernommen wird (z. B. ["Herrmann (Bariton)"] oder Duett ["Herrmann (Bariton)", "Sonja (Sopran)"]). Dieser Name ist verbindlich – in den folgenden Schritten (Lyrics, Style) darf kein anderer Name verwendet oder erfunden werden.
 - Falls das Thema einen Künstler referenziert (z. B. "wie Michael Jackson"), kann dieser Vorname (Michael) als vocals-Name genutzt werden; ansonsten wähle einen passenden, eindeutigen Namen.${timbreExclBlock}`,
@@ -773,6 +952,18 @@ export const analyzeTopic = async (
     const result: Partial<SongConcept> = { ...defaultSuggestions, ...parsed };
     result.timbre = pickAllowedOptions(parsed.timbre, opts.timbre);
     result.excludedStyles = pickAllowedOptions(parsed.excludedStyles, opts.exclusions);
+    if (copilotContract) {
+      const language = fuzzyPickAllowedOptions(copilotContract.language, opts.languages);
+      const vocals = fuzzyPickAllowedOptions(copilotContract.vocals, opts.vocals);
+      const mood = fuzzyPickAllowedOptions(copilotContract.mood, opts.moods);
+      const instruments = fuzzyPickAllowedOptions(copilotContract.instruments, opts.instruments);
+      const legacyNoGos = fuzzyPickAllowedOptions(copilotContract.legacyNoGos, opts.exclusions);
+      if (language.length > 0) result.language = language;
+      if (vocals.length > 0) result.vocals = vocals;
+      if (mood.length > 0) result.mood = mood;
+      if (instruments.length > 0) result.instrumentation = instruments;
+      if (legacyNoGos.length > 0) result.excludedStyles = legacyNoGos;
+    }
     if (isInstrumental) {
       result.language = [];
       result.vocals = [];

@@ -37,9 +37,9 @@ export const useToast = () => useContext(ToastContext);
 const ToastBar: React.FC<{ toast: ToastState; onDismiss: () => void }> = ({ toast, onDismiss }) => {
   if (!toast) return null;
   React.useEffect(() => {
-    const t = setTimeout(onDismiss, 4000);
+    const t = setTimeout(onDismiss, 3000);
     return () => clearTimeout(t);
-  }, [toast?.message, onDismiss]);
+  }, [toast, onDismiss]);
   const bg = toast.type === 'error' ? 'bg-red-600/95' : toast.type === 'success' ? 'bg-emerald-600/95' : 'bg-suno-primary/95';
   return (
     <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-5 py-3 rounded-2xl shadow-2xl text-white text-sm font-medium flex items-center gap-3 ${bg} backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300`}
@@ -171,6 +171,7 @@ const App: React.FC = () => {
   const [clockMs, setClockMs] = useState<number>(() => Date.now());
   const coverRequestInFlightRef = useRef(false);
   const showToast = React.useCallback((message: string, type: ToastType = 'info') => setToast({ message, type }), []);
+  const dismissToast = React.useCallback(() => setToast(null), []);
   const tr = useMemo(() => t[lang], [lang]);
   const langValue = useMemo(() => ({ lang, tr }), [lang, tr]);
 
@@ -869,7 +870,7 @@ const App: React.FC = () => {
 
   return (
     <ToastContext.Provider value={{ showToast }}>
-      <ToastBar toast={toast} onDismiss={() => setToast(null)} />
+      <ToastBar toast={toast} onDismiss={dismissToast} />
       {!isKeySaved ? (
         <div className="min-h-screen bg-suno-bg flex items-center justify-center p-6">
           <div className="orb-container" aria-hidden="true">
