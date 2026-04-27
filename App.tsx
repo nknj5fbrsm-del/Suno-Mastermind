@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, createContext, useContext, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { WorkflowStep, SongConcept, GeneratedStyle, SongHistoryItem, ThemeName } from './types';
@@ -16,6 +16,8 @@ import {
 } from './pipelineSnapshot';
 import { useWorkflowPipeline } from './hooks/useWorkflowPipeline';
 import { useGenerationActions } from './hooks/useGenerationActions';
+import { LangProvider } from './providers/LangProvider';
+import { ToastProvider, type ToastState, type ToastType } from './providers/ToastProvider';
 
 // Lazy: Step-Views erst bei Bedarf laden (schnellerer Start)
 import WorkflowNavigation from './components/WorkflowNavigation';
@@ -26,15 +28,8 @@ const StyleDisplay = lazy(() => import('./components/StyleDisplay'));
 const ArtworkDisplay = lazy(() => import('./components/ArtworkDisplay'));
 const DashboardDisplay = lazy(() => import('./components/DashboardDisplay'));
 
-// ─── Language Context ───────────────────────────────────────────────────────
-export const LangContext = createContext<{ lang: Lang; tr: typeof t.de }>({ lang: 'de', tr: t.de });
-export const useLang = () => useContext(LangContext);
-
-// ─── Toast Context ───────────────────────────────────────────────────────────
-type ToastType = 'success' | 'error' | 'info';
-type ToastState = { message: string; type: ToastType } | null;
-const ToastContext = createContext<{ showToast: (message: string, type?: ToastType) => void }>({ showToast: () => {} });
-export const useToast = () => useContext(ToastContext);
+export { useLang } from './providers/LangProvider';
+export { useToast } from './providers/ToastProvider';
 
 const ToastBar: React.FC<{ toast: ToastState; onDismiss: () => void }> = ({ toast, onDismiss }) => {
   if (!toast) return null;
@@ -616,7 +611,7 @@ const App: React.FC = () => {
   }, [activeStep, styleRegenPendingForVariants, concept, lang, lyrics, lyricsVariants, styleVariants, handleError, tr.loading.generatingStyle, mergeLyricsTitlesIntoStyle]);
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastProvider showToast={showToast}>
       <ToastBar toast={toast} onDismiss={dismissToast} />
       {!isKeySaved ? (
         <div className="min-h-screen bg-suno-bg flex items-center justify-center p-6">
@@ -658,7 +653,7 @@ const App: React.FC = () => {
           </div>
         </div>
       ) : (
-    <LangContext.Provider value={langValue}>
+    <LangProvider value={langValue}>
     <div className="min-h-screen flex flex-col bg-suno-bg text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
 
       {/* ─── ABOUT MODAL (NilsP) ─── */}
@@ -1251,10 +1246,10 @@ const App: React.FC = () => {
       </Suspense>
       </main>
     </div>
-    </LangContext.Provider>
+    </LangProvider>
       )}
       <Analytics />
-    </ToastContext.Provider>
+    </ToastProvider>
   );
 };
 
