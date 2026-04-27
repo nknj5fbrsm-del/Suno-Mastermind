@@ -14,6 +14,7 @@ import {
   type CoverGenSnapshot,
   type StyleGenSnapshot,
 } from './pipelineSnapshot';
+import { useWorkflowPipeline } from './hooks/useWorkflowPipeline';
 
 // Lazy: Step-Views erst bei Bedarf laden (schnellerer Start)
 import WorkflowNavigation from './components/WorkflowNavigation';
@@ -334,33 +335,40 @@ const App: React.FC = () => {
     setIsThemeMenuOpen(false);
   };
 
-  const handleStartNew = useCallback(() => {
-    setConcept({
-      topic: '',
-      chordProgression: undefined,
-      genre: [],
-      mood: [],
-      tempo: [],
-      language: [],
-      isInstrumental: false,
-      vocals: [],
-      instrumentation: [],
-      timbre: [],
-      excludedStyles: [],
-    });
-    setLyrics(''); setLyricsVariants(null); setStyleData(null); setStyleVariants(null); setStyleRegenPendingForVariants([]); setCoverUrl('');
-    setSongTitleSuggestions([]); setSelectedSongTitle(null); setSongTitlesLoading(false);
-    setCoverStepUnlocked(false);
-    setLyricsStepUnlocked(false);
-    setStyleStepUnlocked(false);
-    setWorkflowChainComplete(false);
-    setStyleGenSnap(null);
-    setCoverGenSnap(null);
-    styleGenSnapRef.current = null;
-    coverGenSnapRef.current = null;
-    setCurrentHistoryItemId(null);
-    setActiveStep(WorkflowStep.CONCEPT);
-  }, []);
+  const {
+    handleStartNew,
+    handleConceptNext,
+    reanchorStyleAndCoverSnapshots,
+    handleLyricsNextNavOnly,
+    handleStyleStepNextNavOnly,
+  } = useWorkflowPipeline({
+    concept,
+    lyrics,
+    lyricsVariants,
+    styleData,
+    styleVariants,
+    setConcept,
+    setLyrics,
+    setLyricsVariants,
+    setStyleData,
+    setStyleVariants,
+    setStyleRegenPendingForVariants,
+    setSongTitleSuggestions,
+    setSelectedSongTitle,
+    setSongTitlesLoading,
+    setCoverUrl,
+    setCoverError,
+    setStyleGenSnap,
+    setCoverGenSnap,
+    styleGenSnapRef,
+    coverGenSnapRef,
+    setLyricsStepUnlocked,
+    setStyleStepUnlocked,
+    setCoverStepUnlocked,
+    setWorkflowChainComplete,
+    setCurrentHistoryItemId,
+    setActiveStep,
+  });
 
   // Helper zum Bereinigen von %20 und anderen Encodings
   const cleanAiText = (text: string) => {
@@ -437,61 +445,6 @@ const App: React.FC = () => {
     },
     [currentHistoryItemId, showToast, tr.lyrics.titleSelectedForCleanToast]
   );
-
-  /** Konzept → Lyrics: `nav` = bestehende Inhalte optional per Snapshot „bestätigen“; `pipeline` = Lyrics/Style/Cover leeren. */
-  const handleConceptNext = useCallback((inputConcept: SongConcept, mode: 'nav' | 'pipeline') => {
-    setConcept(inputConcept);
-    setLyricsStepUnlocked(true);
-    setCoverStepUnlocked(false);
-
-    if (mode === 'pipeline') {
-      setLyrics('');
-      setLyricsVariants(null);
-      setStyleData(null);
-      setStyleVariants(null);
-      setStyleRegenPendingForVariants([]);
-      setSongTitleSuggestions([]); setSelectedSongTitle(null); setSongTitlesLoading(false);
-      setCoverUrl('');
-      setCoverError(null);
-      setStyleGenSnap(null);
-      setCoverGenSnap(null);
-      styleGenSnapRef.current = null;
-      coverGenSnapRef.current = null;
-      setStyleStepUnlocked(false);
-    } else if (styleData) {
-      const sSnap = buildStyleGenSnapshot(inputConcept, lyrics, lyricsVariants);
-      setStyleGenSnap(sSnap);
-      styleGenSnapRef.current = sSnap;
-      const cSnap = buildCoverGenSnapshot(inputConcept, lyrics, lyricsVariants, styleData, styleVariants);
-      setCoverGenSnap(cSnap);
-      coverGenSnapRef.current = cSnap;
-    }
-    setActiveStep(WorkflowStep.LYRICS);
-  }, [lyrics, lyricsVariants, styleData, styleVariants]);
-
-  /** Snapshots an aktuellen Stand anbinden (ohne KI) – „ohne neue KI weiter“. */
-  const reanchorStyleAndCoverSnapshots = useCallback(() => {
-    if (!styleData) return;
-    const sSnap = buildStyleGenSnapshot(concept, lyrics, lyricsVariants);
-    setStyleGenSnap(sSnap);
-    styleGenSnapRef.current = sSnap;
-    const cSnap = buildCoverGenSnapshot(concept, lyrics, lyricsVariants, styleData, styleVariants);
-    setCoverGenSnap(cSnap);
-    coverGenSnapRef.current = cSnap;
-  }, [concept, lyrics, lyricsVariants, styleData, styleVariants]);
-
-  const handleLyricsNextNavOnly = useCallback(() => {
-    if (styleData) reanchorStyleAndCoverSnapshots();
-    setStyleStepUnlocked(true);
-    setCoverStepUnlocked(false);
-    setActiveStep(WorkflowStep.STYLE);
-  }, [styleData, reanchorStyleAndCoverSnapshots]);
-
-  const handleStyleStepNextNavOnly = useCallback(() => {
-    if (styleData) reanchorStyleAndCoverSnapshots();
-    setCoverStepUnlocked(true);
-    setActiveStep(WorkflowStep.ARTWORK);
-  }, [styleData, reanchorStyleAndCoverSnapshots]);
 
   /** Create-Flow: Konzept aus State, ggf. analysieren, 2 Lyrics + 2 Styles generieren (von Lyrics-Tab aus). */
   const handleGenerateLyrics = useCallback(async () => {
