@@ -15,6 +15,7 @@ import {
   type StyleGenSnapshot,
 } from './pipelineSnapshot';
 import { useWorkflowPipeline } from './hooks/useWorkflowPipeline';
+import { useGenerationActions } from './hooks/useGenerationActions';
 
 // Lazy: Step-Views erst bei Bedarf laden (schnellerer Start)
 import WorkflowNavigation from './components/WorkflowNavigation';
@@ -446,262 +447,55 @@ const App: React.FC = () => {
     [currentHistoryItemId, showToast, tr.lyrics.titleSelectedForCleanToast]
   );
 
-  /** Create-Flow: Konzept aus State, ggf. analysieren, 2 Lyrics + 2 Styles generieren (von Lyrics-Tab aus). */
-  const handleGenerateLyrics = useCallback(async () => {
-    if (!manualApiKey) {
-      showToast(tr.errors.noApiKey, 'error');
-      setIsKeySaved(false);
-      return;
-    }
-    if (!concept.topic?.trim()) {
-      showToast(tr.concept.enterTopicFirst, 'error');
-      setActiveStep(WorkflowStep.CONCEPT);
-      return;
-    }
-    setIsLoading(true);
-    setLoadingProgress(5);
-    setLoadingText(tr.loading.analyzingConcept);
-    try {
-      let finalConcept = { ...concept };
-      if (!finalConcept.topic.trim()) finalConcept = { ...finalConcept, topic: await generateRandomTopic() };
-      setLoadingProgress(15);
-      const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental, lang);
-      finalConcept = {
-        ...finalConcept,
-        genre: finalConcept.genre.length ? finalConcept.genre : (suggestions.genre || []),
-        mood: finalConcept.mood.length ? finalConcept.mood : (suggestions.mood || []),
-        instrumentation: (finalConcept.instrumentation?.length ? finalConcept.instrumentation : (suggestions.instrumentation || [])) as string[],
-        tempo: finalConcept.tempo.length ? finalConcept.tempo : (suggestions.tempo || []),
-        timbre: finalConcept.timbre?.length ? finalConcept.timbre : (suggestions.timbre || []),
-        excludedStyles: finalConcept.excludedStyles?.length ? finalConcept.excludedStyles : (suggestions.excludedStyles || []),
-        vocals: finalConcept.isInstrumental ? [] : (finalConcept.vocals.length ? finalConcept.vocals : (suggestions.vocals || [])),
-        language: finalConcept.isInstrumental ? [] : (finalConcept.language.length ? finalConcept.language : (suggestions.language || []))
-      };
-      setConcept(finalConcept);
-      setLoadingProgress(30);
-      setLoadingText(tr.loading.generatingLyrics);
-      setLoadingProgress(35);
-      const [genLyricsA, genLyricsB] = await Promise.all([
-        generateLyrics(finalConcept),
-        generateLyrics(finalConcept)
-      ]);
-      const lyricsA = cleanAiText(genLyricsA);
-      const lyricsB = cleanAiText(genLyricsB);
-      setLyricsVariants([lyricsA, lyricsB]);
-      setLyrics(lyricsA);
-      // Sprache/Gesangsstil pro Spalte entkoppeln (Variante 2 sonst Fallback auf dieselben Arrays wie Variante 1).
-      setConcept((prev) =>
-        prev.isInstrumental
-          ? prev
-          : {
-              ...prev,
-              languageVariant2: [...(prev.language ?? [])],
-              vocalsVariant2: [...(prev.vocals ?? [])],
-            }
-      );
-      setLoadingProgress(100);
-      setLyricsStepUnlocked(true);
-      setCoverStepUnlocked(false);
-      setActiveStep(WorkflowStep.LYRICS);
-      void refreshSongTitles({ concept: finalConcept, primary: lyricsA, secondary: lyricsB });
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setIsLoading(false);
-      setLoadingProgress(0);
-    }
-  }, [concept, tr, lang, handleError, refreshSongTitles]);
-
   const onConceptChange = useCallback((patch: Partial<SongConcept>) => setConcept(prev => ({ ...prev, ...patch })), []);
   const onUpdateLyrics = useCallback((l: string) => setLyrics(l), []);
 
-  const getCoverCooldownRemainingMs = () => {
-    const raw = localStorage.getItem(COVER_COOLDOWN_KEY);
-    const until = raw ? Number(raw) : 0;
-    if (!Number.isFinite(until) || until <= 0) return 0;
-    return Math.max(0, until - Date.now());
-  };
-
-  const setCoverCooldown = (ms: number) => {
-    localStorage.setItem(COVER_COOLDOWN_KEY, String(Date.now() + ms));
-  };
-
-  const isCoverQuotaError = (msg: string) => /429|quota|resource_exhausted|rate-limit/i.test(msg);
-
-  /** Style-Prompt(s) aus aktuellem Konzept + Lyrics erzeugen und Pipeline-Snapshots setzen (ohne Tab-Wechsel). */
-  const runStylePromptGeneration = useCallback(async () => {
-    const hasTwo = lyricsVariants && lyricsVariants.length >= 2;
-    const hasOne = lyrics?.trim();
-    if (!hasTwo && !hasOne) return;
-    if (hasTwo) {
-      const conceptForB: SongConcept = {
-        ...concept,
-        language: (concept.languageVariant2 && concept.languageVariant2.length > 0) ? concept.languageVariant2 : concept.language,
-        vocals: (concept.vocalsVariant2 && concept.vocalsVariant2.length > 0) ? concept.vocalsVariant2 : concept.vocals,
-      };
-      const [styleA, styleB] = await Promise.all([
-        generateStylePrompt(concept, lang, [lyricsVariants![0]]),
-        generateStylePrompt(conceptForB, lang, [lyricsVariants![1]])
-      ]);
-      setStyleVariants([mergeLyricsTitlesIntoStyle(styleA), mergeLyricsTitlesIntoStyle(styleB)]);
-      setStyleData(mergeLyricsTitlesIntoStyle(styleA));
-    } else {
-      const styleA = await generateStylePrompt(concept, lang, [lyrics!]);
-      setStyleData(mergeLyricsTitlesIntoStyle(styleA));
-      setStyleVariants(null);
-    }
-    const snap = buildStyleGenSnapshot(concept, lyrics, lyricsVariants);
-    setStyleGenSnap(snap);
-    styleGenSnapRef.current = snap;
-    setCoverGenSnap(null);
-    coverGenSnapRef.current = null;
-  }, [concept, lang, lyrics, lyricsVariants, mergeLyricsTitlesIntoStyle]);
-
-  /** Lyrics „Weiter“: Style-Prompt generieren und zum Style-Tab wechseln (nach kompletter Kette ggf. nur navigieren). */
-  const handleLyricsNext = useCallback(async () => {
-    const hasTwo = lyricsVariants && lyricsVariants.length >= 2;
-    const hasOne = lyrics?.trim();
-    if (!hasTwo && !hasOne) return;
-
-    if (workflowChainComplete && !computeNeedsStyleRegen(concept, lyrics, lyricsVariants, styleGenSnap)) {
-      setActiveStep(WorkflowStep.STYLE);
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadingText(tr.loading.generatingStyle);
-    setLoadingProgress(30);
-    try {
-      await runStylePromptGeneration();
-      setLoadingProgress(100);
-      setCoverStepUnlocked(false);
-      setStyleStepUnlocked(true);
-      setActiveStep(WorkflowStep.STYLE);
-    } catch (e) { handleError(e); }
-    finally { setIsLoading(false); setLoadingProgress(0); }
-  }, [concept, lyrics, lyricsVariants, workflowChainComplete, styleGenSnap, runStylePromptGeneration, tr.loading.generatingStyle, handleError]);
-
-  /** Tab-Wechsel (z. B. Navigation + „Weiter“ am Style-Ende); bei zwei Lyrics-Varianten: Cover ggf. generieren. */
-  const handleWorkflowStepChange = useCallback(async (step: WorkflowStep) => {
-    if (step === WorkflowStep.ARTWORK) {
-      setCoverStepUnlocked(true);
-    }
-
-    const dualCoverPipeline =
-      step === WorkflowStep.ARTWORK &&
-      lyricsVariants &&
-      lyricsVariants.length >= 2 &&
-      styleData &&
-      computeNeedsCoverRegen(
-        concept,
-        lyrics,
-        lyricsVariants,
-        styleData,
-        styleVariants,
-        coverUrl,
-        styleGenSnapRef.current,
-        coverGenSnapRef.current
-      );
-
-    if (dualCoverPipeline) {
-      if (coverRequestInFlightRef.current) return;
-      const cooldownLeft = getCoverCooldownRemainingMs();
-      if (cooldownLeft > 0) {
-        const sec = Math.ceil(cooldownLeft / 1000);
-        const msg = `Cover-Generierung pausiert: bitte ${sec}s warten und erneut versuchen.`;
-        setCoverError(msg);
-        showToast(msg, 'info');
-        setActiveStep(WorkflowStep.ARTWORK);
-        return;
-      }
-      coverRequestInFlightRef.current = true;
-      setIsLoading(true);
-      setLoadingText(tr.loading.generatingCover);
-      setLoadingProgress(50);
-      setCoverError(null);
-      try {
-        const genCover = await generateCoverArt(concept);
-        setCoverUrl(genCover);
-        const cSnap = buildCoverGenSnapshot(concept, lyrics, lyricsVariants, styleData, styleVariants);
-        setCoverGenSnap(cSnap);
-        coverGenSnapRef.current = cSnap;
-        const item: SongHistoryItem = {
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          concept,
-          lyrics: lyricsVariants[0],
-          lyricsVariant2: lyricsVariants[1],
-          styleData: styleData!,
-          ...(styleVariants ? { styleVariant2: styleVariants[1] } : {}),
-          coverUrl: genCover,
-        };
-        await saveSongToDB(item);
-        setCurrentHistoryItemId(item.id);
-        setHistory(prev => [item, ...prev]);
-      } catch (e) {
-        handleError(e);
-        const msg = e instanceof Error ? e.message : String(e ?? 'Unbekannter Fehler');
-        if (isCoverQuotaError(msg)) {
-          setCoverCooldown(COVER_COOLDOWN_MS);
-          recordQuotaError(COVER_COOLDOWN_MS);
-        }
-        setCoverError(msg);
-      } finally {
-        coverRequestInFlightRef.current = false;
-        setIsLoading(false);
-        setLoadingProgress(0);
-        setActiveStep(WorkflowStep.ARTWORK);
-      }
-      return;
-    }
-    setActiveStep(step);
-  }, [concept, coverUrl, handleError, lyrics, lyricsVariants, showToast, styleData, styleVariants, tr.loading.generatingCover]);
-
-  /** Style „Weiter“: ggf. Style neu, dann Cover (Dual) oder nur zum Cover-Tab. */
-  const handleStyleStepNext = useCallback(async () => {
-    if (coverRequestInFlightRef.current) return;
-
-    if (computeNeedsStyleRegen(concept, lyrics, lyricsVariants, styleGenSnapRef.current)) {
-      setIsLoading(true);
-      setLoadingText(tr.loading.generatingStyle);
-      setLoadingProgress(30);
-      try {
-        await runStylePromptGeneration();
-        setLoadingProgress(100);
-        setStyleStepUnlocked(true);
-        setCoverStepUnlocked(false);
-      } catch (e) {
-        handleError(e);
-        return;
-      } finally {
-        setIsLoading(false);
-        setLoadingProgress(0);
-      }
-    }
-
-    const dualNeedsCover =
-      lyricsVariants &&
-      lyricsVariants.length >= 2 &&
-      styleData &&
-      computeNeedsCoverRegen(
-        concept,
-        lyrics,
-        lyricsVariants,
-        styleData,
-        styleVariants,
-        coverUrl,
-        styleGenSnapRef.current,
-        coverGenSnapRef.current
-      );
-
-    if (dualNeedsCover) {
-      await handleWorkflowStepChange(WorkflowStep.ARTWORK);
-      return;
-    }
-
-    setCoverStepUnlocked(true);
-    setActiveStep(WorkflowStep.ARTWORK);
-  }, [concept, lyrics, lyricsVariants, styleData, styleVariants, coverUrl, runStylePromptGeneration, handleWorkflowStepChange, tr.loading.generatingStyle, handleError]);
+  const {
+    runStylePromptGeneration,
+    handleGenerateLyrics,
+    handleLyricsNext,
+    handleWorkflowStepChange,
+    handleStyleStepNext,
+  } = useGenerationActions({
+    manualApiKey,
+    concept,
+    lyrics,
+    lyricsVariants,
+    styleData,
+    styleVariants,
+    coverUrl,
+    styleGenSnap,
+    workflowChainComplete,
+    lang,
+    tr,
+    showToast,
+    handleError,
+    refreshSongTitles,
+    mergeLyricsTitlesIntoStyle,
+    styleGenSnapRef,
+    coverGenSnapRef,
+    coverRequestInFlightRef,
+    setConcept,
+    setLyrics,
+    setLyricsVariants,
+    setStyleData,
+    setStyleVariants,
+    setStyleGenSnap,
+    setCoverGenSnap,
+    setCoverUrl,
+    setCoverError,
+    setCurrentHistoryItemId,
+    setHistory,
+    setSongTitleSuggestions,
+    setSelectedSongTitle,
+    setIsLoading,
+    setLoadingText,
+    setLoadingProgress,
+    setLyricsStepUnlocked,
+    setStyleStepUnlocked,
+    setCoverStepUnlocked,
+    setActiveStep,
+  });
 
   const handleRecall = useCallback((item: SongHistoryItem) => {
     let recalledConcept: SongConcept = {
