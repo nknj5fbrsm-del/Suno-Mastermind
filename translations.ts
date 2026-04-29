@@ -53,6 +53,7 @@ export const t = {
       untitled: 'Ohne Titel',
       whatsNew: 'Was ist neu',
       whatsNewItems: [
+        { date: '2026-04-29', text: 'Inspirationswege vereinheitlicht und optimiert: Zufall, Bild, Link und Copilot liefern jetzt durchgängig 3 Vorschläge im gleichen Format mit Songidee, Genre, Stimmung und Instrumentierung – einzeln übernehmbar.' },
         { date: '2026-04-26', text: 'Konzept · Songidee-Copilot: Neuer optionaler Copilot als interaktiver Chat im Concept-Step (Modal mit 5 Kernfragen). Ein LLM-Call am Ende erstellt einen strukturierten Entwurf; „Als Song-Idee übernehmen“ übergibt Thema, Stimmung, Perspektive, Sprache/Vocal-Art und Wunsch-Instrumente robust in die Pipeline.' },
         { date: '2026-04-22', text: 'Header · KI-Status (Gemini): Neue Ampel-Anzeige (grün/gelb/rot) zentral zwischen SUNO und DE/EN. Per Klick öffnet sich ein Mini-Modal mit Kurz-Erklärung sowie Tokenwerten (Heute, Rest geschätzt, Session), damit schneller erkennbar ist, ob weitere Generierung voraussichtlich ohne Quota-Fehler möglich ist.' },
         { date: '2026-04-20', text: 'Konzept · Song-Idee: Neuer Button „Inspiration aus Link“ neben Zufall und Bild-Inspiration. Im Modal können Apple-Music- und Spotify-Links eingefügt werden; die KI extrahiert Artist/Titel und erzeugt übernehmbare Song-Idee-Vorschläge. Mit Domain-Precheck inkl. Inline-Hinweis und deaktiviertem Analyse-Button bei nicht unterstützten Links.' },
@@ -486,6 +487,7 @@ export const t = {
       untitled: 'Untitled',
       whatsNew: "What's New",
       whatsNewItems: [
+        { date: '2026-04-29', text: 'Inspiration paths unified and optimized: random, image, link and copilot now consistently provide 3 suggestions in the same format with song idea, genre, mood and instrumentation – each can be applied individually.' },
         { date: '2026-04-26', text: 'Concept · Song Idea Copilot: New optional copilot as an interactive chat in the Concept step (modal with 5 core questions). A single LLM call at the end creates a structured draft; “Use as song idea” now passes topic, mood, perspective, language/vocal style, and preferred instruments robustly into the pipeline.' },
         { date: '2026-04-22', text: 'Header · AI status (Gemini): New traffic-light indicator (green/yellow/red) centered between SUNO and DE/EN. Clicking it opens a mini modal with a short explanation and token values (today, estimated remaining, session), so you can quickly see whether further generation is likely without quota errors.' },
         { date: '2026-04-20', text: 'Concept · Song idea: New “Inspiration from link” button next to Random and Image Inspiration. The modal accepts Apple Music and Spotify links; AI extracts artist/title and generates apply-ready song-idea drafts. Includes domain precheck with inline hint and disabled Analyze button for unsupported links.' },

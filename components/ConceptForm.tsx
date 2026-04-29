@@ -3,13 +3,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SongConcept } from '../types';
 import {
-  analyzeTopic, generateConceptStoryIdea, analyzeAudio, AudioAnalysisResult,
+  analyzeTopic, analyzeAudio, AudioAnalysisResult,
   generateGenreFusion, GenreFusionResult,
   generateCreativeBoost, CreativeBoostResult,
   generateChaosMode, ChaosModeResult,
   synthesizeReferenceStyle, ReferenceStyleResult, analyzeInspirationImage,
   analyzeChordProgression, analyzeMusicLinkInspiration, MusicLinkInspirationResult,
-  generateSongIdeaCopilotDraft, SongIdeaCopilotDraft,
+  generateSongIdeaCopilotDraft, SongIdeaCopilotDraft, generateSongIdeaSuggestions, SongIdeaSuggestionCard,
 } from '../services/geminiService';
 import { useLang, useToast } from '../App';
 import SearchableMultiInput from './SearchableMultiInput';
@@ -852,13 +852,17 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const [randomThemePreset, setRandomThemePreset] = useState<string>(opts.randomThemes[0] ?? 'Zufall');
   const [randomDirectionCustom, setRandomDirectionCustom] = useState('');
   const [isRandomModalOpen, setIsRandomModalOpen] = useState(false);
-  const [randomSuggestion, setRandomSuggestion] = useState('');
+  const [randomSuggestions, setRandomSuggestions] = useState<SongIdeaSuggestionCard[]>([]);
   const [inspirationImage, setInspirationImage] = useState<InspirationImageFile | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [isImageSuggesting, setIsImageSuggesting] = useState(false);
+  const [imageSuggestions, setImageSuggestions] = useState<SongIdeaSuggestionCard[]>([]);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isCopilotModalOpen, setIsCopilotModalOpen] = useState(false);
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
+  const [isCopilotSuggesting, setIsCopilotSuggesting] = useState(false);
+  const [copilotSuggestions, setCopilotSuggestions] = useState<SongIdeaSuggestionCard[]>([]);
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotQuestionIdx, setCopilotQuestionIdx] = useState(0);
@@ -936,49 +940,42 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   const handleRandomize = async () => {
     setIsRandomizing(true);
     try {
-      const topic = await generateConceptStoryIdea(
-        'random',
-        lang,
-        randomThemePreset,
-        randomDirectionCustom
-      );
-      setRandomSuggestion(topic);
+      const seed =
+        lang === 'de'
+          ? `Zufallsinspiration. Thema: ${randomThemePreset}. Richtung: ${randomDirectionCustom.trim() || 'offen, aber songtauglich'}.`
+          : `Random inspiration. Theme: ${randomThemePreset}. Direction: ${randomDirectionCustom.trim() || 'open but song-friendly'}.`;
+      const suggestions = await generateSongIdeaSuggestions(seed, lang);
+      setRandomSuggestions(suggestions.slice(0, 3));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
       showToast(tr.errors.aiErrorPrefix + msg, 'error');
     } finally { setIsRandomizing(false); }
   };
 
-  const extractRandomSuggestionForTopic = (text: string): string => {
-    const raw = String(text ?? '');
-    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) return '';
-
-    const cleanLine = (line: string): string => {
-      if (/^\[Titel\]\s*/i.test(line)) return `Titel: ${line.replace(/^\[Titel\]\s*/i, '').trim()}`;
-      if (/^\[Title\]\s*/i.test(line)) return `Title: ${line.replace(/^\[Title\]\s*/i, '').trim()}`;
-      if (/^\[Genre\]\s*/i.test(line)) return `Genre: ${line.replace(/^\[Genre\]\s*/i, '').trim()}`;
-      if (/^\[Stimmung\s*&\s*Setting\]\s*/i.test(line)) return `Stimmung & Setting: ${line.replace(/^\[Stimmung\s*&\s*Setting\]\s*/i, '').trim()}`;
-      if (/^\[Mood\s*&\s*Setting\]\s*/i.test(line)) return `Mood & Setting: ${line.replace(/^\[Mood\s*&\s*Setting\]\s*/i, '').trim()}`;
-      if (/^\[Perspektive\]\s*/i.test(line)) return `Perspektive: ${line.replace(/^\[Perspektive\]\s*/i, '').trim()}`;
-      if (/^\[Perspective\]\s*/i.test(line)) return `Perspective: ${line.replace(/^\[Perspective\]\s*/i, '').trim()}`;
-      if (/^\[Kernidee\]\s*/i.test(line)) return line.replace(/^\[Kernidee\]\s*/i, '').trim();
-      if (/^\[Core idea\]\s*/i.test(line)) return line.replace(/^\[Core idea\]\s*/i, '').trim();
-      return line
-        .replace(/^Kernidee:\s*/i, '')
-        .replace(/^Core idea:\s*/i, '')
-        .trim();
-    };
-
-    return lines.map(cleanLine).filter(Boolean).join('\n').trim();
+  const formatSongIdeaForTopic = (suggestion: SongIdeaSuggestionCard): string => {
+    const idea = suggestion.idea.trim();
+    const genre = suggestion.genre.trim();
+    const mood = suggestion.mood.trim();
+    const instrumentation = suggestion.instrumentation.trim();
+    if (!idea) return '';
+    const trailing = [genre, mood, instrumentation].filter(Boolean).join(', ');
+    return trailing ? `${idea} ${trailing}.` : idea;
   };
 
-  const handleApplyRandomSuggestion = () => {
-    const suggestion = extractRandomSuggestionForTopic(randomSuggestion);
-    if (!suggestion) return;
-    setConcept(prev => ({ ...prev, topic: suggestion }));
-    showToast(tr.concept.randomApplySuccess, 'success');
-    setIsRandomModalOpen(false);
+  const suggestionMetaLabels = lang === 'de'
+    ? { genre: 'Genre', mood: 'Stimmung', instrumentation: 'Instrumentierung' }
+    : { genre: 'Genre', mood: 'Mood', instrumentation: 'Instrumentation' };
+
+  const applySongIdeaSuggestion = (suggestion: SongIdeaSuggestionCard, source: SongConcept['inspirationSource'], successMessage: string, close?: () => void) => {
+    const formatted = formatSongIdeaForTopic(suggestion).trim();
+    if (!formatted) return;
+    setConcept(prev => ({
+      ...prev,
+      topic: formatted,
+      inspirationSource: prev.topic.trim() ? 'mixed' : source,
+    }));
+    showToast(successMessage, 'success');
+    close?.();
   };
 
   const runSongIdeaAnalysis = async (mode: 'merge' | 'replace') => {
@@ -1018,6 +1015,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
   };
 
   const handleImageFile = async (file: File) => {
+    setImageSuggestions([]);
     try {
       const img = await readInspirationImageFile(file);
       setInspirationImage(img);
@@ -1045,6 +1043,18 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
         imageInspirationText: idea,
         inspirationSource: prev.topic.trim() ? 'mixed' : 'image',
       }));
+      setIsImageSuggesting(true);
+      try {
+        const suggestions = await generateSongIdeaSuggestions(
+          lang === 'de'
+            ? `Bildanalyse-Kontext: ${idea}`
+            : `Image analysis context: ${idea}`,
+          lang
+        );
+        setImageSuggestions(suggestions.slice(0, 3));
+      } finally {
+        setIsImageSuggesting(false);
+      }
       showToast(tr.concept.imageAnalyzeSuccess, 'success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -1056,18 +1066,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
     } finally {
       setIsAnalyzingImage(false);
     }
-  };
-
-  const handleApplyImageIdea = () => {
-    const suggestion = (concept.imageInspirationText || '').trim();
-    if (!suggestion) return;
-    setConcept(prev => ({
-      ...prev,
-      topic: suggestion,
-      inspirationSource: prev.topic.trim() ? 'mixed' : 'image',
-    }));
-    showToast(tr.concept.imageApplySuccess, 'success');
-    setIsImageModalOpen(false);
   };
 
   const handleAnalyzeMusicLink = async () => {
@@ -1089,16 +1087,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
     }
   };
 
-  const handleApplyMusicLinkIdea = (idea: string) => {
-    const suggestion = (idea || '').trim();
-    if (!suggestion) return;
-    setConcept(prev => ({
-      ...prev,
-      topic: suggestion,
-      inspirationSource: prev.topic.trim() ? 'mixed' : 'text',
-    }));
-    showToast(tr.concept.linkInspirationApplySuccess, 'success');
-    setIsLinkModalOpen(false);
+  const handleApplyMusicLinkIdea = (idea: SongIdeaSuggestionCard) => {
+    applySongIdeaSuggestion(idea, 'text', tr.concept.linkInspirationApplySuccess, () => setIsLinkModalOpen(false));
   };
 
   const trimmedMusicLinkInput = musicLinkInput.trim();
@@ -1114,6 +1104,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
 
   const handleResetCopilot = () => {
     setCopilotDraft(null);
+    setCopilotSuggestions([]);
     setCopilotQuestionIdx(0);
     setCopilotInput('');
     setCopilotAnswers({
@@ -1160,6 +1151,17 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
         lang
       );
       setCopilotDraft(draft);
+      setIsCopilotSuggesting(true);
+      try {
+        const seed =
+          lang === 'de'
+            ? `Copilot-Briefing: Thema ${draft.topicShort}; Konflikt ${draft.coreConflict}; Perspektive ${draft.perspective}; Emotionsbogen ${draft.emotionArc}; Bildwelt ${draft.imagerySetting}; Instrumente ${(draft.instrumentHints || []).join(', ')}.`
+            : `Copilot briefing: topic ${draft.topicShort}; conflict ${draft.coreConflict}; perspective ${draft.perspective}; emotion arc ${draft.emotionArc}; imagery ${draft.imagerySetting}; instruments ${(draft.instrumentHints || []).join(', ')}.`;
+        const suggestions = await generateSongIdeaSuggestions(seed, lang);
+        setCopilotSuggestions(suggestions.slice(0, 3));
+      } finally {
+        setIsCopilotSuggesting(false);
+      }
       setCopilotMessages(prev => [...prev, { role: 'assistant', text: tr.concept.copilotDraftReady }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err ?? '');
@@ -1193,39 +1195,8 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
     void generateCopilotDraftFromAnswers(nextAnswers);
   };
 
-  const handleApplyCopilotDraft = () => {
-    if (!copilotDraft?.topicShort?.trim()) return;
-    const instrumentsLine = (copilotDraft.instrumentHints || []).filter(Boolean).join(' · ');
-    const contractLanguage = copilotAnswers.languageAndVocalStyle || '';
-    const contractVocals = copilotAnswers.languageAndVocalStyle || '';
-    const contractMood = copilotAnswers.moodMain || '';
-    const contractPerspective = copilotAnswers.perspective || copilotDraft.perspective || '';
-    const contractInstruments = copilotAnswers.instrumentHints || instrumentsLine || '';
-    const copilotContract = [
-      '[Copilot Contract]',
-      `Language: ${contractLanguage}`,
-      `Vocals: ${contractVocals}`,
-      `Mood: ${contractMood}`,
-      `Perspective: ${contractPerspective}`,
-      `Instruments: ${contractInstruments}`,
-      '[/Copilot Contract]',
-    ].join('\n');
-    const composed = [
-      copilotContract,
-      `Thema: ${copilotDraft.topicShort}`,
-      `Kernkonflikt: ${copilotDraft.coreConflict}`,
-      `Perspektive: ${copilotDraft.perspective}`,
-      `Emotionsbogen: ${copilotDraft.emotionArc}`,
-      `Bildwelt / Setting: ${copilotDraft.imagerySetting}`,
-      instrumentsLine ? `Instrumente: ${instrumentsLine}` : '',
-    ].filter(Boolean).join('\n');
-    setConcept(prev => ({
-      ...prev,
-      topic: composed,
-      inspirationSource: prev.topic.trim() ? 'mixed' : 'text',
-    }));
-    showToast(tr.concept.copilotApplySuccess, 'success');
-    setIsCopilotModalOpen(false);
+  const handleApplyCopilotSuggestion = (idea: SongIdeaSuggestionCard) => {
+    applySongIdeaSuggestion(idea, 'text', tr.concept.copilotApplySuccess, () => setIsCopilotModalOpen(false));
   };
 
   const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
@@ -1799,9 +1770,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                   >
                     <i className="fas fa-comments flex-shrink-0 text-[9px]"></i>
                     <span className="min-w-0 truncate">{tr.concept.copilotTitle}</span>
-                    {copilotDraft && (
+                    {copilotSuggestions.length > 0 && (
                       <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
-                        1
+                        {Math.min(9, copilotSuggestions.length)}
                       </span>
                     )}
                   </button>
@@ -1816,9 +1787,9 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                   >
                     <i className="fas fa-image flex-shrink-0 text-[9px]"></i>
                     <span className="min-w-0 truncate">{tr.concept.imageInspirationButton}</span>
-                    {(inspirationImage || concept.imageInspirationText?.trim()) && (
+                    {imageSuggestions.length > 0 && (
                       <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-secondary/25 px-1 text-[8px] font-black">
-                        1
+                        {Math.min(9, imageSuggestions.length)}
                       </span>
                     )}
                   </button>
@@ -1831,7 +1802,7 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                     <span className="min-w-0 truncate">{tr.concept.linkInspirationButton}</span>
                     {musicLinkResult && (
                       <span className="inline-flex min-h-[1rem] min-w-[1rem] flex-shrink-0 items-center justify-center rounded-full bg-suno-primary/25 px-1 text-[8px] font-black">
-                        1
+                        {Math.min(9, musicLinkResult.suggestions.length)}
                       </span>
                     )}
                   </button>
@@ -1938,15 +1909,33 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-                {tr.concept.randomResultLabel}
-              </label>
-              <textarea
-                className="glass-input w-full rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 resize-none h-36 custom-scrollbar"
-                placeholder={tr.concept.randomResultPlaceholder}
-                value={randomSuggestion}
-                onChange={(e) => setRandomSuggestion(e.target.value)}
-              />
+              <p className="text-[9px] font-black uppercase tracking-wider text-zinc-300">
+                {tr.concept.linkInspirationIdeas}
+              </p>
+              {randomSuggestions.length === 0 ? (
+                <div className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-zinc-400">{tr.concept.randomResultPlaceholder}</p>
+                </div>
+              ) : (
+                randomSuggestions.map((idea, i) => (
+                  <div key={`random-idea-${i}`} className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3 space-y-2">
+                    <p className="text-[11px] text-zinc-200 leading-relaxed">{idea.idea}</p>
+                    <p className="text-[10px] text-zinc-400 leading-relaxed">
+                      {suggestionMetaLabels.genre}: {idea.genre} · {suggestionMetaLabels.mood}: {idea.mood} · {suggestionMetaLabels.instrumentation}: {idea.instrumentation}
+                    </p>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => applySongIdeaSuggestion(idea, 'text', tr.concept.randomApplySuccess, () => setIsRandomModalOpen(false))}
+                        className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white"
+                      >
+                        <i className="fas fa-arrow-turn-up mr-1"></i>
+                        {tr.concept.randomApply}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
@@ -1956,15 +1945,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                 className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
               >
                 {tr.about.close}
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyRandomSuggestion}
-                disabled={!randomSuggestion.trim()}
-                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-arrow-turn-up mr-1"></i>
-                {tr.concept.randomApply}
               </button>
             </div>
           </div>
@@ -2071,15 +2051,40 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
             <p className="text-[9px] leading-relaxed text-zinc-400">{tr.concept.imageSafetyHint}</p>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-                {tr.concept.imageResultLabel}
-              </label>
-              <textarea
-                className="glass-input w-full rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 resize-none h-28 custom-scrollbar"
-                placeholder={tr.concept.imageResultPlaceholder}
-                value={concept.imageInspirationText || ''}
-                onChange={(e) => setConcept(prev => ({ ...prev, imageInspirationText: e.target.value }))}
-              />
+              <p className="text-[9px] font-black uppercase tracking-wider text-zinc-300">
+                {tr.concept.linkInspirationIdeas}
+              </p>
+              {(isAnalyzingImage || isImageSuggesting) && (
+                <div className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-zinc-400">
+                    <i className="fas fa-spinner animate-spin mr-1"></i>
+                    {tr.concept.imageAnalyzing}
+                  </p>
+                </div>
+              )}
+              {!isAnalyzingImage && !isImageSuggesting && imageSuggestions.length === 0 && (
+                <div className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                  <p className="text-[10px] text-zinc-400">{tr.concept.imageResultPlaceholder}</p>
+                </div>
+              )}
+              {!isAnalyzingImage && !isImageSuggesting && imageSuggestions.map((idea, i) => (
+                <div key={`image-idea-${i}`} className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3 space-y-2">
+                  <p className="text-[11px] text-zinc-200 leading-relaxed">{idea.idea}</p>
+                  <p className="text-[10px] text-zinc-400 leading-relaxed">
+                    {suggestionMetaLabels.genre}: {idea.genre} · {suggestionMetaLabels.mood}: {idea.mood} · {suggestionMetaLabels.instrumentation}: {idea.instrumentation}
+                  </p>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => applySongIdeaSuggestion(idea, 'image', tr.concept.imageApplySuccess, () => setIsImageModalOpen(false))}
+                      className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white"
+                    >
+                      <i className="fas fa-arrow-turn-up mr-1"></i>
+                      {tr.concept.imageApply}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-1">
@@ -2089,15 +2094,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                 className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
               >
                 {tr.about.close}
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyImageIdea}
-                disabled={!concept.imageInspirationText?.trim()}
-                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-arrow-turn-up mr-1"></i>
-                {tr.concept.imageApply}
               </button>
             </div>
           </div>
@@ -2172,7 +2168,10 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                   </p>
                   {musicLinkResult.suggestions.map((idea, i) => (
                     <div key={`link-idea-${i}`} className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3 space-y-2">
-                      <p className="text-[11px] text-zinc-200 leading-relaxed">{idea}</p>
+                      <p className="text-[11px] text-zinc-200 leading-relaxed">{idea.idea}</p>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        {suggestionMetaLabels.genre}: {idea.genre} · {suggestionMetaLabels.mood}: {idea.mood} · {suggestionMetaLabels.instrumentation}: {idea.instrumentation}
+                      </p>
                       <div className="flex justify-end">
                         <button
                           type="button"
@@ -2280,6 +2279,38 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
               </div>
             )}
 
+            {copilotDraft && (
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-300">{tr.concept.linkInspirationIdeas}</p>
+                {isCopilotSuggesting && (
+                  <div className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3">
+                    <p className="text-[10px] text-zinc-400">
+                      <i className="fas fa-spinner animate-spin mr-1"></i>
+                      {tr.concept.copilotGenerating}
+                    </p>
+                  </div>
+                )}
+                {!isCopilotSuggesting && copilotSuggestions.map((idea, i) => (
+                  <div key={`copilot-idea-${i}`} className="rounded-2xl border border-zinc-700 bg-white/[0.03] p-3 space-y-2">
+                    <p className="text-[11px] text-zinc-200 leading-relaxed">{idea.idea}</p>
+                    <p className="text-[10px] text-zinc-400 leading-relaxed">
+                      {suggestionMetaLabels.genre}: {idea.genre} · {suggestionMetaLabels.mood}: {idea.mood} · {suggestionMetaLabels.instrumentation}: {idea.instrumentation}
+                    </p>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCopilotSuggestion(idea)}
+                        className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white"
+                      >
+                        <i className="fas fa-arrow-turn-up mr-1"></i>
+                        {tr.concept.copilotApply}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
@@ -2294,15 +2325,6 @@ const ConceptForm: React.FC<ConceptFormProps> = ({ initialConcept, onConceptCont
                 className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] glass-btn text-zinc-400 hover:text-zinc-200"
               >
                 {tr.about.close}
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyCopilotDraft}
-                disabled={!copilotDraft?.topicShort?.trim()}
-                className="px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.12em] btn-create text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-arrow-turn-up mr-1"></i>
-                {tr.concept.copilotApply}
               </button>
             </div>
           </div>

@@ -812,6 +812,111 @@ Rules:
   }
 };
 
+export const generateSongIdeaSuggestions = async (
+  seedContext: string,
+  lang: 'de' | 'en' = 'de'
+): Promise<SongIdeaSuggestionCard[]> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+  const ai = new GoogleGenAI({ apiKey });
+  const promptBody =
+    lang === 'de'
+      ? `Erzeuge genau 3 unterschiedliche Song-Idee-Vorschläge aus diesem Kontext:\n${seedContext}\n\nRegeln:\n- Jeder Vorschlag enthält: idea (1-2 Sätze), genre (kurz), mood (kurz), instrumentation (kurz).\n- idea ist konkret, singbar, ohne Kitsch.\n- genre/mood/instrumentation sind kompakte Phrasen, keine Erklärtexte.\n- Keine Aufzählungszeichen, keine Nummerierung.\n- Ausgabe als JSON-Array "suggestions" mit genau 3 Objekten.`
+      : `Generate exactly 3 distinct song-idea suggestions from this context:\n${seedContext}\n\nRules:\n- Each suggestion contains: idea (1-2 sentences), genre (short), mood (short), instrumentation (short).\n- idea is concrete, singable, and not cliche.\n- genre/mood/instrumentation are compact phrases, no explanations.\n- No bullets, no numbering.\n- Return JSON array "suggestions" with exactly 3 objects.`;
+
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model: TEXT_MODEL,
+      contents: promptBody,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        ...DEFAULT_THINKING,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            suggestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  idea: { type: Type.STRING },
+                  genre: { type: Type.STRING },
+                  mood: { type: Type.STRING },
+                  instrumentation: { type: Type.STRING },
+                },
+                required: ["idea", "genre", "mood", "instrumentation"],
+              },
+            },
+          },
+          required: ["suggestions"],
+        },
+      },
+    })
+  );
+
+  const fallback: SongIdeaSuggestionCard[] = lang === 'de'
+    ? [
+        {
+          idea: 'Erzähle von einer Beziehung, die im Alltag an kleinen Missverständnissen reibt und erst im richtigen Moment wieder Nähe findet.',
+          genre: 'Cineastische Popballade',
+          mood: 'nachdenklich und hoffnungsvoll',
+          instrumentation: 'Piano und warme Streicher',
+        },
+        {
+          idea: 'Schreibe über eine Person, die zwischen Pflicht und echtem Wunsch hin- und hergerissen ist und eine klare Entscheidung treffen muss.',
+          genre: 'Moderner Deutschpop',
+          mood: 'angespannt und entschlossen',
+          instrumentation: 'Akustikgitarre, Bass und treibende Drums',
+        },
+        {
+          idea: 'Beschreibe einen stillen Wendepunkt, an dem aus Zweifel langsam Mut wird und ein neuer Anfang greifbar wird.',
+          genre: 'Atmosphärischer Indie-Pop',
+          mood: 'ruhig und aufbrechend',
+          instrumentation: 'E-Piano, Gitarrenflächen und dezente Percussion',
+        },
+      ]
+    : [
+        {
+          idea: 'Write about a relationship worn down by small daily misunderstandings that finds closeness again at the right moment.',
+          genre: 'Cinematic pop ballad',
+          mood: 'reflective and hopeful',
+          instrumentation: 'piano and warm strings',
+        },
+        {
+          idea: 'Tell the story of someone torn between obligation and desire who has to make one clear decision.',
+          genre: 'Modern pop',
+          mood: 'tense and determined',
+          instrumentation: 'acoustic guitar, bass and driving drums',
+        },
+        {
+          idea: 'Capture a quiet turning point where doubt slowly turns into courage and a new beginning becomes real.',
+          genre: 'Atmospheric indie pop',
+          mood: 'calm and rising',
+          instrumentation: 'electric piano, guitar textures and subtle percussion',
+        },
+      ];
+
+  try {
+    const parsed = JSON.parse(response.text || "{}");
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions
+          .map((s: any) => ({
+            idea: cleanText(String(s?.idea ?? '')).trim(),
+            genre: cleanText(String(s?.genre ?? '')).trim(),
+            mood: cleanText(String(s?.mood ?? '')).trim(),
+            instrumentation: cleanText(String(s?.instrumentation ?? '')).trim(),
+          }))
+          .filter((s: SongIdeaSuggestionCard) => s.idea && s.genre && s.mood && s.instrumentation)
+      : [];
+    if (suggestions.length >= 3) return suggestions.slice(0, 3);
+    if (suggestions.length > 0) return [...suggestions, ...fallback].slice(0, 3);
+    return fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const generateHomeSongIdeas = async (lang: 'de' | 'en' = 'de'): Promise<HomeSongIdeas> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
@@ -1088,11 +1193,18 @@ export interface ImageInspirationResult {
   titleIdeas: string[];
 }
 
+export interface SongIdeaSuggestionCard {
+  idea: string;
+  genre: string;
+  mood: string;
+  instrumentation: string;
+}
+
 export interface MusicLinkInspirationResult {
   platform: "apple_music" | "spotify" | "unknown";
   artist: string;
   title: string;
-  suggestions: string[];
+  suggestions: SongIdeaSuggestionCard[];
 }
 
 export const analyzeAudio = async (
@@ -1318,26 +1430,34 @@ export const analyzeMusicLinkInspiration = async (
 
 Aufgabe:
 1) Extrahiere Artist und Titel so präzise wie möglich.
-2) Erstelle GENAU 3 hochwertige Song-Idee-Vorschläge (je 1-2 Sätze), inspiriert vom mutmaßlichen Stil/Vibe.
+2) Erstelle GENAU 3 hochwertige Song-Idee-Vorschläge, je als Objekt mit:
+- idea (1-2 Sätze),
+- genre (kurz),
+- mood (kurz),
+- instrumentation (kurz).
 
 Regeln:
 - Nutze nur plausible Informationen aus Linkstruktur/typischen Metadaten; nichts erfinden, wenn unklar.
 - Wenn Artist/Titel unklar sind, setze den jeweiligen Wert auf "Unbekannt".
 - "platform" ist exakt einer von: "apple_music", "spotify", "unknown".
-- "suggestions" muss genau 3 nicht-leere Strings enthalten.
+- "suggestions" muss genau 3 nicht-leere Objekte enthalten.
 
 Antworte ausschließlich als valides JSON.`
       : `You get a music link (Apple Music or Spotify): "${trimmed}".
 
 Task:
 1) Extract artist and title as accurately as possible.
-2) Create EXACTLY 3 high-quality song-idea suggestions (1-2 sentences each), inspired by the likely vibe/style.
+2) Create EXACTLY 3 high-quality song-idea suggestions as objects with:
+- idea (1-2 sentences),
+- genre (short),
+- mood (short),
+- instrumentation (short).
 
 Rules:
 - Use only plausible information from URL structure / likely metadata; do not fabricate certainty.
 - If artist/title are unclear, set the value to "Unknown".
 - "platform" must be exactly one of: "apple_music", "spotify", "unknown".
-- "suggestions" must contain exactly 3 non-empty strings.
+- "suggestions" must contain exactly 3 non-empty objects.
 
 Respond only with valid JSON.`;
 
@@ -1353,7 +1473,19 @@ Respond only with valid JSON.`;
           platform: { type: Type.STRING, enum: ["apple_music", "spotify", "unknown"] },
           artist: { type: Type.STRING },
           title: { type: Type.STRING },
-          suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          suggestions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                idea: { type: Type.STRING },
+                genre: { type: Type.STRING },
+                mood: { type: Type.STRING },
+                instrumentation: { type: Type.STRING },
+              },
+              required: ["idea", "genre", "mood", "instrumentation"],
+            },
+          },
         },
         required: ["platform", "artist", "title", "suggestions"],
       },
@@ -1367,14 +1499,44 @@ Respond only with valid JSON.`;
     title: fallbackUnknown,
     suggestions: [
       lang === "de"
-        ? "Ein Song über den Moment, in dem du zwischen Aufbruch und Rückzug festhängst, mit klarer Bildsprache und starker Dynamik."
-        : "A song about being stuck between moving forward and pulling back, with vivid imagery and dynamic contrast.",
+        ? {
+            idea: "Ein Song über den Moment, in dem du zwischen Aufbruch und Rückzug festhängst, mit klarer Bildsprache und starker Dynamik.",
+            genre: "Moderner Pop",
+            mood: "angespannt und aufbrechend",
+            instrumentation: "Piano, Synth-Bass und Drums",
+          }
+        : {
+            idea: "A song about being stuck between moving forward and pulling back, with vivid imagery and dynamic contrast.",
+            genre: "Modern pop",
+            mood: "tense and rising",
+            instrumentation: "piano, synth bass and drums",
+          },
       lang === "de"
-        ? "Eine Szene aus dem Alltag, die langsam kippt und eine unerwartet emotionale Wahrheit freilegt."
-        : "An everyday scene that slowly shifts and reveals an unexpectedly emotional truth.",
+        ? {
+            idea: "Eine Szene aus dem Alltag, die langsam kippt und eine unerwartet emotionale Wahrheit freilegt.",
+            genre: "Indie-Pop",
+            mood: "ruhig und verletzlich",
+            instrumentation: "Akustikgitarre, E-Piano und Percussion",
+          }
+        : {
+            idea: "An everyday scene that slowly shifts and reveals an unexpectedly emotional truth.",
+            genre: "Indie pop",
+            mood: "calm and vulnerable",
+            instrumentation: "acoustic guitar, electric piano and percussion",
+          },
       lang === "de"
-        ? "Ein persönlicher, direkter Text mit cineastischer Atmosphäre und einem klaren Hook im Refrain."
-        : "A personal, direct lyric with cinematic atmosphere and a clear chorus hook.",
+        ? {
+            idea: "Ein persönlicher, direkter Text mit cineastischer Atmosphäre und einem klaren Hook im Refrain.",
+            genre: "Cineastische Popballade",
+            mood: "emotional und klar",
+            instrumentation: "Piano, Streicher und dezente Drums",
+          }
+        : {
+            idea: "A personal, direct lyric with cinematic atmosphere and a clear chorus hook.",
+            genre: "Cinematic pop ballad",
+            mood: "emotional and clear",
+            instrumentation: "piano, strings and subtle drums",
+          },
     ],
   };
 
@@ -1386,7 +1548,15 @@ Respond only with valid JSON.`;
     const artist = cleanText(String(parsed.artist ?? "")).trim() || fallbackUnknown;
     const title = cleanText(String(parsed.title ?? "")).trim() || fallbackUnknown;
     const suggestions = Array.isArray(parsed.suggestions)
-      ? parsed.suggestions.map((s: unknown) => cleanText(String(s)).trim()).filter(Boolean).slice(0, 3)
+      ? parsed.suggestions
+          .map((s: any) => ({
+            idea: cleanText(String(s?.idea ?? "")).trim(),
+            genre: cleanText(String(s?.genre ?? "")).trim(),
+            mood: cleanText(String(s?.mood ?? "")).trim(),
+            instrumentation: cleanText(String(s?.instrumentation ?? "")).trim(),
+          }))
+          .filter((s: SongIdeaSuggestionCard) => s.idea && s.genre && s.mood && s.instrumentation)
+          .slice(0, 3)
       : [];
     return {
       platform,
