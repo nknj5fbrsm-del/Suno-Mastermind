@@ -59,6 +59,19 @@ const cleanAiText = (text: string) => {
   }
 };
 
+const hasConceptDetails = (c: SongConcept): boolean => {
+  const has = (arr?: string[]) => Array.isArray(arr) && arr.length > 0;
+  return (
+    has(c.genre) ||
+    has(c.mood) ||
+    has(c.tempo) ||
+    has(c.instrumentation) ||
+    has(c.timbre) ||
+    has(c.excludedStyles) ||
+    (!c.isInstrumental && (has(c.language) || has(c.vocals)))
+  );
+};
+
 export function useGenerationActions(params: UseGenerationActionsParams) {
   const {
     manualApiKey,
@@ -159,18 +172,20 @@ export function useGenerationActions(params: UseGenerationActionsParams) {
       let finalConcept = { ...concept };
       if (!finalConcept.topic.trim()) finalConcept = { ...finalConcept, topic: await generateRandomTopic() };
       setLoadingProgress(15);
-      const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental, lang);
-      finalConcept = {
-        ...finalConcept,
-        genre: finalConcept.genre.length ? finalConcept.genre : (suggestions.genre || []),
-        mood: finalConcept.mood.length ? finalConcept.mood : (suggestions.mood || []),
-        instrumentation: (finalConcept.instrumentation?.length ? finalConcept.instrumentation : (suggestions.instrumentation || [])) as string[],
-        tempo: finalConcept.tempo.length ? finalConcept.tempo : (suggestions.tempo || []),
-        timbre: finalConcept.timbre?.length ? finalConcept.timbre : (suggestions.timbre || []),
-        excludedStyles: finalConcept.excludedStyles?.length ? finalConcept.excludedStyles : (suggestions.excludedStyles || []),
-        vocals: finalConcept.isInstrumental ? [] : (finalConcept.vocals.length ? finalConcept.vocals : (suggestions.vocals || [])),
-        language: finalConcept.isInstrumental ? [] : (finalConcept.language.length ? finalConcept.language : (suggestions.language || []))
-      };
+      if (!hasConceptDetails(finalConcept)) {
+        const suggestions = await analyzeTopic(finalConcept.topic, finalConcept.isInstrumental, lang);
+        finalConcept = {
+          ...finalConcept,
+          genre: finalConcept.genre.length ? finalConcept.genre : (suggestions.genre || []),
+          mood: finalConcept.mood.length ? finalConcept.mood : (suggestions.mood || []),
+          instrumentation: (finalConcept.instrumentation?.length ? finalConcept.instrumentation : (suggestions.instrumentation || [])) as string[],
+          tempo: finalConcept.tempo.length ? finalConcept.tempo : (suggestions.tempo || []),
+          timbre: finalConcept.timbre?.length ? finalConcept.timbre : (suggestions.timbre || []),
+          excludedStyles: finalConcept.excludedStyles?.length ? finalConcept.excludedStyles : (suggestions.excludedStyles || []),
+          vocals: finalConcept.isInstrumental ? [] : (finalConcept.vocals.length ? finalConcept.vocals : (suggestions.vocals || [])),
+          language: finalConcept.isInstrumental ? [] : (finalConcept.language.length ? finalConcept.language : (suggestions.language || []))
+        };
+      }
       setConcept(finalConcept);
       setLoadingProgress(30);
       setLoadingText(tr.loading.generatingLyrics);

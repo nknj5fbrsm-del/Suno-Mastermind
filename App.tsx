@@ -215,9 +215,17 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const id = window.setInterval(() => setClockMs(Date.now()), 1000);
+    const cooldownUntil = tokenUsage.quota.cooldownUntil ?? 0;
+    const inCooldown = cooldownUntil > clockMs;
+    const inPostCooldownWindow =
+      cooldownUntil > 0 &&
+      clockMs > cooldownUntil &&
+      clockMs <= cooldownUntil + QUOTA_POST_COOLDOWN_YELLOW_MS;
+    const needsFastTick = isQuotaInfoOpen || inCooldown || inPostCooldownWindow;
+    const intervalMs = needsFastTick ? 1000 : 15_000;
+    const id = window.setInterval(() => setClockMs(Date.now()), intervalMs);
     return () => window.clearInterval(id);
-  }, []);
+  }, [tokenUsage.quota.cooldownUntil, clockMs, isQuotaInfoOpen]);
 
   useEffect(() => {
     // Theme Initialisierung – App läuft ausschließlich im Dark-Mode

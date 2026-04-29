@@ -816,44 +816,12 @@ export const generateSongIdeaSuggestions = async (
   seedContext: string,
   lang: 'de' | 'en' = 'de'
 ): Promise<SongIdeaSuggestionCard[]> => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
-  const ai = new GoogleGenAI({ apiKey });
-  const promptBody =
-    lang === 'de'
-      ? `Erzeuge genau 3 unterschiedliche Song-Idee-Vorschläge aus diesem Kontext:\n${seedContext}\n\nRegeln:\n- Jeder Vorschlag enthält: idea (1-2 Sätze), genre (kurz), mood (kurz), instrumentation (kurz).\n- idea ist konkret, singbar, ohne Kitsch.\n- genre/mood/instrumentation sind kompakte Phrasen, keine Erklärtexte.\n- Keine Aufzählungszeichen, keine Nummerierung.\n- Ausgabe als JSON-Array "suggestions" mit genau 3 Objekten.`
-      : `Generate exactly 3 distinct song-idea suggestions from this context:\n${seedContext}\n\nRules:\n- Each suggestion contains: idea (1-2 sentences), genre (short), mood (short), instrumentation (short).\n- idea is concrete, singable, and not cliche.\n- genre/mood/instrumentation are compact phrases, no explanations.\n- No bullets, no numbering.\n- Return JSON array "suggestions" with exactly 3 objects.`;
+  const cacheKey = `${lang}::${seedContext.trim()}`;
+  const cached = songIdeaSuggestionsCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts <= SONG_IDEA_SUGGESTIONS_TTL_MS) return cached.value;
 
-  const response = await withRetry(() =>
-    ai.models.generateContent({
-      model: TEXT_MODEL,
-      contents: promptBody,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        ...DEFAULT_THINKING,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            suggestions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  idea: { type: Type.STRING },
-                  genre: { type: Type.STRING },
-                  mood: { type: Type.STRING },
-                  instrumentation: { type: Type.STRING },
-                },
-                required: ["idea", "genre", "mood", "instrumentation"],
-              },
-            },
-          },
-          required: ["suggestions"],
-        },
-      },
-    })
-  );
+  const running = songIdeaSuggestionsInFlight.get(cacheKey);
+  if (running) return running;
 
   const fallback: SongIdeaSuggestionCard[] = lang === 'de'
     ? [
@@ -897,23 +865,77 @@ export const generateSongIdeaSuggestions = async (
         },
       ];
 
+  const task = (async (): Promise<SongIdeaSuggestionCard[]> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("Kein API Key gefunden. Bitte in der App speichern.");
+    const ai = new GoogleGenAI({ apiKey });
+    const promptBody =
+      lang === 'de'
+        ? `Erzeuge genau 3 unterschiedliche Song-Idee-Vorschläge aus diesem Kontext:\n${seedContext}\n\nRegeln:\n- Jeder Vorschlag enthält: idea (1-2 Sätze), genre (kurz), mood (kurz), instrumentation (kurz).\n- idea ist konkret, singbar, ohne Kitsch.\n- genre/mood/instrumentation sind kompakte Phrasen, keine Erklärtexte.\n- Keine Aufzählungszeichen, keine Nummerierung.\n- Ausgabe als JSON-Array "suggestions" mit genau 3 Objekten.`
+        : `Generate exactly 3 distinct song-idea suggestions from this context:\n${seedContext}\n\nRules:\n- Each suggestion contains: idea (1-2 sentences), genre (short), mood (short), instrumentation (short).\n- idea is concrete, singable, and not cliche.\n- genre/mood/instrumentation are compact phrases, no explanations.\n- No bullets, no numbering.\n- Return JSON array "suggestions" with exactly 3 objects.`;
+
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: TEXT_MODEL,
+        contents: promptBody,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          ...DEFAULT_THINKING,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              suggestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    idea: { type: Type.STRING },
+                    genre: { type: Type.STRING },
+                    mood: { type: Type.STRING },
+                    instrumentation: { type: Type.STRING },
+                  },
+                  required: ["idea", "genre", "mood", "instrumentation"],
+                },
+              },
+            },
+            required: ["suggestions"],
+          },
+        },
+      })
+    );
+
+    try {
+      const parsed = JSON.parse(response.text || "{}");
+      const suggestions = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions
+            .map((s: any) => ({
+              idea: cleanText(String(s?.idea ?? '')).trim(),
+              genre: cleanText(String(s?.genre ?? '')).trim(),
+              mood: cleanText(String(s?.mood ?? '')).trim(),
+              instrumentation: cleanText(String(s?.instrumentation ?? '')).trim(),
+            }))
+            .filter((s: SongIdeaSuggestionCard) => s.idea && s.genre && s.mood && s.instrumentation)
+        : [];
+      const result =
+        suggestions.length >= 3
+          ? suggestions.slice(0, 3)
+          : suggestions.length > 0
+            ? [...suggestions, ...fallback].slice(0, 3)
+            : fallback;
+      songIdeaSuggestionsCache.set(cacheKey, { ts: Date.now(), value: result });
+      return result;
+    } catch {
+      songIdeaSuggestionsCache.set(cacheKey, { ts: Date.now(), value: fallback });
+      return fallback;
+    }
+  })();
+
+  songIdeaSuggestionsInFlight.set(cacheKey, task);
   try {
-    const parsed = JSON.parse(response.text || "{}");
-    const suggestions = Array.isArray(parsed.suggestions)
-      ? parsed.suggestions
-          .map((s: any) => ({
-            idea: cleanText(String(s?.idea ?? '')).trim(),
-            genre: cleanText(String(s?.genre ?? '')).trim(),
-            mood: cleanText(String(s?.mood ?? '')).trim(),
-            instrumentation: cleanText(String(s?.instrumentation ?? '')).trim(),
-          }))
-          .filter((s: SongIdeaSuggestionCard) => s.idea && s.genre && s.mood && s.instrumentation)
-      : [];
-    if (suggestions.length >= 3) return suggestions.slice(0, 3);
-    if (suggestions.length > 0) return [...suggestions, ...fallback].slice(0, 3);
-    return fallback;
-  } catch {
-    return fallback;
+    return await task;
+  } finally {
+    songIdeaSuggestionsInFlight.delete(cacheKey);
   }
 };
 
@@ -1199,6 +1221,15 @@ export interface SongIdeaSuggestionCard {
   mood: string;
   instrumentation: string;
 }
+
+type SongIdeaSuggestionsCacheEntry = {
+  ts: number;
+  value: SongIdeaSuggestionCard[];
+};
+
+const SONG_IDEA_SUGGESTIONS_TTL_MS = 5 * 60 * 1000;
+const songIdeaSuggestionsCache = new Map<string, SongIdeaSuggestionsCacheEntry>();
+const songIdeaSuggestionsInFlight = new Map<string, Promise<SongIdeaSuggestionCard[]>>();
 
 export interface MusicLinkInspirationResult {
   platform: "apple_music" | "spotify" | "unknown";
